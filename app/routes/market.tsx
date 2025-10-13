@@ -17,8 +17,6 @@ export default function MarketPage() {
   
   const { data: markets, isLoading, error } = useCuratedMarkets(20);
 
-  const selectedMarket = markets?.find(m => m.id === selectedMarketId);
-
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
@@ -37,49 +35,32 @@ export default function MarketPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-1">
-            {isLoading && (
-              <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-6">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-12 bg-gray-700 rounded"></div>
-                  ))}
-                </div>
+        <div className="w-full">
+          {isLoading && (
+            <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-6">
+              <div className="animate-pulse space-y-4">
+                <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-12 bg-gray-700 rounded"></div>
+                ))}
               </div>
-            )}
-            {error && (
-              <div className="bg-red-900/30 border border-red-700 rounded-lg p-6">
-                <div className="text-red-200">
-                  <p className="font-medium">Error loading markets</p>
-                  <p className="text-sm mt-1">{error.message}</p>
-                </div>
+            </div>
+          )}
+          {error && (
+            <div className="bg-red-900/30 border border-red-700 rounded-lg p-6">
+              <div className="text-red-200">
+                <p className="font-medium">Error loading markets</p>
+                <p className="text-sm mt-1">{error.message}</p>
               </div>
-            )}
-            {markets && (
-              <MarketList 
-                markets={markets} 
-                selectedMarketId={selectedMarketId}
-                onMarketSelect={setSelectedMarketId}
-              />
-            )}
-          </div>
-
-          <div className="md:col-span-2">
-            {selectedMarket ? (
-              <MarketDisplay market={formatMarketData(selectedMarket)} />
-            ) : (
-              <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-8 text-center h-full flex items-center justify-center">
-                <div className="text-gray-300">
-                  <p className="text-lg font-medium mb-2">Select a market</p>
-                  <p className="text-sm text-gray-400">
-                    Choose a market from the list to view its details and interact with it.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
+          {markets && (
+            <MarketList 
+              markets={markets} 
+              selectedMarketId={selectedMarketId}
+              onMarketSelect={setSelectedMarketId}
+            />
+          )}
         </div>
       </main>
     </div>

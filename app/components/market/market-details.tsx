@@ -1,4 +1,5 @@
 import type { FormattedMarket } from '../../lib/hooks/use-market'
+import { useChains } from 'wagmi'
 
 const formatAddress = (address: string) =>
   `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -11,6 +12,15 @@ interface MarketDetailsProps {
 }
 
 export function MarketDetails({ market }: MarketDetailsProps) {
+  const chains = useChains()
+  const currentChain = chains.find((chain) => chain.id === market.chainId)
+  const explorerUrl = currentChain?.blockExplorers?.default.url
+
+  const getAddressUrl = (address: string) =>
+    explorerUrl ? `${explorerUrl}/address/${address}` : undefined
+  const getTokenUrl = (address: string) =>
+    explorerUrl ? `${explorerUrl}/token/${address}` : undefined
+
   return (
     <div className="p-6">
       <h3 className="text-lg font-semibold text-white mb-4">Market Details</h3>
@@ -28,7 +38,14 @@ export function MarketDetails({ market }: MarketDetailsProps) {
                   <p className="text-sm text-gray-400">{market.loanAsset.name}</p>
                 )}
                 <p className="font-mono text-xs text-gray-500">
-                  {formatAddress(market.loanAsset.address)}
+                  <a
+                    href={getTokenUrl(market.loanAsset.address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-blue-400 transition-colors"
+                  >
+                    {formatAddress(market.loanAsset.address)}
+                  </a>
                 </p>
               </div>
             </div>
@@ -40,7 +57,14 @@ export function MarketDetails({ market }: MarketDetailsProps) {
                   <p className="text-sm text-gray-400">{market.collateralAsset.name}</p>
                 )}
                 <p className="font-mono text-xs text-gray-500">
-                  {formatAddress(market.collateralAsset.address)}
+                  <a
+                    href={getTokenUrl(market.collateralAsset.address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-blue-400 transition-colors"
+                  >
+                    {formatAddress(market.collateralAsset.address)}
+                  </a>
                 </p>
               </div>
             </div>
@@ -53,11 +77,25 @@ export function MarketDetails({ market }: MarketDetailsProps) {
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-400">Oracle:</span>
-              <span className="font-mono text-xs text-gray-300">{formatAddress(market.oracleAddress)}</span>
+              <a
+                href={getAddressUrl(market.oracleAddress)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-xs text-gray-300 hover:text-blue-400 transition-colors"
+              >
+                {formatAddress(market.oracleAddress)}
+              </a>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Interest Rate Model:</span>
-              <span className="font-mono text-xs text-gray-300">{formatAddress(market.irmAddress)}</span>
+              <a
+                href={getAddressUrl(market.irmAddress)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-xs text-gray-300 hover:text-blue-400 transition-colors"
+              >
+                {formatAddress(market.irmAddress)}
+              </a>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Whitelisted:</span>

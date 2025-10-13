@@ -5,17 +5,7 @@ export interface MarketAsset {
   name?: string | null
 }
 
-export interface MarketState {
-  supplyAssets: string
-  borrowAssets: string
-  supplyApy: number
-  borrowApy: number
-  utilization: number
-  supplyAssetsUsd?: number | null
-  borrowAssetsUsd?: number | null
-}
-
-export interface Market {
+export interface FrontendMarket {
   id?: string
   uniqueKey: string
   chainId: number
@@ -27,7 +17,7 @@ export interface Market {
   creatorAddress?: string
   loanAsset: MarketAsset
   collateralAsset?: MarketAsset | null
-  state: MarketState
+  metrics: CuratedMarketMetrics
   whitelisted: boolean
   oracle?: {
     address: string
@@ -41,12 +31,6 @@ export interface Market {
   tvl?: number
 }
 
-export interface MarketResponse {
-  markets: {
-    items: Market[]
-  }
-}
-
 export interface CuratedMarketToken {
   address: string
   symbol: string
@@ -56,8 +40,8 @@ export interface CuratedMarketToken {
 
 export interface CuratedMarketMetrics {
   tvl: number
-  totalSupply: number
-  totalBorrow: number
+  totalSupply: string
+  totalBorrow: string
   supplyApy: number
   borrowApy: number
   utilization: number
@@ -80,4 +64,28 @@ export interface CuratedMarket {
   metrics: CuratedMarketMetrics
   whitelisted: boolean
   createdAt: number
+}
+
+// --- Output JSON TypeScript Interface ---
+export interface CuratedMarketJSON {
+  generatedAt: string
+  totalMarkets: number
+  curatedCount: number
+  criteria: {
+    chains: string[]
+    minTvlUsd: number
+    minSupplyApy: number
+    sortBy: string
+    note: string
+  }
+  fieldInfo: {
+    note: string
+    supplyApy: string
+    borrowApy: string
+    utilization: string
+    tvl: string
+    totalSupply: string
+    totalBorrow: string
+  }
+  markets: CuratedMarket[]
 }

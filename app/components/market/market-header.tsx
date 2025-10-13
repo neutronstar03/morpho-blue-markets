@@ -20,7 +20,14 @@ export function MarketHeader({ market }: MarketHeaderProps) {
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-400">Market ID</p>
-          <p className="font-mono text-sm text-gray-300">{formatAddress(market.id)}</p>
+          <a
+            href={`https://app.morpho.org/${market.chainName.toLowerCase()}/market/${market.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-sm text-gray-300 hover:text-blue-400 transition-colors"
+          >
+            {formatAddress(market.id)}
+          </a>
         </div>
       </div>
     </div>
