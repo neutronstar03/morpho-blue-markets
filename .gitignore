@@ -5,3 +5,6 @@
 # React Router
 /.react-router/
 /build/
+
+# Curated markets
+public/curated-markets.json

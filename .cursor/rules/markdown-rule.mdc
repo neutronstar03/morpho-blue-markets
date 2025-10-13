@@ -1,0 +1,8 @@
+---
+globs: *.human.md,*.machine.md
+alwaysApply: false
+---
+Files ending with .human.md are NOT meant to be modified. Those are meant to be historical context files.
+Files ending with .machine.md can be modified to enrich the context and explain to self what are the plans to do.
+
+You can specify the intention in the file name using this rule `<topic>.info|description|plan.machine.md`
