@@ -1,0 +1,447 @@
+"""
+Filtering options for markets. AND operator is used for multiple filters, while OR operator is used for multiple values in the same filter.
+"""
+input MarketFilters {
+  search: String
+
+  """Filter by market id"""
+  id_in: [String!]
+  whitelisted: Boolean
+  countryCode: String
+  isIdle: Boolean
+
+  """Filter by market unique key"""
+  uniqueKey_in: [String!]
+
+  """Filter by loan asset tags."""
+  loanAssetTags_in: [String!]
+
+  """Filter by collateral asset tags."""
+  collateralAssetTags_in: [String!]
+
+  """Filter by market oracle address. Case insensitive."""
+  oracleAddress_in: [String!]
+
+  """Filter by market irm address"""
+  irmAddress_in: [String!]
+
+  """Filter by chain id"""
+  chainId_in: [Int!]
+
+  """Filter by collateral asset address. Case insensitive."""
+  collateralAssetAddress_in: [String!]
+
+  """Filter by collateral asset id"""
+  collateralAssetId_in: [String!]
+
+  """Filter by loan asset address. Case insensitive."""
+  loanAssetAddress_in: [String!]
+
+  """Filter by loan asset id"""
+  loanAssetId_in: [String!]
+
+  """Filter by greater than or equal to given lltv"""
+  lltv_gte: BigInt
+
+  """Filter by lower than or equal to given lltv"""
+  lltv_lte: BigInt
+
+  """
+  Filter by greater than or equal to given borrow asset amount, in underlying token units.
+  """
+  borrowAssets_gte: BigInt
+
+  """
+  Filter by lower than or equal to given borrow asset amount, in underlying token units.
+  """
+  borrowAssets_lte: BigInt
+
+  """Filter by greater than or equal to given borrow asset amount, in USD."""
+  borrowAssetsUsd_gte: Float
+
+  """Filter by lower than or equal to given borrow asset amount, in USD."""
+  borrowAssetsUsd_lte: Float
+
+  """
+  Filter by greater than or equal to given supply asset amount, in underlying token units.
+  """
+  supplyAssets_gte: BigInt
+
+  """
+  Filter by lower than or equal to given supply asset amount, in underlying token units.
+  """
+  supplyAssets_lte: BigInt
+
+  """Filter by greater than or equal to given supply asset amount, in USD."""
+  supplyAssetsUsd_gte: Float
+
+  """Filter by lower than or equal to given supply asset amount, in USD."""
+  supplyAssetsUsd_lte: Float
+
+  """Filter by greater than or equal to given borrow shares amount"""
+  borrowShares_gte: BigInt
+
+  """Filter by lower than or equal to given borrow shares amount"""
+  borrowShares_lte: BigInt
+
+  """Filter by greater than or equal to given supply shares amount"""
+  supplyShares_gte: BigInt
+
+  """Filter by lower than or equal to given borrow shares amount"""
+  supplyShares_lte: BigInt
+
+  """Filter by greater than or equal to given utilization rate"""
+  utilization_gte: Float
+
+  """Filter by lower than or equal to given utilization rate"""
+  utilization_lte: Float
+
+  """Filter by greater than or equal to given apy at target utilization"""
+  apyAtTarget_gte: Float
+
+  """Filter by lower than or equal to given apy at target utilization"""
+  apyAtTarget_lte: Float
+
+  """Filter by greater than or equal to given supply APY"""
+  supplyApy_gte: Float
+
+  """Filter by lower than or equal to given supply APY"""
+  supplyApy_lte: Float
+
+  """Filter by greater than or equal to given net supply APY"""
+  netSupplyApy_gte: Float
+
+  """Filter by lower than or equal to given net supply APY"""
+  netSupplyApy_lte: Float
+
+  """Filter by greater than or equal to given borrow APY"""
+  borrowApy_gte: Float
+
+  """Filter by lower than or equal to given borrow APY"""
+  borrowApy_lte: Float
+
+  """Filter by greater than or equal to given net borrow APY"""
+  netBorrowApy_gte: Float
+
+  """Filter by lower than or equal to given net borrow APY"""
+  netBorrowApy_lte: Float
+
+  """Filter by greater than or equal to given fee rate"""
+  fee_gte: Float
+
+  """Filter by lower than or equal to given fee rate"""
+  fee_lte: Float
+
+  """Filter by credora risk score lower than or equal to given value"""
+  credoraRiskScore_lte: Float
+
+  """Filter by credora risk score greater than or equal to given value"""
+  credoraRiskScore_gte: Float
+}
+
+
+"""Morpho Blue market"""
+type Market {
+  id: ID!
+  uniqueKey: MarketId!
+  lltv: BigInt!
+  oracleAddress: Address!
+  irmAddress: Address!
+  creationBlockNumber: Int!
+  creationTimestamp: BigInt!
+  creatorAddress: Address
+  whitelisted: Boolean!
+
+  """
+  Amount of collateral to borrow 1 loan asset scaled to both asset decimals
+  """
+  collateralPrice: BigInt @deprecated(reason: "Use `state.price` instead.")
+
+  """Underlying amount of assets that can be reallocated to this market"""
+  reallocatableLiquidityAssets: BigInt
+  targetBorrowUtilization: BigInt!
+  targetWithdrawUtilization: BigInt!
+  loanAsset: Asset!
+  collateralAsset: Asset
+  oracle: Oracle
+  morphoBlue: MorphoBlue!
+
+  """Current state"""
+  state(useRealtimeApi: Boolean @deprecated(reason: "Internal use only")): MarketState
+
+  """State history"""
+  historicalState: MarketHistory
+
+  """Feeds used by the oracle if provided by the contract"""
+  oracleFeed: MarketOracleFeed
+
+  """Market oracle information"""
+  oracleInfo: MarketOracleInfo
+
+  """Market concentrations"""
+  concentration: MarketConcentration @deprecated(reason: "Not maintained.")
+
+  """Market bad debt values"""
+  badDebt: MarketBadDebt
+
+  """Market realized bad debt values"""
+  realizedBadDebt: MarketBadDebt
+
+  """Daily market APYs"""
+  dailyApys: MarketApyAggregates @deprecated(reason: "Use `market.state` daily average APYs instead.")
+
+  """Weekly market APYs"""
+  weeklyApys: MarketApyAggregates @deprecated(reason: "Use `market.state` weekly average APYs instead.")
+
+  """Monthly market APYs"""
+  monthlyApys: MarketApyAggregates @deprecated(reason: "Use `market.state` monthly average APYs instead.")
+
+  """Quarterly market APYs"""
+  quarterlyApys: MarketApyAggregates @deprecated(reason: "Use `market.state` quarterly average APYs instead.")
+
+  """Yearly market APYs"""
+  yearlyApys: MarketApyAggregates @deprecated(reason: "Use `market.state` yearly average APYs instead.")
+
+  """All time market APYs"""
+  allTimeApys: MarketApyAggregates @deprecated(reason: "Use `market.state` all time average APYs instead.")
+
+  """
+  Current IRM curve at different utilization thresholds for display purpose
+  """
+  currentIrmCurve(numberOfPoints: Int = 100): [IRMCurveDataPoint!]
+
+  """Public allocator shared liquidity available reallocations"""
+  publicAllocatorSharedLiquidity: [PublicAllocatorSharedLiquidity!]
+
+  """Market warnings"""
+  warnings: [MarketWarning!]
+
+  """Vaults with the market in supply queue"""
+  supplyingVaults: [Vault!]
+
+  """Risk related data on the market"""
+  riskAnalysis: [RiskAnalysis!]
+}
+
+type Query {
+  chain(id: Int!): Chain!
+  chains: [Chain!]!
+  asset(id: String!): Asset!
+  assetByAddress(address: String!, chainId: Int = 1): Asset!
+  assets(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    where: AssetsFilters
+    orderBy: AssetOrderBy = Address
+    orderDirection: OrderDirection
+  ): PaginatedAssets!
+  transaction(id: String!): Transaction!
+  transactionByHash(hash: String!, chainId: Int = 1): Transaction! @deprecated(reason: "Multiple Transaction entities correspond to a single hash, because a Transaction entity corresponds to an onchain event.")
+  transactions(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: TransactionsOrderBy = Timestamp
+    orderDirection: OrderDirection
+    where: TransactionFilters
+  ): PaginatedTransactions!
+  user(id: String!): User!
+  userByAddress(address: String!, chainId: Int = 1): User!
+  users(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: UsersOrderBy = Address
+    orderDirection: OrderDirection
+    where: UsersFilters
+  ): PaginatedUsers!
+  marketCollateralAtRisk(uniqueKey: String!, chainId: Int = 1, numberOfPoints: Float = 100): MarketCollateralAtRisk!
+  market(id: String!): Market!
+  marketByUniqueKey(uniqueKey: String!, chainId: Int = 1): Market!
+  marketAverageApys(uniqueKey: String!, chainId: Int = 1, startTimestamp: Float @deprecated(reason: "Average APYs based on custom timestamp is no longer supported. Use `market.state` average APYs instead.")): MarketApyAggregates @deprecated(reason: "Use `market.state` average APYs instead.")
+  markets(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: MarketOrderBy = UniqueKey
+    orderDirection: OrderDirection
+    where: MarketFilters
+  ): PaginatedMarkets!
+  curator(id: String!): Curator!
+  curators(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    where: CuratorFilters
+  ): PaginatedCurators!
+  marketOracleAccuracy(marketId: String!, options: TimeseriesOptions = {}): MarketOracleAccuracy!
+  morphoBlue(id: String!): MorphoBlue!
+  morphoBlueByAddress(address: String!, chainId: Int = 1): MorphoBlue!
+  morphoBlues(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: MorphoBlueOrderBy = Address
+    orderDirection: OrderDirection
+    where: MorphoBlueFilters
+
+    """Explicitly request data from the realtime API when available"""
+    useRealtimeApi: Boolean @deprecated(reason: "Internal use only")
+  ): PaginatedMorphoBlue!
+  marketPosition(userAddress: String!, marketUniqueKey: String!, chainId: Int = 1): MarketPosition!
+  marketPositions(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: MarketPositionOrderBy = SupplyShares
+    orderDirection: OrderDirection
+    where: MarketPositionFilters
+  ): PaginatedMarketPositions!
+  oracleFeedByAddress(address: String!, chainId: Int = 1): OracleFeed!
+  oracleFeeds(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    where: OracleFeedsFilters
+  ): PaginatedOracleFeeds!
+  oracleVaultByAddress(address: String!, chainId: Int = 1): OracleVault!
+  oracleVaults(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    where: OracleVaultsFilters
+  ): PaginatedOracleVaults!
+  oracleByAddress(address: String!, chainId: Int = 1): Oracle!
+  oracles(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    where: OraclesFilters
+  ): PaginatedOracles!
+  publicAllocator(address: String!, chainId: Int = 1): PublicAllocator!
+  publicAllocators(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: PublicAllocatorOrderBy = Address
+    orderDirection: OrderDirection
+    where: PublicAllocatorFilters
+  ): PaginatedPublicAllocator!
+  publicAllocatorReallocates(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: PublicAllocatorReallocateOrderBy = Timestamp
+    orderDirection: OrderDirection
+    where: PublicallocatorReallocateFilters
+  ): PaginatedPublicAllocatorReallocates!
+  search(
+    search: String!
+    marketOrderBy: MarketOrderBy = SupplyAssetsUsd
+    vaultOrderBy: VaultOrderBy = TotalAssetsUsd
+    numberOfResults: Int = 5
+
+    """Number of items skipped"""
+    skip: Int = 0
+
+    """Filter by chain id"""
+    chainId_in: [Int!]
+  ): SearchResults!
+  vaultFactory(id: String!): VaultFactory!
+  vaultFactoryByAddress(address: String!, chainId: Int = 1): VaultFactory!
+  vaultFactories: PaginatedMetaMorphoFactories!
+  vault(id: String!): Vault!
+  vaultByAddress(address: String!, chainId: Int = 1): Vault!
+  vaults(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: VaultOrderBy = Address
+    orderDirection: OrderDirection
+    where: VaultFilters
+  ): PaginatedMetaMorphos!
+  vaultPosition(userAddress: String!, vaultAddress: String!, chainId: Int = 1): VaultPosition!
+  vaultPositions(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: VaultPositionOrderBy = Shares
+    orderDirection: OrderDirection
+    where: VaultPositionFilters
+  ): PaginatedMetaMorphoPositions!
+  vaultReallocates(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: VaultReallocateOrderBy = Timestamp
+    orderDirection: OrderDirection
+    where: VaultReallocateFilters
+  ): PaginatedVaultReallocates!
+  vaultV2Factories: PaginatedVaultV2Factories! @deprecated(reason: "WIP")
+  vaultV2MetaMorphoAdapterFactories: PaginatedMetaMorphoAdapterFactories! @deprecated(reason: "WIP")
+  vaultV2s(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    where: VaultV2sFilters
+    orderBy: VaultV2OrderBy = Address
+    orderDirection: OrderDirection
+  ): PaginatedVaultV2s! @deprecated(reason: "WIP")
+  vaultV2ByAddress(address: String!, chainId: Int!): VaultV2! @deprecated(reason: "WIP")
+  _crossVersionVaults(
+    orderBy: VaultOrderBy = Address
+    orderDirection: OrderDirection
+    where: _CrossVersionVaultFilters
+
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+  ): _PaginatedCrossVersionVault! @deprecated(reason: "WIP")
+  vaultV2PositionByAddress(userAddress: String!, vaultAddress: String!, chainId: Int!): VaultV2Position! @deprecated(reason: "WIP")
+  vaultV2transactions(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    orderBy: VaultV2TransactionOrderBy = Time
+    orderDirection: OrderDirection
+    where: VaultV2TransactionFilters
+  ): PaginatedVaultV2Transactions! @deprecated(reason: "WIP")
+}
+

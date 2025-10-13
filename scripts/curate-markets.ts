@@ -1,46 +1,13 @@
 import { GraphQLClient, gql } from 'graphql-request'
 import * as fs from 'fs'
 import * as path from 'path'
+import { type Market, type MarketResponse } from '../app/lib/types'
 
 // Official Morpho Blue API endpoint
 const MORPHO_API = 'https://blue-api.morpho.org/graphql'
 const client = new GraphQLClient(MORPHO_API)
 
-interface MarketAsset {
-  address: string
-  symbol: string
-  decimals?: number
-  name?: string
-}
-
-interface MarketState {
-  supplyAssets: number
-  borrowAssets: number
-  supplyApy: number
-  borrowApy: number
-  utilization: number
-  supplyAssetsUsd?: number
-  borrowAssetsUsd?: number
-}
-
-interface Market {
-  uniqueKey: string
-  loanAsset: MarketAsset
-  collateralAsset: MarketAsset
-  state: MarketState
-  whitelisted: boolean
-  creationTimestamp: number
-  lltv?: number
-  oracleAddress?: string
-  irmAddress?: string
-  chainId?: number
-}
-
-interface MarketResponse {
-  markets: {
-    items: Market[]
-  }
-}
+// Interfaces are now in app/lib/types.ts
 
 // Enhanced stablecoin list including exotic ones
 const STABLECOIN_SYMBOLS = [
@@ -56,41 +23,46 @@ const STABLECOIN_SYMBOLS = [
   'USDM', 'GHO'
 ]
 
-const MARKETS_QUERY = gql`
-  query GetMarkets($first: Int!, $skip: Int!, $where: MarketFilters, $orderBy: MarketOrderBy, $orderDirection: OrderDirection) {
-    markets(first: $first, skip: $skip, where: $where, orderBy: $orderBy, orderDirection: $orderDirection) {
-      items {
-        uniqueKey
-        lltv
-        oracleAddress
-        irmAddress
-        loanAsset {
-          address
-          symbol
-          name
-          decimals
+const QUERY_MARKETS = gql`
+    query GetMarkets(
+      $chainId: Int!
+      $first: Int!
+      $skip: Int!
+      $where: MarketFilters
+      $orderBy: MarketOrderBy
+      $orderDirection: OrderDirection
+    ) {
+      chain(id: $chainId) { id }   # optional, for cache/namespacing
+      markets(
+        first: $first
+        skip: $skip
+        orderBy: $orderBy
+        orderDirection: $orderDirection
+        where: $where
+      ) {
+        items {
+          uniqueKey
+          lltv
+          oracleAddress
+          irmAddress
+          loanAsset { address symbol name decimals }
+          collateralAsset { address symbol name decimals }
+          state {
+            supplyAssets
+            borrowAssets
+            supplyApy
+            borrowApy
+            utilization
+            supplyAssetsUsd
+            borrowAssetsUsd
+          }
+          whitelisted
+          creationTimestamp
         }
-        collateralAsset {
-          address
-          symbol
-          name
-          decimals
-        }
-        state {
-          supplyAssets
-          borrowAssets
-          supplyApy
-          borrowApy
-          utilization
-          supplyAssetsUsd
-          borrowAssetsUsd
-        }
-        whitelisted
-        creationTimestamp
       }
     }
-  }
-`
+  `;
+
 
 const CHAIN_IDS = {
   ETHEREUM: 1,
@@ -101,7 +73,7 @@ const CHAIN_IDS = {
 const CONFIG = {
   // Which chains to fetch (can add more chains later)
   chainIds: [CHAIN_IDS.BASE], // Start with Base only
-  minSupplyApy: 0.05, // 5% minimum APY (as decimal: 0.05 = 5%)
+  minSupplyApy: 0.09, // 9% minimum APY (as decimal: 0.09 = 9%)
   maxSupplyApy: 2.0, // 200% maximum APY (filter out broken markets)
   minTvlUsd: 10000, // $10k minimum TVL
   maxUtilization: 0.99, // Max 99% utilization (filter out 100% utilized markets)
@@ -123,12 +95,13 @@ async function fetchAllMarkets(): Promise<Market[]> {
   try {
     while (hasMore && allMarkets.length < CONFIG.maxMarkets) {
       const data = await client.request<MarketResponse>(
-        MARKETS_QUERY,
+        QUERY_MARKETS,
         {
           first: CONFIG.batchSize,
           skip,
+          chainId: CONFIG.chainIds[0],
           where: {
-            chainId_in: CONFIG.chainIds,
+            chainId_in: [CONFIG.chainIds[0]],
             supplyApy_gte: CONFIG.minSupplyApy,
             supplyApy_lte: CONFIG.maxSupplyApy,
             supplyAssetsUsd_gte: CONFIG.minTvlUsd,
@@ -166,12 +139,12 @@ async function fetchAllMarkets(): Promise<Market[]> {
 
 function isStablecoinPair(market: Market): boolean {
   return STABLECOIN_SYMBOLS.includes(market.loanAsset.symbol.toUpperCase()) ||
-         STABLECOIN_SYMBOLS.includes(market.collateralAsset.symbol.toUpperCase())
+         STABLECOIN_SYMBOLS.includes(market.collateralAsset!.symbol.toUpperCase())
 }
 
 function calculateTVL(market: Market): number {
   // Prefer USD values from API, fallback to raw asset amounts
-  return market.state.supplyAssetsUsd || market.state.supplyAssets || 0
+  return Number(market.state.supplyAssetsUsd) || Number(market.state.supplyAssets) || 0
 }
 
 // Simple comparison function for sorting
@@ -238,6 +211,7 @@ async function generateCuratedMarkets() {
       },
       markets: curatedMarkets.map(market => ({
         id: market.uniqueKey,
+        chainId: market.chainId,
         lltv: market.lltv,
         oracleAddress: market.oracleAddress,
         irmAddress: market.irmAddress,
@@ -248,10 +222,10 @@ async function generateCuratedMarkets() {
           decimals: market.loanAsset.decimals
         },
         collateralToken: {
-          address: market.collateralAsset.address,
-          symbol: market.collateralAsset.symbol,
-          name: market.collateralAsset.name,
-          decimals: market.collateralAsset.decimals
+          address: market.collateralAsset!.address,
+          symbol: market.collateralAsset!.symbol,
+          name: market.collateralAsset!.name,
+          decimals: market.collateralAsset!.decimals
         },
         metrics: {
           // Raw values (original from API)
@@ -293,7 +267,7 @@ async function generateCuratedMarkets() {
         ? `$${(market.tvl / 1000).toFixed(2)}K`
         : `$${market.tvl.toFixed(0)}`
       
-      const pairName = `${market.loanAsset.symbol}/${market.collateralAsset.symbol}`.padEnd(25)
+      const pairName = `${market.loanAsset.symbol}/${market.collateralAsset!.symbol}`.padEnd(25)
       const apyStr = `APY: ${(market.state.supplyApy * 100).toFixed(2)}%`.padEnd(18)
       const tvlStr = `TVL: ${tvlFormatted}`.padEnd(20)
       const utilStr = `Util: ${(market.state.utilization * 100).toFixed(1)}%`.padEnd(15)
