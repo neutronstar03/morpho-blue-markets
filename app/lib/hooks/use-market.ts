@@ -1,39 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { executeQuery, CHAIN_IDS } from '../graphql/client'
-import { GET_MARKET_BY_ID, GET_MARKETS, GET_MARKETS_BY_CHAIN } from '../graphql/queries'
+import { GET_MARKET_BY_ID, GET_MARKETS } from '../graphql/queries'
 import type { Network } from '../graphql/client'
+import type { CuratedMarket, Market } from '../types'  
 
-// Types for market data matching the official Morpho Blue API
-export interface Market {
-  uniqueKey: string
-  chainId: number
-  lltv: string
-  oracleAddress: string
-  irmAddress: string
-  loanAsset: {
-    address: string
-    symbol: string
-    name?: string | null
-    decimals?: number | null
-  }
-  collateralAsset: {
-    address: string
-    symbol: string
-    name?: string | null
-    decimals?: number | null
-  }
-  state: {
-    supplyAssets: string
-    borrowAssets: string
-    supplyApy: number
-    borrowApy: number
-    utilization: number
-    supplyAssetsUsd?: number | null
-    borrowAssetsUsd?: number | null
-  }
-  whitelisted: boolean
-  creationTimestamp: number
-}
+// Types are now in app/lib/types.ts
 
 export interface MarketStats {
   uniqueKey: string
@@ -46,6 +17,27 @@ export interface MarketStats {
     supplyAssetsUsd?: number | null
     borrowAssetsUsd?: number | null
   }
+}
+
+// Hook to fetch curated markets from JSON
+export function useCuratedMarkets(limit: number = 20) {
+  return useQuery({
+    queryKey: ['curated-markets', limit],
+    queryFn: async () => {
+      const response = await fetch('/curated-markets.json')
+      if (!response.ok) {
+        throw new Error('Could not fetch curated markets')
+      }
+      const data = await response.json()
+      
+      const markets: Market[] = (data.markets || [])
+        .slice(0, limit)
+        .map(formatCuratedMarket)
+
+      return markets
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
 }
 
 // Hook to fetch a specific market by uniqueKey
@@ -67,36 +59,7 @@ export function useMarket(marketId: string | undefined, network?: Network) {
           
           if (curatedMarket) {
             // Convert curated market format to API format
-            const market: Market = {
-              uniqueKey: curatedMarket.id,
-              chainId: 8453, // Base (curated markets are Base only)
-              lltv: curatedMarket.lltv,
-              oracleAddress: curatedMarket.oracleAddress,
-              irmAddress: curatedMarket.irmAddress,
-              loanAsset: {
-                address: curatedMarket.loanToken.address,
-                symbol: curatedMarket.loanToken.symbol,
-                name: curatedMarket.loanToken.name,
-                decimals: curatedMarket.loanToken.decimals,
-              },
-              collateralAsset: {
-                address: curatedMarket.collateralToken.address,
-                symbol: curatedMarket.collateralToken.symbol,
-                name: curatedMarket.collateralToken.name,
-                decimals: curatedMarket.collateralToken.decimals,
-              },
-              state: {
-                supplyAssets: curatedMarket.metrics.tvl.toString(),
-                borrowAssets: '0', // Not in curated format
-                supplyApy: curatedMarket.metrics.supplyApy,
-                borrowApy: curatedMarket.metrics.borrowApy,
-                utilization: curatedMarket.metrics.utilization,
-                supplyAssetsUsd: curatedMarket.metrics.tvl,
-                borrowAssetsUsd: null,
-              },
-              whitelisted: curatedMarket.whitelisted,
-              creationTimestamp: curatedMarket.createdAt,
-            }
+            const market = formatCuratedMarket(curatedMarket)
             
             if (network) {
               const targetChainId = CHAIN_IDS[network]
@@ -112,16 +75,14 @@ export function useMarket(marketId: string | undefined, network?: Network) {
         console.warn('Could not load from curated markets:', e)
       }
 
-      // Fallback: fetch all markets and filter client-side (API doesn't support uniqueKey filter)
+      // Fallback: fetch specific market using GraphQL where filter
       const data = await executeQuery<{ markets: { items: Market[] } }>(
-        GET_MARKETS,
-        { first: 1000 }
+        GET_MARKET_BY_ID,
+        { uniqueKey: marketId }
       )
 
-      const market = data.markets.items?.find(m => 
-        m.uniqueKey.toLowerCase() === marketId.toLowerCase()
-      )
-      
+      const market = data.markets.items?.[0]
+
       if (!market) {
         throw new Error('Market not found')
       }
@@ -136,7 +97,7 @@ export function useMarket(marketId: string | undefined, network?: Network) {
       return market
     },
     enabled: !!marketId,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 60 * 1000, // 1 minute (increased since we're fetching single market)
   })
 }
 
@@ -165,6 +126,41 @@ export function useMarkets(network?: Network, limit: number = 100) {
 // Hook to fetch market statistics (same as useMarket for now)
 export function useMarketStats(marketId: string | undefined, network?: Network) {
   return useMarket(marketId, network)
+}
+
+// Utility function to format a curated market into the standard Market type
+export function formatCuratedMarket(curatedMarket: CuratedMarket): Market {
+  return {
+    uniqueKey: curatedMarket.id,
+    id: curatedMarket.id,
+    chainId: curatedMarket.chainId || 1, // Default to mainnet if not specified
+    lltv: curatedMarket.lltv,
+    oracleAddress: curatedMarket.oracleAddress,
+    irmAddress: curatedMarket.irmAddress,
+    loanAsset: {
+      address: curatedMarket.loanToken.address,
+      symbol: curatedMarket.loanToken.symbol,
+      name: curatedMarket.loanToken.name,
+      decimals: curatedMarket.loanToken.decimals,
+    },
+    collateralAsset: {
+      address: curatedMarket.collateralToken.address,
+      symbol: curatedMarket.collateralToken.symbol,
+      name: curatedMarket.collateralToken.name,
+      decimals: curatedMarket.collateralToken.decimals,
+    },
+    state: {
+      supplyAssets: curatedMarket.metrics.tvl.toString(),
+      borrowAssets: '0', // Not in curated format
+      supplyApy: curatedMarket.metrics.supplyApy,
+      borrowApy: curatedMarket.metrics.borrowApy,
+      utilization: curatedMarket.metrics.utilization,
+      supplyAssetsUsd: curatedMarket.metrics.tvl,
+      borrowAssetsUsd: null,
+    },
+    whitelisted: curatedMarket.whitelisted,
+    creationTimestamp: curatedMarket.createdAt,
+  }
 }
 
 // Utility to format USD values for display
@@ -211,14 +207,20 @@ export function formatMarketData(market: Market) {
 
   const createdAt = new Date(market.creationTimestamp * 1000).toISOString()
 
+  const collateralAsset = market.collateralAsset || {
+    address: '0x0',
+    symbol: 'N/A',
+    name: 'Not Available',
+  }
+
   return {
     id: market.uniqueKey,
-    name: `${market.loanAsset.symbol}/${market.collateralAsset.symbol}`,
-    pair: `${market.loanAsset.symbol}/${market.collateralAsset.symbol}`,
+    name: `${market.loanAsset.symbol}/${collateralAsset.symbol}`,
+    pair: `${market.loanAsset.symbol}/${collateralAsset.symbol}`,
     chainId: market.chainId,
     chainName: getChainName(market.chainId),
     loanAsset: market.loanAsset,
-    collateralAsset: market.collateralAsset,
+    collateralAsset: collateralAsset,
     totalSupplyFormatted,
     totalBorrowFormatted,
     supplyApyFormatted,
@@ -235,7 +237,14 @@ export function formatMarketData(market: Market) {
   }
 }
 
-export type FormattedMarket = ReturnType<typeof formatMarketData>
+export type FormattedMarket = Omit<ReturnType<typeof formatMarketData>, 'collateralAsset'> & {
+  collateralAsset: {
+    address: string
+    symbol: string
+    name?: string | null
+    decimals?: number | null
+  }
+}
 
 // Utility to get human-readable chain name
 export function getChainName(chainId?: number): string {

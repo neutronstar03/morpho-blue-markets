@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
-import { useSupply, useTokenApproval, useTransactionStatus, MORPHO_BLUE_ADDRESSES } from '../lib/hooks/use-morpho'
+import { useSupply, useTokenApproval, useTransactionStatus, useTokenBalance, formatTokenBalance, MORPHO_BLUE_ADDRESSES } from '../lib/hooks/use-morpho'
 import type { MarketParams } from '../lib/hooks/use-morpho'
 import { Button } from './ui/button'
 
@@ -19,8 +19,12 @@ export function DepositForm({ marketParams, loanTokenSymbol, onSuccess }: Deposi
   const { needsApproval, approve, hash: approveHash, isPending: isApprovingToken, error: approveError } = useTokenApproval(
     marketParams.loanToken,
     MORPHO_BLUE_ADDRESSES.mainnet,
-    amount
+    amount,
+    address
   )
+
+  const { data: tokenBalance } = useTokenBalance(marketParams.loanToken, address)
+  const formattedBalance = formatTokenBalance(tokenBalance, marketParams.loanToken)
 
   const { isSuccess: isSupplySuccess, isLoading: isSupplyLoading } = useTransactionStatus(supplyHash)
   const { isSuccess: isApproveSuccess, isLoading: isApproveLoading } = useTransactionStatus(approveHash)
@@ -100,6 +104,11 @@ export function DepositForm({ marketParams, loanTokenSymbol, onSuccess }: Deposi
           placeholder="0.0"
           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
+        {address && (
+          <div className="text-sm text-gray-600 mt-1">
+            Wallet balance: <span className="font-medium">{formattedBalance} {loanTokenSymbol}</span>
+          </div>
+        )}
       </div>
 
       {needsApproval && (

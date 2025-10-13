@@ -8,6 +8,18 @@ export const MORPHO_BLUE_ADDRESSES = {
   base: '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb', // Same address on Base
 } as const
 
+// Get the correct Morpho Blue address for the current chain
+export function getMorphoBlueAddress(chainId?: number): `0x${string}` {
+  switch (chainId) {
+    case 1: // Ethereum mainnet
+      return MORPHO_BLUE_ADDRESSES.mainnet as `0x${string}`
+    case 8453: // Base
+      return MORPHO_BLUE_ADDRESSES.base as `0x${string}`
+    default:
+      return MORPHO_BLUE_ADDRESSES.mainnet as `0x${string}`
+  }
+}
+
 // ERC20 ABI for token interactions
 const ERC20_ABI = [
   {
@@ -129,12 +141,15 @@ export interface UserPosition {
 }
 
 // Hook for token approval
-export function useTokenApproval(tokenAddress: string, spender: string, amount: string) {
+export function useTokenApproval(tokenAddress: string, spender: string, amount: string, userAddress?: string) {
   const { data: allowance } = useReadContract({
     address: tokenAddress as `0x${string}`,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: [spender as `0x${string}`, spender as `0x${string}`], // This should be the user's address and Morpho contract
+    args: userAddress ? [userAddress as `0x${string}`, spender as `0x${string}`] : undefined,
+    query: {
+      enabled: !!userAddress,
+    },
   })
 
   const { data: simulateData } = useSimulateContract({
@@ -162,10 +177,48 @@ export function useTokenApproval(tokenAddress: string, spender: string, amount: 
   }
 }
 
+// Hook for checking token balance in wallet
+export function useTokenBalance(tokenAddress: string, userAddress?: string) {
+  return useReadContract({
+    address: tokenAddress as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: userAddress ? [userAddress as `0x${string}`] : undefined,
+    query: {
+      enabled: !!userAddress,
+      refetchInterval: 30000, // Refetch every 30 seconds
+    },
+  })
+}
+
+// Token decimals configuration (for non-18 decimal tokens)
+export const TOKEN_DECIMALS: Record<string, number> = {
+  // USDC and other 6-decimal tokens
+  '0xa0b86a33e6c33364a5cc5c6c5d5f5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c': 6, // USDC on Ethereum
+  '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': 6, // USDC on Base
+  // Add more tokens here as needed
+}
+
+// Format token balance with proper decimals
+export function formatTokenBalance(balance: bigint | undefined, tokenAddress: string): string {
+  if (!balance) return '0'
+
+  const decimals = TOKEN_DECIMALS[tokenAddress.toLowerCase()] || 18
+
+  if (decimals === 18) {
+    return formatEther(balance)
+  } else {
+    // For non-18 decimal tokens, we need to format manually
+    const divisor = BigInt(10) ** BigInt(decimals)
+    const formatted = Number(balance) / Number(divisor)
+    return formatted.toFixed(decimals > 6 ? 6 : decimals) // Limit decimal places for display
+  }
+}
+
 // Hook for supplying to a market
 export function useSupply(marketParams: MarketParams, amount: string) {
   const { data: simulateData } = useSimulateContract({
-    address: MORPHO_BLUE_ADDRESSES.mainnet as `0x${string}`,
+    address: getMorphoBlueAddress(),
     abi: MORPHO_BLUE_ABI,
     functionName: 'supply',
     args: [
