@@ -1,22 +1,24 @@
 import { useAccount } from 'wagmi'
 import { formatEther } from 'viem'
 import { useUserPosition } from '../../lib/hooks/use-morpho'
-import type { FormattedMarket } from '../../lib/hooks/use-market'
-import type { MarketParams } from '../../lib/hooks/use-morpho'
+import type { FormattedMarket } from '~/lib/types'
+import { useIsClient } from '../../lib/hooks/use-is-client';
 
 interface UserPositionProps {
   market: FormattedMarket
-  marketParams: MarketParams
 }
 
-export function UserPosition({ market, marketParams }: UserPositionProps) {
+export function UserPosition({ market }: UserPositionProps) {
+  const isClient = useIsClient();
   const { address } = useAccount()
-  const { data: position } = useUserPosition(marketParams, address)
+  const { data: position } = useUserPosition(market.id, address)
+
+  console.log('user position', position)
 
   const userSupplyShares = position ? formatEther(position[0]) : '0'
   const userCollateral = position ? formatEther(position[2]) : '0'
 
-  if (!address) {
+  if (!address || !isClient) {
     return null
   }
 

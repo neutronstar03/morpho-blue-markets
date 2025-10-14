@@ -1,38 +1,58 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
-import { useSupply, useTokenApproval, useTransactionStatus, useTokenBalance, formatTokenBalance, MORPHO_BLUE_ADDRESSES } from '../lib/hooks/use-morpho'
-import type { MarketParams } from '../lib/hooks/use-morpho'
+import { useDebounce } from 'use-debounce'
+import { useSupply, useTokenApproval, useTransactionStatus, useTokenBalance, formatTokenBalance, getMorphoBlueAddress } from '../lib/hooks/use-morpho'
+import type { FormattedMarket } from '~/lib/types'
 import { Button } from './ui/button'
+import { useIsClient } from '../lib/hooks/use-is-client';
 
 interface DepositFormProps {
-  marketParams: MarketParams
+  market: FormattedMarket
   loanTokenSymbol: string
   onSuccess?: () => void
 }
 
-export function DepositForm({ marketParams, loanTokenSymbol, onSuccess }: DepositFormProps) {
+export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormProps) {
+  const isClient = useIsClient();
   const [amount, setAmount] = useState('')
   const [isApproving, setIsApproving] = useState(false)
   const { address } = useAccount()
+  const [debouncedAmount] = useDebounce(amount, 500)
+  const isAmountDebounced = amount === debouncedAmount
 
-  const { supply, hash: supplyHash, isPending: isSupplying, error: supplyError } = useSupply(marketParams, amount)
-  const { needsApproval, approve, hash: approveHash, isPending: isApprovingToken, error: approveError } = useTokenApproval(
-    marketParams.loanToken,
-    MORPHO_BLUE_ADDRESSES.mainnet,
-    amount,
-    address
-  )
 
-  const { data: tokenBalance } = useTokenBalance(marketParams.loanToken, address)
-  const formattedBalance = formatTokenBalance(tokenBalance, marketParams.loanToken)
+  const {
+    supply,
+    hash: supplyHash,
+    isPending: isSupplying,
+    error: supplyError,
+  } = useSupply(market.id, debouncedAmount, market.loanAsset.decimals!)
+  const {
+    needsApproval,
+    approve,
+    hash: approveHash,
+    isPending: isApprovingToken,
+    error: approveError,
+    refetch: refetchApproval,
+  } = useTokenApproval(market.loanAsset.address, debouncedAmount, address)
+
+  const { data: tokenBalance } = useTokenBalance(market.loanAsset.address, address)
+  const formattedBalance = formatTokenBalance(tokenBalance, market.loanAsset.address)
 
   const { isSuccess: isSupplySuccess, isLoading: isSupplyLoading } = useTransactionStatus(supplyHash)
   const { isSuccess: isApproveSuccess, isLoading: isApproveLoading } = useTransactionStatus(approveHash)
 
+  useEffect(() => {
+    if (isApproveSuccess) {
+      refetchApproval?.()
+      setIsApproving(false)
+    }
+  }, [isApproveSuccess, refetchApproval])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!amount || !address) return
+    if (!amount || !address || !isClient) return
 
     try {
       if (needsApproval) {
@@ -56,7 +76,7 @@ export function DepositForm({ marketParams, loanTokenSymbol, onSuccess }: Deposi
 
   const isLoading = isSupplying || isApprovingToken || isSupplyLoading || isApproveLoading
   const hasError = supplyError || approveError
-  const isSuccess = isSupplySuccess || isApproveSuccess
+  const isSuccess = isSupplySuccess
 
   if (isSuccess) {
     return (
@@ -69,13 +89,13 @@ export function DepositForm({ marketParams, loanTokenSymbol, onSuccess }: Deposi
           </div>
           <div className="ml-3">
             <p className="text-sm font-medium text-green-800">
-              {isSupplySuccess ? 'Deposit successful!' : 'Approval successful!'}
+              Deposit successful!
             </p>
           </div>
           <div className="ml-auto pl-3">
             <div className="-mx-1.5 -my-1.5">
               <button
-                onClick={onSuccess}
+                onClick={() => onSuccess?.()}
                 className="inline-flex bg-green-50 rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-50 focus:ring-green-600"
               >
                 <span className="sr-only">Dismiss</span>
@@ -111,6 +131,14 @@ export function DepositForm({ marketParams, loanTokenSymbol, onSuccess }: Deposi
         )}
       </div>
 
+      {isApproveSuccess && !needsApproval && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+          <p className="text-sm text-green-800">
+            Approval successful! You can now deposit your {loanTokenSymbol}.
+          </p>
+        </div>
+      )}
+
       {needsApproval && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
           <p className="text-sm text-yellow-800">
@@ -129,7 +157,7 @@ export function DepositForm({ marketParams, loanTokenSymbol, onSuccess }: Deposi
 
       <Button
         type="submit"
-        disabled={!amount || isLoading || !address}
+        disabled={!amount || isLoading || !address || !isAmountDebounced}
         className="w-full"
       >
         {isLoading ? (

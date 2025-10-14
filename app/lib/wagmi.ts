@@ -9,7 +9,7 @@ export const config = createConfig({
   ],
   transports: {
     [mainnet.id]: http(),
-    [base.id]: http(),
+    [base.id]: http("https://base.llamarpc.com"),
   },
 })
 

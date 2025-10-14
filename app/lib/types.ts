@@ -89,3 +89,26 @@ export interface CuratedMarketJSON {
   }
   markets: CuratedMarket[]
 }
+
+export interface FormattedMarket {
+  id: string
+  name: string
+  pair: string
+  chainId: number
+  chainName: string
+  loanAsset: MarketAsset
+  collateralAsset: MarketAsset
+  totalSupplyFormatted: string
+  totalBorrowFormatted: string
+  supplyApyFormatted: string
+  borrowApyFormatted: string
+  utilizationFormatted: string
+  tvlFormatted: string
+  lltvPercent: string
+  lltvRaw: string
+  oracleAddress: string
+  irmAddress: string
+  whitelisted: boolean
+  createdAt: string
+  creationTimestamp: number
+}

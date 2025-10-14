@@ -1,10 +1,16 @@
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { Button } from './ui/button'
+import { useIsClient } from '../lib/hooks/use-is-client';
 
 export function ConnectButton() {
+  const isClient = useIsClient();
   const { address, isConnected } = useAccount()
   const { connectors, connect, isPending } = useConnect()
   const { disconnect } = useDisconnect()
+
+  if (!isClient) {
+    return null;
+  }
 
   if (isConnected && address) {
     return (

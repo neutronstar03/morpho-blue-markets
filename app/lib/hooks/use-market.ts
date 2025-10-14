@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { CuratedMarket, CuratedMarketJSON, FrontendMarket } from '../types'  
+import type { CuratedMarket, CuratedMarketJSON, FrontendMarket, FormattedMarket } from '../types'  
 
 // Types are now in app/lib/types.ts
 
@@ -86,7 +86,7 @@ function formatTokenAmount(
 }
 
 // Utility function to format market data for display
-export function formatMarketData(market: FrontendMarket) {
+export function formatMarketData(market: FrontendMarket): FormattedMarket {
   const { metrics } = market
 
   const totalBorrowFormatted = formatTokenAmount(
@@ -124,15 +124,6 @@ export function formatMarketData(market: FrontendMarket) {
     whitelisted: market.whitelisted,
     createdAt,
     creationTimestamp: market.creationTimestamp,
-  }
-}
-
-export type FormattedMarket = Omit<ReturnType<typeof formatMarketData>, 'collateralAsset'> & {
-  collateralAsset: {
-    address: string
-    symbol: string
-    name?: string | null
-    decimals?: number | null
   }
 }
 

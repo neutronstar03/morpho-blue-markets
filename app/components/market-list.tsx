@@ -1,3 +1,4 @@
+import { Fragment } from 'react/jsx-runtime'
 import { formatMarketData } from '../lib/hooks/use-market'
 import type { FrontendMarket } from '../lib/types'
 import { MarketDisplay } from './market-display'
@@ -65,9 +66,8 @@ export function MarketList({
               const formatted = formatMarketData(market)
               const isSelected = selectedMarketId === market.id
               return (
-                <>
+                <Fragment key={market.id}>
                   <tr
-                    key={market.id}
                     onClick={() =>
                       onMarketSelect(isSelected ? null : market.id!)
                     }
@@ -115,7 +115,7 @@ export function MarketList({
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
           </tbody>

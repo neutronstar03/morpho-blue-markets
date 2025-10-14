@@ -4,18 +4,16 @@ import { formatEther } from 'viem'
 import { DepositForm } from '../deposit-form'
 import { WithdrawForm } from '../withdraw-form'
 import { useUserPosition } from '../../lib/hooks/use-morpho'
-import type { FormattedMarket } from '../../lib/hooks/use-market'
-import type { MarketParams } from '../../lib/hooks/use-morpho'
+import type { FormattedMarket } from '~/lib/types'
 
 interface MarketActionsProps {
   market: FormattedMarket
-  marketParams: MarketParams
 }
 
-export function MarketActions({ market, marketParams }: MarketActionsProps) {
+export function MarketActions({ market }: MarketActionsProps) {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit')
   const { address } = useAccount()
-  const { data: position } = useUserPosition(marketParams, address)
+  const { data: position } = useUserPosition(market.id, address)
   const userSupplyShares = position ? formatEther(position[0]) : '0'
 
   return (
@@ -47,12 +45,12 @@ export function MarketActions({ market, marketParams }: MarketActionsProps) {
         <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
           {activeTab === 'deposit' ? (
             <DepositForm
-              marketParams={marketParams}
+              market={market}
               loanTokenSymbol={market.loanAsset.symbol}
             />
           ) : (
             <WithdrawForm
-              marketParams={marketParams}
+              market={market}
               loanTokenSymbol={market.loanAsset.symbol}
               maxWithdrawable={userSupplyShares}
             />

@@ -1,27 +1,29 @@
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
 import { useWithdraw, useTransactionStatus } from '../lib/hooks/use-morpho'
-import type { MarketParams } from '../lib/hooks/use-morpho'
+import type { FormattedMarket } from '~/lib/types'
 import { Button } from './ui/button'
+import { useIsClient } from '../lib/hooks/use-is-client';
 
 interface WithdrawFormProps {
-  marketParams: MarketParams
+  market: FormattedMarket
   loanTokenSymbol: string
   maxWithdrawable?: string
   onSuccess?: () => void
 }
 
-export function WithdrawForm({ marketParams, loanTokenSymbol, maxWithdrawable = '0', onSuccess }: WithdrawFormProps) {
+export function WithdrawForm({ market, loanTokenSymbol, maxWithdrawable = '0', onSuccess }: WithdrawFormProps) {
+  const isClient = useIsClient();
   const [amount, setAmount] = useState('')
   const { address } = useAccount()
 
-  const { withdraw, hash: withdrawHash, isPending: isWithdrawing, error: withdrawError } = useWithdraw(marketParams, amount)
+  const { withdraw, hash: withdrawHash, isPending: isWithdrawing, error: withdrawError } = useWithdraw(market.id, amount, market.loanAsset.decimals!)
   const { isSuccess: isWithdrawSuccess, isLoading: isWithdrawLoading } = useTransactionStatus(withdrawHash)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!amount || !address) return
+    if (!amount || !address || !isClient) return
 
     try {
       withdraw()

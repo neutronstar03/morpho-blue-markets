@@ -1,31 +1,27 @@
-import type { FormattedMarket } from '../lib/hooks/use-market'
-import type { MarketParams } from '../lib/hooks/use-morpho'
 import { MarketHeader } from './market/market-header'
 import { MarketMetrics } from './market/market-metrics'
 import { MarketDetails } from './market/market-details'
-import { UserPosition } from './market/user-position'
 import { MarketActions } from './market/market-actions'
+import type { FormattedMarket } from '~/lib/types'
+import { UserPosition } from './market/user-position'
 
 interface MarketDisplayProps {
   market: FormattedMarket
 }
 
 export function MarketDisplay({ market }: MarketDisplayProps) {
-  const marketParams: MarketParams = {
-    loanToken: market.loanAsset.address,
-    collateralToken: market.collateralAsset.address,
-    oracle: market.oracleAddress,
-    irm: market.irmAddress,
-    lltv: market.lltvRaw,
-  }
+  if (!market) return <div>Loading market data...</div>
 
   return (
-    <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+    <div className="bg-gray-800 text-white max-w-4xl mx-auto my-8 rounded-lg shadow-2xl overflow-hidden">
+      <UserPosition market={market} />
       <MarketHeader market={market} />
       <MarketMetrics market={market} />
-      <MarketDetails market={market} />
-      <UserPosition market={market} marketParams={marketParams} />
-      <MarketActions market={market} marketParams={marketParams} />
+      <div className="grid grid-cols-1 md:grid-cols-2">
+        <MarketDetails market={market} />
+
+        <MarketActions market={market} />
+      </div>
     </div>
   )
 }
