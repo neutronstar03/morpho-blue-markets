@@ -26,7 +26,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
     hash: supplyHash,
     isPending: isSupplying,
     error: supplyError,
-  } = useSupply(market.id, debouncedAmount, market.loanAsset.decimals!)
+  } = useSupply(market, debouncedAmount, market.loanAsset.decimals!)
   const {
     needsApproval,
     approve,

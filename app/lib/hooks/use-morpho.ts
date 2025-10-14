@@ -5,6 +5,7 @@ import { SIMPLIFIED_MORPHO_BLUE_ABI } from './simplified.abi'
 import { erc20Abi } from 'viem'
 import { getSupportedChainName, morphoAddressOnChain, supportedChains, supportedChainsID } from '../addresses'
 import { tokenAmountToWei } from '../tokens'
+import type { FormattedMarket } from '../types'
 
 export function getMorphoBlueAddress(chainId?: number): `0x${string}` {
   const chainName = getSupportedChainName(chainId)
@@ -46,7 +47,6 @@ export function formatTokenBalance(balance: bigint | undefined, tokenAddress: st
 }
 
 export function useTokenApproval(tokenAddress: string, amount: string, userAddress?: string) {
-  console.log('useTokenApproval running with amount:', amount)
   const { chainId } = useAccount()
   const spender = getMorphoBlueAddress(chainId)
   const isValidAmount = !!amount && parseFloat(amount) > 0
@@ -79,7 +79,6 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
   const { writeContract: approve, data: hash, isPending, error: writeError } = useWriteContract()
 
   const handleApprove = () => {
-    console.log('handleApprove called. simulateData:', simulateData, 'simulateError:', simulateError)
     if (simulateData?.request) {
       approve(simulateData.request)
     }
@@ -111,21 +110,26 @@ export function useTokenBalance(tokenAddress: string, userAddress?: string) {
 }
 
 // Hook for supplying to a market
-export function useSupply(marketKey: string, amount: string, loanTokenDecimals: number) {
+export function useSupply(market: FormattedMarket, amount: string, loanTokenDecimals: number) {
   const { chainId, address: userAddress } = useAccount()
-  console.log('useSupply running with amount:', amount)
   const isValidAmount = !!amount && parseFloat(amount) > 0
 
   const supplyArgs = useMemo(() => {
     if (!isValidAmount || !userAddress) return undefined
     return [
-      marketKey as `0x${string}`,
+      {
+        loanToken: market.loanAsset.address as `0x${string}`,
+        collateralToken: market.collateralAsset?.address as `0x${string}`,
+        oracle: market.oracleAddress as `0x${string}`,
+        irm: market.irmAddress as `0x${string}`,
+        lltv: BigInt(market.lltvRaw),
+      },
       tokenAmountToWei(amount, loanTokenDecimals),
       BigInt(0), // shares (0 for max)
       userAddress as `0x${string}`, // onBehalf
       '0x', // data
     ] as const
-  }, [isValidAmount, marketKey, amount, userAddress])
+  }, [isValidAmount, market, amount, userAddress])
 
   const { data: simulateData, error: simulateError } = useSimulateContract({
     address: getMorphoBlueAddress(chainId),
@@ -133,14 +137,13 @@ export function useSupply(marketKey: string, amount: string, loanTokenDecimals: 
     functionName: 'supply',
     args: supplyArgs as any,
     query: {
-      enabled: isValidAmount && !!userAddress,
+      enabled: isValidAmount && !!userAddress && !!market,
     },
   })
 
   const { writeContract: supply, data: hash, isPending, error: writeError } = useWriteContract()
 
   const handleSupply = () => {
-    console.log('handleSupply called. simulateData:', simulateData, 'simulateError:', simulateError)
     if (simulateData?.request) {
       supply(simulateData.request)
     }
@@ -155,24 +158,28 @@ export function useSupply(marketKey: string, amount: string, loanTokenDecimals: 
 }
 
 // Hook for withdrawing from a market
-export function useWithdraw(
-  marketKey: string,
-  amount: string,
-  loanTokenDecimals: number,
-) {
+export function useWithdraw(market: FormattedMarket, sharesIn: string) {
   const { chainId, address: userAddress } = useAccount()
-  const isValidAmount = !!amount && parseFloat(amount) > 0
+  const isValidAmount = !!sharesIn && parseFloat(sharesIn) > 0
 
   const withdrawArgs = useMemo(() => {
     if (!isValidAmount || !userAddress) return undefined
     return [
-      marketKey as `0x${string}`,
-      tokenAmountToWei(amount, loanTokenDecimals),
-      BigInt(0), // shares (0 for max)
+      {
+        loanToken: market.loanAsset.address as `0x${string}`,
+        collateralToken: market.collateralAsset?.address as `0x${string}`,
+        oracle: market.oracleAddress as `0x${string}`,
+        irm: market.irmAddress as `0x${string}`,
+        lltv: BigInt(market.lltvRaw),
+      },
+      0n, // assets
+      parseUnits(sharesIn, 18), // shares
       userAddress as `0x${string}`, // onBehalf
       userAddress as `0x${string}`, // receiver (user's address)
     ] as const
-  }, [isValidAmount, marketKey, amount, userAddress])
+  }, [isValidAmount, market, sharesIn, userAddress])
+
+  console.log('useWithdraw running', chainId, withdrawArgs)
 
   const { data: simulateData, error: simulateError } = useSimulateContract({
     address: getMorphoBlueAddress(chainId),
@@ -180,7 +187,7 @@ export function useWithdraw(
     functionName: 'withdraw',
     args: withdrawArgs as any,
     query: {
-      enabled: isValidAmount && !!userAddress,
+      enabled: isValidAmount && !!userAddress && !!market,
     },
   })
 
@@ -202,7 +209,6 @@ export function useWithdraw(
 
 export function useUserPosition(marketKey: string, userAddress: string | undefined) {
   const { chainId } = useAccount()
-  console.log('useUserPosition running', userAddress, marketKey)
 
   return useReadContract({
     address: getMorphoBlueAddress(chainId),
@@ -214,6 +220,20 @@ export function useUserPosition(marketKey: string, userAddress: string | undefin
     ],
     query: {
       enabled: !!userAddress && !!marketKey,
+    },
+  })
+}
+
+export function useMarket(marketKey: string) {
+  const { chainId } = useAccount()
+
+  return useReadContract({
+    address: getMorphoBlueAddress(chainId),
+    abi: SIMPLIFIED_MORPHO_BLUE_ABI,
+    functionName: 'market',
+    args: [marketKey as any],
+    query: {
+      enabled: !!marketKey,
     },
   })
 }

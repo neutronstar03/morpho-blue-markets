@@ -13,8 +13,6 @@ export function UserPosition({ market }: UserPositionProps) {
   const { address } = useAccount()
   const { data: position } = useUserPosition(market.id, address)
 
-  console.log('user position', position)
-
   const userSupplyShares = position ? formatEther(position[0]) : '0'
   const userCollateral = position ? formatEther(position[2]) : '0'
 

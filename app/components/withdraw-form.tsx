@@ -1,23 +1,50 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAccount } from 'wagmi'
-import { useWithdraw, useTransactionStatus } from '../lib/hooks/use-morpho'
+import { useWithdraw, useTransactionStatus, useUserPosition, useMarket } from '../lib/hooks/use-morpho'
 import type { FormattedMarket } from '~/lib/types'
 import { Button } from './ui/button'
-import { useIsClient } from '../lib/hooks/use-is-client';
+import { useIsClient } from '../lib/hooks/use-is-client'
+import { formatUnits } from 'viem'
 
 interface WithdrawFormProps {
   market: FormattedMarket
   loanTokenSymbol: string
-  maxWithdrawable?: string
   onSuccess?: () => void
 }
 
-export function WithdrawForm({ market, loanTokenSymbol, maxWithdrawable = '0', onSuccess }: WithdrawFormProps) {
-  const isClient = useIsClient();
+function formatAmount(amount: number, decimals: number) {
+  return isNaN(amount) ? '0' : (amount).toLocaleString(undefined, { maximumFractionDigits: decimals })
+}
+
+export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFormProps) {
+  const isClient = useIsClient()
   const [amount, setAmount] = useState('')
   const { address } = useAccount()
 
-  const { withdraw, hash: withdrawHash, isPending: isWithdrawing, error: withdrawError } = useWithdraw(market.id, amount, market.loanAsset.decimals!)
+  const { data: position } = useUserPosition(market.id, address)
+  const { data: marketData } = useMarket(market.id)
+
+  const maxWithdrawableShares = useMemo(() => {
+    if (!position || !position[0]) return '0'
+    return formatUnits(position[0], 18)
+  }, [position])
+
+  const maxWithdrawableAssets = useMemo(() => {
+    if (!position || !position[0] || !marketData) return '0'
+    const [supplyShares] = position
+    const [totalSupplyAssets, totalSupplyShares] = marketData
+    if (totalSupplyShares === 0n) return '0'
+
+    const assets = (supplyShares * totalSupplyAssets) / totalSupplyShares
+    return formatUnits(assets, market.loanAsset.decimals!)
+  }, [position, marketData, market.loanAsset.decimals])
+
+  const sharesToAssetsRatio = useMemo(() => {
+    if (!maxWithdrawableShares || !maxWithdrawableAssets || !marketData) return 0
+    return parseFloat(maxWithdrawableAssets) / parseFloat(maxWithdrawableShares)
+  }, [maxWithdrawableShares, maxWithdrawableAssets, marketData])
+
+  const { withdraw, hash: withdrawHash, isPending: isWithdrawing, error: withdrawError } = useWithdraw(market, amount)
   const { isSuccess: isWithdrawSuccess, isLoading: isWithdrawLoading } = useTransactionStatus(withdrawHash)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,7 +68,7 @@ export function WithdrawForm({ market, loanTokenSymbol, maxWithdrawable = '0', o
   }
 
   const handleMaxClick = () => {
-    setAmount(maxWithdrawable)
+    setAmount(maxWithdrawableShares)
   }
 
   const isLoading = isWithdrawing || isWithdrawLoading
@@ -84,7 +111,7 @@ export function WithdrawForm({ market, loanTokenSymbol, maxWithdrawable = '0', o
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="withdraw-amount" className="block text-sm font-medium text-gray-700 mb-2">
-          Amount to Withdraw ({loanTokenSymbol})
+          Amount to Withdraw (in shares)
         </label>
         <div className="flex gap-2">
           <input
@@ -105,9 +132,9 @@ export function WithdrawForm({ market, loanTokenSymbol, maxWithdrawable = '0', o
             Max
           </Button>
         </div>
-        {maxWithdrawable && (
+        {maxWithdrawableShares && parseFloat(maxWithdrawableShares) > 0 && (
           <p className="text-xs text-gray-500 mt-1">
-            Max available: {maxWithdrawable} {loanTokenSymbol}
+            Max available: {maxWithdrawableShares} shares
           </p>
         )}
       </div>
@@ -122,7 +149,7 @@ export function WithdrawForm({ market, loanTokenSymbol, maxWithdrawable = '0', o
 
       <Button
         type="submit"
-        disabled={!amount || isLoading || !address || parseFloat(amount) > parseFloat(maxWithdrawable)}
+        disabled={!amount || isLoading || !address || parseFloat(amount) > parseFloat(maxWithdrawableShares)}
         className="w-full"
         variant="outline"
       >
@@ -135,7 +162,7 @@ export function WithdrawForm({ market, loanTokenSymbol, maxWithdrawable = '0', o
             Withdrawing...
           </>
         ) : (
-          `Withdraw ${amount || '0'} ${loanTokenSymbol}`
+          `Withdraw ${(formatAmount(parseFloat(amount) * sharesToAssetsRatio, market.loanAsset.decimals!))} ${loanTokenSymbol}`
         )}
       </Button>
 
@@ -145,7 +172,7 @@ export function WithdrawForm({ market, loanTokenSymbol, maxWithdrawable = '0', o
         </p>
       )}
 
-      {parseFloat(amount) > parseFloat(maxWithdrawable) && (
+      {parseFloat(amount) > parseFloat(maxWithdrawableShares) && (
         <p className="text-sm text-red-600 text-center">
           Amount exceeds available balance
         </p>
