@@ -1,11 +1,10 @@
-import { useAccount, useWriteContract, useSimulateContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
-import { parseUnits, formatUnits } from 'viem'
-import { useMemo } from 'react'
-import { SIMPLIFIED_MORPHO_BLUE_ABI } from './simplified.abi'
-import { erc20Abi } from 'viem'
-import { getSupportedChainName, morphoAddressOnChain, supportedChains, supportedChainsID } from '../addresses'
-import { tokenAmountToWei } from '../tokens'
 import type { FormattedMarket } from '../types'
+import { useMemo } from 'react'
+import { erc20Abi, formatUnits, parseUnits } from 'viem'
+import { useAccount, useReadContract, useSimulateContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { getSupportedChainName, morphoAddressOnChain } from '../addresses'
+import { tokenAmountToWei } from '../tokens'
+import { SIMPLIFIED_MORPHO_BLUE_ABI } from './simplified.abi'
 
 export function getMorphoBlueAddress(chainId?: number): `0x${string}` {
   const chainName = getSupportedChainName(chainId)
@@ -27,21 +26,24 @@ export function formatTokenAmount(amount: bigint, tokenAddress: string): string 
 }
 
 export function parseTokenAmount(amount: string, tokenAddress: string): bigint {
-  if (!amount) return 0n
+  if (!amount)
+    return 0n
   const decimals = getTokenDecimals(tokenAddress)
   try {
     return parseUnits(amount, decimals)
-  } catch (e) {
+  }
+  catch {
     // handle invalid amount string e.g. "" or "."
     return 0n
   }
 }
 
 export function formatTokenBalance(balance: bigint | undefined, tokenAddress: string): string {
-  if (!balance) return '0'
+  if (!balance)
+    return '0'
 
   const formatted = formatTokenAmount(balance, tokenAddress)
-  const num = parseFloat(formatted)
+  const num = Number.parseFloat(formatted)
   // Format for display with commas and a max of 6 decimal places
   return num.toLocaleString(undefined, { maximumFractionDigits: 6 })
 }
@@ -49,7 +51,7 @@ export function formatTokenBalance(balance: bigint | undefined, tokenAddress: st
 export function useTokenApproval(tokenAddress: string, amount: string, userAddress?: string) {
   const { chainId } = useAccount()
   const spender = getMorphoBlueAddress(chainId)
-  const isValidAmount = !!amount && parseFloat(amount) > 0
+  const isValidAmount = !!amount && Number.parseFloat(amount) > 0
 
   const { data: allowance, refetch } = useReadContract({
     address: tokenAddress as `0x${string}`,
@@ -62,7 +64,8 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
   })
 
   const approveArgs = useMemo(() => {
-    if (!isValidAmount) return undefined
+    if (!isValidAmount)
+      return undefined
     return [spender as `0x${string}`, parseTokenAmount(amount, tokenAddress)] as const
   }, [isValidAmount, spender, amount, tokenAddress])
 
@@ -112,10 +115,11 @@ export function useTokenBalance(tokenAddress: string, userAddress?: string) {
 // Hook for supplying to a market
 export function useSupply(market: FormattedMarket, amount: string, loanTokenDecimals: number) {
   const { chainId, address: userAddress } = useAccount()
-  const isValidAmount = !!amount && parseFloat(amount) > 0
+  const isValidAmount = !!amount && Number.parseFloat(amount) > 0
 
   const supplyArgs = useMemo(() => {
-    if (!isValidAmount || !userAddress) return undefined
+    if (!isValidAmount || !userAddress)
+      return undefined
     return [
       {
         loanToken: market.loanAsset.address as `0x${string}`,
@@ -160,10 +164,11 @@ export function useSupply(market: FormattedMarket, amount: string, loanTokenDeci
 // Hook for withdrawing from a market
 export function useWithdraw(market: FormattedMarket, sharesIn: string) {
   const { chainId, address: userAddress } = useAccount()
-  const isValidAmount = !!sharesIn && parseFloat(sharesIn) > 0
+  const isValidAmount = !!sharesIn && Number.parseFloat(sharesIn) > 0
 
   const withdrawArgs = useMemo(() => {
-    if (!isValidAmount || !userAddress) return undefined
+    if (!isValidAmount || !userAddress)
+      return undefined
     return [
       {
         loanToken: market.loanAsset.address as `0x${string}`,
@@ -178,8 +183,6 @@ export function useWithdraw(market: FormattedMarket, sharesIn: string) {
       userAddress as `0x${string}`, // receiver (user's address)
     ] as const
   }, [isValidAmount, market, sharesIn, userAddress])
-
-  console.log('useWithdraw running', chainId, withdrawArgs)
 
   const { data: simulateData, error: simulateError } = useSimulateContract({
     address: getMorphoBlueAddress(chainId),

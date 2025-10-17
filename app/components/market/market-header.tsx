@@ -1,7 +1,8 @@
-import type { FormattedMarket } from '../../lib/hooks/use-market'
+import type { FormattedMarket } from '~/lib/types'
 
-const formatAddress = (address: string) =>
-  `${address.slice(0, 6)}...${address.slice(-4)}`
+function formatAddress(address: string) {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
 
 interface MarketHeaderProps {
   market: FormattedMarket

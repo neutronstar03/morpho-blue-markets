@@ -1,5 +1,5 @@
-import { http, createConfig } from 'wagmi'
-import { mainnet, base } from 'wagmi/chains'
+import { createConfig, http } from 'wagmi'
+import { base, mainnet } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 
 export const config = createConfig({
@@ -9,7 +9,7 @@ export const config = createConfig({
   ],
   transports: {
     [mainnet.id]: http(),
-    [base.id]: http("https://base.llamarpc.com"),
+    [base.id]: http('https://base.llamarpc.com'),
   },
 })
 

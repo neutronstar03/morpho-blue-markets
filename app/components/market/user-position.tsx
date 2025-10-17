@@ -1,15 +1,15 @@
-import { useAccount } from 'wagmi'
-import { formatEther } from 'viem'
-import { useUserPosition } from '../../lib/hooks/use-morpho'
 import type { FormattedMarket } from '~/lib/types'
-import { useIsClient } from '../../lib/hooks/use-is-client';
+import { formatEther } from 'viem'
+import { useAccount } from 'wagmi'
+import { useIsClient } from '../../lib/hooks/use-is-client'
+import { useUserPosition } from '../../lib/hooks/use-morpho'
 
 interface UserPositionProps {
   market: FormattedMarket
 }
 
 export function UserPosition({ market }: UserPositionProps) {
-  const isClient = useIsClient();
+  const isClient = useIsClient()
   const { address } = useAccount()
   const { data: position } = useUserPosition(market.id, address)
 
@@ -33,7 +33,9 @@ export function UserPosition({ market }: UserPositionProps) {
             <div>
               <p className="text-gray-400">Collateral:</p>
               <p className="font-medium text-white">
-                {userCollateral} {market.collateralAsset.symbol}
+                {userCollateral}
+                {' '}
+                {market.collateralAsset.symbol}
               </p>
             </div>
           </div>

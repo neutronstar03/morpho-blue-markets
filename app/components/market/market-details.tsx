@@ -1,11 +1,13 @@
-import type { FormattedMarket } from '../../lib/hooks/use-market'
+import type { FormattedMarket } from '~/lib/types'
 import { useChains } from 'wagmi'
 
-const formatAddress = (address: string) =>
-  `${address.slice(0, 6)}...${address.slice(-4)}`
+function formatAddress(address: string) {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
 
-const formatDate = (isoDate: string) =>
-  new Date(isoDate).toLocaleDateString()
+function formatDate(isoDate: string) {
+  return new Date(isoDate).toLocaleDateString()
+}
 
 interface MarketDetailsProps {
   market: FormattedMarket
@@ -13,7 +15,7 @@ interface MarketDetailsProps {
 
 export function MarketDetails({ market }: MarketDetailsProps) {
   const chains = useChains()
-  const currentChain = chains.find((chain) => chain.id === market.chainId)
+  const currentChain = chains.find(chain => chain.id === market.chainId)
   const explorerUrl = currentChain?.blockExplorers?.default.url
 
   const getAddressUrl = (address: string) =>
@@ -108,8 +110,14 @@ export function MarketDetails({ market }: MarketDetailsProps) {
       {/* Creation Info */}
       <div className="mt-6 pt-6 border-t border-gray-700">
         <div className="flex justify-between text-sm text-gray-400">
-          <span>Created: {formatDate(market.createdAt)}</span>
-          <span>Borrow APY: {market.borrowApyFormatted}</span>
+          <span>
+            Created:
+            {formatDate(market.createdAt)}
+          </span>
+          <span>
+            Borrow APY:
+            {market.borrowApyFormatted}
+          </span>
         </div>
       </div>
     </div>

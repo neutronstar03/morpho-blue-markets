@@ -1,6 +1,6 @@
+import type { FrontendMarket } from '../lib/types'
 import { Fragment } from 'react/jsx-runtime'
 import { formatMarketData } from '../lib/hooks/use-market'
-import type { FrontendMarket } from '../lib/types'
 import { MarketDisplay } from './market-display'
 
 interface MarketListProps {
@@ -69,8 +69,7 @@ export function MarketList({
                 <Fragment key={market.id}>
                   <tr
                     onClick={() =>
-                      onMarketSelect(isSelected ? null : market.id!)
-                    }
+                      onMarketSelect(isSelected ? null : market.id!)}
                     className={`cursor-pointer hover:bg-gray-700/50 transition-colors ${
                       isSelected ? 'bg-blue-900/30' : ''
                     }`}

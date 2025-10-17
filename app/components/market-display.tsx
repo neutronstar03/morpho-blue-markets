@@ -1,8 +1,8 @@
+import type { FormattedMarket } from '~/lib/types'
+import { MarketActions } from './market/market-actions'
+import { MarketDetails } from './market/market-details'
 import { MarketHeader } from './market/market-header'
 import { MarketMetrics } from './market/market-metrics'
-import { MarketDetails } from './market/market-details'
-import { MarketActions } from './market/market-actions'
-import type { FormattedMarket } from '~/lib/types'
 import { UserPosition } from './market/user-position'
 
 interface MarketDisplayProps {
@@ -10,7 +10,8 @@ interface MarketDisplayProps {
 }
 
 export function MarketDisplay({ market }: MarketDisplayProps) {
-  if (!market) return <div>Loading market data...</div>
+  if (!market)
+    return <div>Loading market data...</div>
 
   return (
     <div className="bg-gray-800 text-white max-w-4xl mx-auto my-8 rounded-lg shadow-2xl overflow-hidden">

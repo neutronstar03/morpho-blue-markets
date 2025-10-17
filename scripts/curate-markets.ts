@@ -1,7 +1,7 @@
-import { GraphQLClient, gql } from 'graphql-request'
-import * as fs from 'fs'
-import * as path from 'path'
-import type { QueryMarketsResult, MorphoMarket } from '../app/lib/morpho-graphql.types'
+import type { MorphoMarket, QueryMarketsResult } from '../app/lib/morpho-graphql.types'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { gql, GraphQLClient } from 'graphql-request'
 
 // --- Enriched Market Type ---
 interface EnrichedMarket extends MorphoMarket {
@@ -19,15 +19,38 @@ const client = new GraphQLClient(MORPHO_API)
 // Enhanced stablecoin list including exotic ones
 const STABLECOIN_SYMBOLS = [
   // Major stablecoins
-  'USDC', 'USDT', 'DAI', 'FRAX', 'TUSD',
+  'USDC',
+  'USDT',
+  'DAI',
+  'FRAX',
+  'TUSD',
   // Exotic/algorithmic stablecoins
-  'UST', 'MIM', 'LUSD', 'SUSD', 'GUSD', 'USDP', 'BUSD',
-  'USDD', 'USDN', 'FEI', 'DOLA', 'BEAN', 'RAI',
-  'sUSD', 'cUSD', 'EURS', 'EURT', 'USDK',
+  'UST',
+  'MIM',
+  'LUSD',
+  'SUSD',
+  'GUSD',
+  'USDP',
+  'BUSD',
+  'USDD',
+  'USDN',
+  'FEI',
+  'DOLA',
+  'BEAN',
+  'RAI',
+  'sUSD',
+  'cUSD',
+  'EURS',
+  'EURT',
+  'USDK',
   // Yield-bearing stablecoins
-  'ysUSDS', 'sDAI', 'sUSDS', 'USDS',
+  'ysUSDS',
+  'sDAI',
+  'sUSDS',
+  'USDS',
   // Other stables
-  'USDM', 'GHO'
+  'USDM',
+  'GHO',
 ]
 
 const QUERY_MARKETS = gql`
@@ -68,12 +91,9 @@ const QUERY_MARKETS = gql`
       }
     }
   }
-`;
+`
 
 // --- Corresponding TypeScript type for the above query result ---
-
-
-
 
 const CHAIN_IDS = {
   ETHEREUM: 1,
@@ -100,7 +120,7 @@ const CONFIG = {
   minTvlUsd: 50000, // $50k minimum TVL
   maxUtilization: 0.99, // Max 99% utilization (filter out 100% utilized markets)
   batchSize: 100, // Fetch 100 markets per request
-  maxMarketsPerChain: 500 // Limit markets per chain to avoid over-representing one chain
+  maxMarketsPerChain: 500, // Limit markets per chain to avoid over-representing one chain
 }
 
 const CONFIG_CHEAP_BORROW = {
@@ -108,7 +128,7 @@ const CONFIG_CHEAP_BORROW = {
   minTvlUsd: 50000, // $50k minimum TVL
   maxUtilization: 0.99, // Max 99% utilization (filter out 100% utilized markets)
   batchSize: 100, // Fetch 100 markets per request
-  maxMarketsPerChain: 500 // Limit markets per chain to avoid over-representing one chain
+  maxMarketsPerChain: 500, // Limit markets per chain to avoid over-representing one chain
 }
 
 async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
@@ -124,7 +144,7 @@ async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
         {
           first: CONFIG.batchSize,
           skip,
-          chainId: chainId,
+          chainId,
           where: {
             chainId_in: [chainId],
             supplyApy_gte: CONFIG.minSupplyApy,
@@ -133,8 +153,8 @@ async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
             // utilization_lte: CONFIG.maxUtilization
           },
           orderBy: 'SupplyApy',
-          orderDirection: 'Desc'
-        }
+          orderDirection: 'Desc',
+        },
       )
 
       if (!data?.markets?.items || data.markets.items.length === 0) {
@@ -144,15 +164,17 @@ async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
 
       const markets = data.markets.items
       marketsForChain.push(...markets)
-      
+
       console.log(`Fetched ${markets.length} markets (total for this chain: ${marketsForChain.length})`)
 
       if (markets.length < CONFIG.batchSize) {
         hasMore = false
-      } else {
+      }
+      else {
         skip += CONFIG.batchSize
       }
-    } catch (error: any) {
+    }
+    catch (error: any) {
       console.error(`Error fetching markets for chain ${chainId}:`, error.message)
       if (error.response?.errors) {
         console.error('GraphQL errors:', JSON.stringify(error.response.errors, null, 2))
@@ -176,7 +198,7 @@ async function fetchCheapBorrowMarkets(chainId: number): Promise<MorphoMarket[]>
         {
           first: CONFIG_CHEAP_BORROW.batchSize,
           skip,
-          chainId: chainId,
+          chainId,
           where: {
             chainId_in: [chainId],
             supplyApy_lte: CONFIG_CHEAP_BORROW.maxSupplyApy,
@@ -184,8 +206,8 @@ async function fetchCheapBorrowMarkets(chainId: number): Promise<MorphoMarket[]>
             // utilization_lte: CONFIG_CHEAP_BORROW.maxUtilization
           },
           orderBy: 'SupplyApy',
-          orderDirection: 'Asc'
-        }
+          orderDirection: 'Asc',
+        },
       )
 
       if (!data?.markets?.items || data.markets.items.length === 0) {
@@ -195,15 +217,17 @@ async function fetchCheapBorrowMarkets(chainId: number): Promise<MorphoMarket[]>
 
       const markets = data.markets.items
       marketsForChain.push(...markets)
-      
+
       console.log(`Fetched ${markets.length} markets (total for this chain: ${marketsForChain.length})`)
 
       if (markets.length < CONFIG_CHEAP_BORROW.batchSize) {
         hasMore = false
-      } else {
+      }
+      else {
         skip += CONFIG_CHEAP_BORROW.batchSize
       }
-    } catch (error: any) {
+    }
+    catch (error: any) {
       console.error(`Error fetching markets for chain ${chainId}:`, error.message)
       if (error.response?.errors) {
         console.error('GraphQL errors:', JSON.stringify(error.response.errors, null, 2))
@@ -228,7 +252,7 @@ async function generateCuratedMarkets() {
     const results = await Promise.allSettled(marketPromises)
 
     // Step 2: Enrich and concatenate markets
-    let allMarkets: MorphoMarket[] = []
+    const allMarkets: MorphoMarket[] = []
     const enrichedMarkets: EnrichedMarket[] = []
 
     results.forEach((result, index) => {
@@ -236,16 +260,17 @@ async function generateCuratedMarkets() {
         const chainId = CONFIG.chainIds[index]
         const markets = result.value
         allMarkets.push(...markets)
-        
-        markets.forEach(market => {
+
+        markets.forEach((market) => {
           enrichedMarkets.push({
             ...market,
-            chainId: chainId,
+            chainId,
             isStablecoinPair: isStablecoinPair(market),
-            tvl: calculateTVL(market)
+            tvl: calculateTVL(market),
           })
         })
-      } else {
+      }
+      else {
         console.error(`Failed to fetch markets for chain ${CONFIG.chainIds[index]}:`, result.reason)
       }
     })
@@ -255,7 +280,7 @@ async function generateCuratedMarkets() {
       ...market,
       chainId: CHAIN_IDS.BASE,
       isStablecoinPair: isStablecoinPair(market),
-      tvl: calculateTVL(market)
+      tvl: calculateTVL(market),
     }))
 
     console.log('CHEAP BORROW MARKETS')
@@ -272,16 +297,16 @@ async function generateCuratedMarkets() {
     // Step 4: Recap and write to file
     recapMarkets(enrichedMarkets)
     writeMarkets(enrichedMarkets, allMarkets.length)
-
-  } catch (error: any) {
+  }
+  catch (error: any) {
     console.error('Failed to generate curated markets:', error.message)
     throw error
   }
 }
 
 function isStablecoinPair(market: MorphoMarket): boolean {
-  return STABLECOIN_SYMBOLS.includes(market.loanAsset.symbol.toUpperCase()) ||
-         STABLECOIN_SYMBOLS.includes(market.collateralAsset!.symbol.toUpperCase())
+  return STABLECOIN_SYMBOLS.includes(market.loanAsset.symbol.toUpperCase())
+    || STABLECOIN_SYMBOLS.includes(market.collateralAsset!.symbol.toUpperCase())
 }
 
 function calculateTVL(market: MorphoMarket): number {
@@ -310,17 +335,17 @@ function writeMarkets(curatedMarkets: EnrichedMarket[], totalFetched: number) {
       chains: CONFIG.chainIds.map(id => `${CHAIN_NAMES[id]} (${id})`),
       minTvlUsd: CONFIG.minTvlUsd,
       minSupplyApy: CONFIG.minSupplyApy,
-      sortBy: "APY (descending), then TVL (descending)",
-      note: "Markets filtered and sorted by APY, then TVL"
+      sortBy: 'APY (descending), then TVL (descending)',
+      note: 'Markets filtered and sorted by APY, then TVL',
     },
     fieldInfo: {
-      note: "Decimal precision guide",
-      supplyApy: "Decimal (0.15 = 15%)",
-      borrowApy: "Decimal (0.15 = 15%)",
-      utilization: "Decimal (0.75 = 75%)",
-      tvl: "USD value",
-      totalSupply: "Raw token amount",
-      totalBorrow: "Raw token amount"
+      note: 'Decimal precision guide',
+      supplyApy: 'Decimal (0.15 = 15%)',
+      borrowApy: 'Decimal (0.15 = 15%)',
+      utilization: 'Decimal (0.75 = 75%)',
+      tvl: 'USD value',
+      totalSupply: 'Raw token amount',
+      totalBorrow: 'Raw token amount',
     },
     markets: curatedMarkets.map(market => ({
       id: market.uniqueKey,
@@ -332,13 +357,13 @@ function writeMarkets(curatedMarkets: EnrichedMarket[], totalFetched: number) {
         address: market.loanAsset.address,
         symbol: market.loanAsset.symbol,
         name: market.loanAsset.name || '',
-        decimals: market.loanAsset.decimals || 18
+        decimals: market.loanAsset.decimals || 18,
       },
       collateralToken: {
         address: market.collateralAsset.address,
         symbol: market.collateralAsset.symbol,
         name: market.collateralAsset.name || '',
-        decimals: market.collateralAsset.decimals || 18
+        decimals: market.collateralAsset.decimals || 18,
       },
       metrics: {
         // Raw values (original from API)
@@ -349,17 +374,17 @@ function writeMarkets(curatedMarkets: EnrichedMarket[], totalFetched: number) {
         borrowApy: market.state.borrowApy,
         utilization: market.state.utilization,
         isStablecoinPair: market.isStablecoinPair,
-        
+
         // Human-readable formatted values
         supplyApyFormatted: `${(market.state.supplyApy * 100).toFixed(2)}%`,
         borrowApyFormatted: `${(market.state.borrowApy * 100).toFixed(2)}%`,
         utilizationFormatted: `${(market.state.utilization * 100).toFixed(2)}%`,
         lltvFormatted: `${(Number(market.lltv) / 1e18 * 100).toFixed(2)}%`,
-        tvlFormatted: `$${(market.state.supplyAssetsUsd || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+        tvlFormatted: `$${(market.state.supplyAssetsUsd || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
       },
       whitelisted: market.whitelisted,
-      createdAt: market.creationTimestamp
-    }))
+      createdAt: market.creationTimestamp,
+    })),
   }
 
   fs.writeFileSync(outputPath, JSON.stringify(output, null, 2))
@@ -371,7 +396,7 @@ function recapMarkets(curatedMarkets: EnrichedMarket[]) {
 
   const whitelisted = curatedMarkets.filter(m => m.whitelisted).length
   const unwhitelisted = curatedMarkets.length - whitelisted
-  
+
   console.log(`- Whitelisted: ${whitelisted}`)
   console.log(`- Unwhitelisted: ${unwhitelisted}`)
 
@@ -380,21 +405,21 @@ function recapMarkets(curatedMarkets: EnrichedMarket[]) {
   curatedMarkets.slice(0, 30).forEach((market, index) => {
     const chainTag = CHAIN_NAMES[market.chainId] || `Chain ${market.chainId}`
     const tvlUsd = market.state.supplyAssetsUsd || 0
-    
-    const tvlFormatted = tvlUsd >= 1000000 
-      ? `$${(tvlUsd / 1000000).toFixed(2)}M` 
+
+    const tvlFormatted = tvlUsd >= 1000000
+      ? `$${(tvlUsd / 1000000).toFixed(2)}M`
       : tvlUsd >= 1000
-      ? `$${(tvlUsd / 1000).toFixed(2)}K`
-      : `$${tvlUsd.toFixed(0)}`
-    
+        ? `$${(tvlUsd / 1000).toFixed(2)}K`
+        : `$${tvlUsd.toFixed(0)}`
+
     const pairName = `${market.collateralAsset!.symbol}/${market.loanAsset.symbol}`.padEnd(25).slice(0, 25)
     const apyStr = `APY: ${(market.state.supplyApy * 100).toFixed(2)}%`.padEnd(18)
     const tvlStr = `TVL: ${tvlFormatted}`.padEnd(20)
     const utilStr = `Util: ${(market.state.utilization * 100).toFixed(1)}%`.padEnd(15)
     const lltvStr = `LLTV: ${(Number(market.lltv) / 1e18 * 100).toFixed(0)}%`.padEnd(12)
-    
+
     console.log(
-      `${(index + 1).toString().padStart(2)}. ${pairName}${apyStr}${tvlStr}${utilStr}${lltvStr}${chainTag}`
+      `${(index + 1).toString().padStart(2)}. ${pairName}${apyStr}${tvlStr}${utilStr}${lltvStr}${chainTag}`,
     )
   })
 
@@ -407,7 +432,7 @@ function recapMarkets(curatedMarkets: EnrichedMarket[]) {
   const stablecoinMarkets = curatedMarkets.filter(m => m.isStablecoinPair).length
   const avgApy = curatedMarkets.reduce((sum, m) => sum + m.state.supplyApy, 0) / curatedMarkets.length
   const avgTvl = curatedMarkets.reduce((sum, m) => sum + (m.state.supplyAssetsUsd || 0), 0) / curatedMarkets.length
-  
+
   console.log('\n=== Summary ===')
   console.log(`Total curated markets: ${curatedMarkets.length}`)
   console.log(`Stablecoin pairs: ${stablecoinMarkets}`)

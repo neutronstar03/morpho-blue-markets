@@ -1,21 +1,20 @@
-import type { Route } from "./+types/market";
-import { useState } from "react";
-import { useCuratedMarkets, formatMarketData } from "../lib/hooks/use-market";
-import { ConnectButton } from "../components/connect-button";
-import { MarketDisplay } from "../components/market-display";
-import { MarketList } from "../components/market-list";
+import type { Route } from './+types/market'
+import { useState } from 'react'
+import { ConnectButton } from '../components/connect-button'
+import { MarketList } from '../components/market-list'
+import { useCuratedMarkets } from '../lib/hooks/use-market'
 
-export function meta({}: Route.MetaArgs) {
+export function meta(_: Route.MetaArgs) {
   return [
-    { title: "Morpho Blue Markets" },
-    { name: "description", content: "View and interact with Morpho Blue markets" },
-  ];
+    { title: 'Morpho Blue Markets' },
+    { name: 'description', content: 'View and interact with Morpho Blue markets' },
+  ]
 }
 
 export default function MarketPage() {
-  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
-  
-  const { data: markets, isLoading, error } = useCuratedMarkets(100);
+  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null)
+
+  const { data: markets, isLoading, error } = useCuratedMarkets(100)
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -40,7 +39,7 @@ export default function MarketPage() {
             <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-6">
               <div className="animate-pulse space-y-4">
                 <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
-                {[...Array(5)].map((_, i) => (
+                {[...Array.from({ length: 5 })].map((_, i) => (
                   <div key={i} className="h-12 bg-gray-700 rounded"></div>
                 ))}
               </div>
@@ -55,8 +54,8 @@ export default function MarketPage() {
             </div>
           )}
           {markets && (
-            <MarketList 
-              markets={markets} 
+            <MarketList
+              markets={markets}
               selectedMarketId={selectedMarketId}
               onMarketSelect={setSelectedMarketId}
             />
@@ -64,5 +63,5 @@ export default function MarketPage() {
         </div>
       </main>
     </div>
-  );
+  )
 }

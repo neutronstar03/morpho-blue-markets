@@ -1,10 +1,8 @@
+import type { FormattedMarket } from '~/lib/types'
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
-import { formatEther } from 'viem'
 import { DepositForm } from '../deposit-form'
 import { WithdrawForm } from '../withdraw-form'
-import { useUserPosition } from '../../lib/hooks/use-morpho'
-import type { FormattedMarket } from '~/lib/types'
 
 interface MarketActionsProps {
   market: FormattedMarket
@@ -13,8 +11,6 @@ interface MarketActionsProps {
 export function MarketActions({ market }: MarketActionsProps) {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit')
   const { address } = useAccount()
-  const { data: position } = useUserPosition(market.id, address)
-  const userSupplyShares = position ? formatEther(position[0]) : '0'
 
   return (
     <div className="p-6">
@@ -43,18 +39,19 @@ export function MarketActions({ market }: MarketActionsProps) {
         </div>
 
         <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-          {activeTab === 'deposit' ? (
-            <DepositForm
-              market={market}
-              loanTokenSymbol={market.loanAsset.symbol}
-            />
-          ) : (
-            <WithdrawForm
-              market={market}
-              loanTokenSymbol={market.loanAsset.symbol}
-              maxWithdrawable={userSupplyShares}
-            />
-          )}
+          {activeTab === 'deposit'
+            ? (
+                <DepositForm
+                  market={market}
+                  loanTokenSymbol={market.loanAsset.symbol}
+                />
+              )
+            : (
+                <WithdrawForm
+                  market={market}
+                  loanTokenSymbol={market.loanAsset.symbol}
+                />
+              )}
         </div>
 
         {!address && (

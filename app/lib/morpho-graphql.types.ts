@@ -28,7 +28,7 @@ export interface MorphoMarket {
   creationTimestamp: string
 }
 
-export type QueryMarketsResult = {
+export interface QueryMarketsResult {
   chain?: { id: string }
   markets: {
     items: MorphoMarket[]

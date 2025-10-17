@@ -1,15 +1,15 @@
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useIsClient } from '../lib/hooks/use-is-client'
 import { Button } from './ui/button'
-import { useIsClient } from '../lib/hooks/use-is-client';
 
 export function ConnectButton() {
-  const isClient = useIsClient();
+  const isClient = useIsClient()
   const { address, isConnected } = useAccount()
   const { connectors, connect, isPending } = useConnect()
   const { disconnect } = useDisconnect()
 
   if (!isClient) {
-    return null;
+    return null
   }
 
   if (isConnected && address) {
@@ -32,7 +32,7 @@ export function ConnectButton() {
 
   return (
     <div className="flex gap-2">
-      {connectors.map((connector) => (
+      {connectors.map(connector => (
         <Button
           key={connector.uid}
           variant="outline"

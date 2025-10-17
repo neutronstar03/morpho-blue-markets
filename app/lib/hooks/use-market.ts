@@ -1,5 +1,5 @@
+import type { CuratedMarket, CuratedMarketJSON, FormattedMarket, FrontendMarket } from '../types'
 import { useQuery } from '@tanstack/react-query'
-import type { CuratedMarket, CuratedMarketJSON, FrontendMarket, FormattedMarket } from '../types'  
 
 // Types are now in app/lib/types.ts
 
@@ -13,7 +13,7 @@ export function useCuratedMarkets(limit: number = 20) {
         throw new Error('Could not fetch curated markets')
       }
       const data = await response.json() as CuratedMarketJSON
-      
+
       const markets: FrontendMarket[] = (data.markets || [])
         .slice(0, limit)
         .map(formatCuratedMarket)
@@ -51,15 +51,6 @@ export function formatCuratedMarket(curatedMarket: CuratedMarket): FrontendMarke
   }
 }
 
-// Utility to format USD values for display
-function formatUsd(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: value >= 100000 ? 0 : 2,
-  }).format(value)
-}
-
 function formatTokenAmount(
   value: string,
   symbol: string,
@@ -79,7 +70,8 @@ function formatTokenAmount(
     const formattedFractional = fractionalPart.toString().padStart(2, '0')
 
     return `${formattedInteger}.${formattedFractional} ${symbol}`
-  } catch (e) {
+  }
+  catch (e) {
     console.error(`Could not format token amount: ${value}`, e)
     return `0 ${symbol}`
   }
@@ -110,7 +102,7 @@ export function formatMarketData(market: FrontendMarket): FormattedMarket {
     chainId: market.chainId,
     chainName: getChainName(market.chainId),
     loanAsset: market.loanAsset,
-    collateralAsset: collateralAsset,
+    collateralAsset,
     totalSupplyFormatted: metrics.tvlFormatted,
     totalBorrowFormatted,
     supplyApyFormatted: metrics.supplyApyFormatted,
