@@ -103,6 +103,14 @@ const CONFIG = {
   maxMarketsPerChain: 500 // Limit markets per chain to avoid over-representing one chain
 }
 
+const CONFIG_CHEAP_BORROW = {
+  maxSupplyApy: 0.10, // 200% maximum APY (filter out broken markets)
+  minTvlUsd: 50000, // $50k minimum TVL
+  maxUtilization: 0.99, // Max 99% utilization (filter out 100% utilized markets)
+  batchSize: 100, // Fetch 100 markets per request
+  maxMarketsPerChain: 500 // Limit markets per chain to avoid over-representing one chain
+}
+
 async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
   console.log(`\nFetching markets for ${CHAIN_NAMES[chainId] || `Chain ${chainId}`}...`)
   let skip = 0
@@ -155,6 +163,57 @@ async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
   return marketsForChain
 }
 
+async function fetchCheapBorrowMarkets(chainId: number): Promise<MorphoMarket[]> {
+  console.log(`\nFetching cheap borrow markets for ${CHAIN_NAMES[chainId] || `Chain ${chainId}`}...`)
+  let skip = 0
+  let hasMore = true
+  const marketsForChain: MorphoMarket[] = []
+
+  while (hasMore && marketsForChain.length < CONFIG_CHEAP_BORROW.maxMarketsPerChain) {
+    try {
+      const data = await client.request<QueryMarketsResult>(
+        QUERY_MARKETS,
+        {
+          first: CONFIG_CHEAP_BORROW.batchSize,
+          skip,
+          chainId: chainId,
+          where: {
+            chainId_in: [chainId],
+            supplyApy_lte: CONFIG_CHEAP_BORROW.maxSupplyApy,
+            supplyAssetsUsd_gte: CONFIG_CHEAP_BORROW.minTvlUsd,
+            // utilization_lte: CONFIG_CHEAP_BORROW.maxUtilization
+          },
+          orderBy: 'SupplyApy',
+          orderDirection: 'Asc'
+        }
+      )
+
+      if (!data?.markets?.items || data.markets.items.length === 0) {
+        hasMore = false
+        continue
+      }
+
+      const markets = data.markets.items
+      marketsForChain.push(...markets)
+      
+      console.log(`Fetched ${markets.length} markets (total for this chain: ${marketsForChain.length})`)
+
+      if (markets.length < CONFIG_CHEAP_BORROW.batchSize) {
+        hasMore = false
+      } else {
+        skip += CONFIG_CHEAP_BORROW.batchSize
+      }
+    } catch (error: any) {
+      console.error(`Error fetching markets for chain ${chainId}:`, error.message)
+      if (error.response?.errors) {
+        console.error('GraphQL errors:', JSON.stringify(error.response.errors, null, 2))
+      }
+      hasMore = false // Stop fetching for this chain on error
+    }
+  }
+  return marketsForChain
+}
+
 async function generateCuratedMarkets() {
   console.log('Fetching markets from Morpho Blue API...')
   const chainNames = CONFIG.chainIds.map(id => CHAIN_NAMES[id] || `Chain ${id}`).join(', ')
@@ -190,6 +249,20 @@ async function generateCuratedMarkets() {
         console.error(`Failed to fetch markets for chain ${CONFIG.chainIds[index]}:`, result.reason)
       }
     })
+
+    const cheapBorrowMarkets = await fetchCheapBorrowMarkets(CHAIN_IDS.BASE)
+    const enrichedCheapBorrowMarkets = cheapBorrowMarkets.filter(market => market.collateralAsset !== null).map(market => ({
+      ...market,
+      chainId: CHAIN_IDS.BASE,
+      isStablecoinPair: isStablecoinPair(market),
+      tvl: calculateTVL(market)
+    }))
+
+    console.log('CHEAP BORROW MARKETS')
+    recapMarkets(enrichedCheapBorrowMarkets)
+
+    allMarkets.push(...enrichedCheapBorrowMarkets)
+    enrichedMarkets.push(...enrichedCheapBorrowMarkets)
 
     console.log(`\nTotal fetched: ${allMarkets.length} markets across all chains.`)
 
@@ -314,7 +387,7 @@ function recapMarkets(curatedMarkets: EnrichedMarket[]) {
       ? `$${(tvlUsd / 1000).toFixed(2)}K`
       : `$${tvlUsd.toFixed(0)}`
     
-    const pairName = `${market.loanAsset.symbol}/${market.collateralAsset!.symbol}`.padEnd(25).slice(0, 25)
+    const pairName = `${market.collateralAsset!.symbol}/${market.loanAsset.symbol}`.padEnd(25).slice(0, 25)
     const apyStr = `APY: ${(market.state.supplyApy * 100).toFixed(2)}%`.padEnd(18)
     const tvlStr = `TVL: ${tvlFormatted}`.padEnd(20)
     const utilStr = `Util: ${(market.state.utilization * 100).toFixed(1)}%`.padEnd(15)

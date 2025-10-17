@@ -105,8 +105,8 @@ export function formatMarketData(market: FrontendMarket): FormattedMarket {
 
   return {
     id: market.uniqueKey,
-    name: `${market.loanAsset.symbol}/${collateralAsset.symbol}`,
-    pair: `${market.loanAsset.symbol}/${collateralAsset.symbol}`,
+    name: `${collateralAsset.symbol}/${market.loanAsset.symbol}`,
+    pair: `${collateralAsset.symbol}/${market.loanAsset.symbol}`,
     chainId: market.chainId,
     chainName: getChainName(market.chainId),
     loanAsset: market.loanAsset,

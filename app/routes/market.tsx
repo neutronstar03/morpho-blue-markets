@@ -15,7 +15,7 @@ export function meta({}: Route.MetaArgs) {
 export default function MarketPage() {
   const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
   
-  const { data: markets, isLoading, error } = useCuratedMarkets(20);
+  const { data: markets, isLoading, error } = useCuratedMarkets(100);
 
   return (
     <div className="min-h-screen bg-gray-900">
