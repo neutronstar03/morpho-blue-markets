@@ -1,0 +1,4 @@
+---
+alwaysApply: true
+---
+Ignore most of eslint errors, the human is good to handle them.

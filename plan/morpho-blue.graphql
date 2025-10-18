@@ -939,3 +939,320 @@ type Asset {
   """Either the asset is whitelisted or not"""
   isWhitelisted: Boolean!
 }
+
+type PaginatedMarkets {
+  items: [Market!]
+  pageInfo: PageInfo
+}
+
+"""Morpho Blue deployment"""
+type MorphoBlue {
+  id: ID!
+  address: Address!
+  creationBlockNumber: Int!
+  chain: Chain!
+
+  """Current state"""
+  state: MorphoBlueState
+
+  """State history"""
+  historicalState: MorphoBlueStateHistory
+}
+
+"""Chain"""
+type Chain {
+  id: Int!
+  network: String!
+  currency: String!
+}
+
+"""MetaMorpho Vaults"""
+type Vault {
+  id: ID!
+  address: Address!
+  symbol: String!
+  name: String!
+  creationBlockNumber: Int!
+  creationTimestamp: BigInt!
+  creatorAddress: Address
+  whitelisted: Boolean!
+  metadata: VaultMetadata
+  asset: Asset!
+  factory: VaultFactory!
+  chain: Chain!
+  state(useRealtimeApi: Boolean @deprecated(reason: "Internal use only")): VaultState
+
+  """Daily vault APY"""
+  dailyApy: Float @deprecated(reason: "Use `dailyApys` instead.")
+
+  """Monthly vault APY"""
+  monthlyApy: Float @deprecated(reason: "Use `monthlyApys` instead.")
+
+  """Weekly vault APY"""
+  weeklyApy: Float @deprecated(reason: "Use `weeklyApys` instead.")
+
+  """Daily vault APYs"""
+  dailyApys: VaultApyAggregates @deprecated(reason: "Use `vault.state` daily average APYs instead.")
+
+  """Weekly vault APYs"""
+  weeklyApys: VaultApyAggregates @deprecated(reason: "Use `vault.state` weekly average APYs instead.")
+
+  """Monthly vault APYs"""
+  monthlyApys: VaultApyAggregates @deprecated(reason: "Use `vault.state` monthly average APYs instead.")
+
+  """Vault liquidity"""
+  liquidity: VaultLiquidity
+
+  """Vault warnings"""
+  warnings: [VaultWarning!]
+
+  """Public allocator configuration"""
+  publicAllocatorConfig: PublicAllocatorConfig
+
+  """Vault allocators"""
+  allocators: [VaultAllocator!]
+
+  """Vault pending caps"""
+  pendingCaps: [VaultPendingCap!]
+
+  """Risk related data on the vault"""
+  riskAnalysis: [RiskAnalysis!]
+
+  """Vault admin events on the vault"""
+  adminEvents(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+    where: VaultAdminEventsFilters
+  ): PaginatedVaultAdminEvent
+  historicalState: VaultHistory!
+}
+
+"""MetaMorpho vault state"""
+type VaultState {
+  id: ID!
+
+  """Block number of the state"""
+  blockNumber: BigInt
+
+  """Total value of vault holdings, in underlying token units."""
+  totalAssets: BigInt!
+
+  """Total value of vault holdings, in USD for display purpose."""
+  totalAssetsUsd: Float
+
+  """
+  Stores the total assets managed by this vault when the fee was last accrued, in underlying token units.
+  """
+  lastTotalAssets: BigInt!
+
+  """Vault shares total supply."""
+  totalSupply: BigInt!
+
+  """Vault performance fee."""
+  fee: Float!
+
+  """Vault APY excluding rewards, before deducting the performance fee."""
+  apy: Float!
+
+  """Vault APY excluding rewards, after deducting the performance fee."""
+  netApyWithoutRewards: Float!
+
+  """
+  Vault APY including rewards and underlying yield, after deducting the performance fee.
+  """
+  netApy: Float
+
+  """Vault curator address."""
+  curator: Address!
+
+  """Additional information about the curator address."""
+  curatorMetadata(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+  ): PaginatedAddressMetadata
+
+  """Fee recipient address."""
+  feeRecipient: Address!
+
+  """Guardian address."""
+  guardian: Address!
+
+  """Additional information about the guardian address."""
+  guardianMetadata(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+  ): PaginatedAddressMetadata
+
+  """Pending guardian address."""
+  pendingGuardian: Address
+
+  """Pending guardian apply timestamp."""
+  pendingGuardianValidAt: BigInt
+
+  """Owner address."""
+  owner: Address!
+
+  """Additional information about the owner address."""
+  ownerMetadata(
+    """Number of items requested"""
+    first: Int = 100
+
+    """Number of items skipped"""
+    skip: Int = 0
+  ): PaginatedAddressMetadata
+
+  """Pending owner address."""
+  pendingOwner: Address
+
+  """Skim recipient address."""
+  skimRecipient: Address!
+
+  """Timelock in seconds."""
+  timelock: BigInt!
+
+  """Pending timelock in seconds."""
+  pendingTimelock: BigInt
+
+  """Pending timelock apply timestamp."""
+  pendingTimelockValidAt: BigInt
+
+  """Last update timestamp."""
+  timestamp: BigInt!
+
+  """Vault allocation on Morpho Blue markets."""
+  allocation: [VaultAllocation!]
+
+  """Vault state rewards"""
+  rewards: [VaultStateReward!]
+
+  """Value of WAD shares in assets"""
+  sharePrice: BigInt
+
+  """Value of WAD shares in USD"""
+  sharePriceUsd: Float
+
+  """Curators operating on this vault"""
+  curators: [Curator!]
+
+  """
+  6h average vault APY excluding rewards, before deducting the performance fee (6h timeframe is subject to change).
+  """
+  avgApy: Float
+
+  """
+  6h average vault APY including rewards, after deducting the performance fee (6h timeframe is subject to change).
+  """
+  avgNetApy: Float
+
+  """
+  Daily Vault APY excluding rewards, before deducting the performance fee.
+  """
+  dailyApy: Float
+
+  """
+  Daily Vault APY including rewards, after deducting the performance fee.
+  """
+  dailyNetApy: Float
+
+  """
+  Weekly Vault APY excluding rewards, before deducting the performance fee.
+  """
+  weeklyApy: Float
+
+  """
+  Weekly Vault APY including rewards, after deducting the performance fee.
+  """
+  weeklyNetApy: Float
+
+  """
+  Biweekly Vault APY excluding rewards, before deducting the performance fee.
+  """
+  biweeklyApy: Float
+
+  """
+  Biweekly Vault APY including rewards, after deducting the performance fee.
+  """
+  biweeklyNetApy: Float
+
+  """
+  Monthly Vault APY excluding rewards, before deducting the performance fee.
+  """
+  monthlyApy: Float
+
+  """
+  Monthly Vault APY including rewards, after deducting the performance fee.
+  """
+  monthlyNetApy: Float
+
+  """
+  Quarterly Vault APY excluding rewards, before deducting the performance fee.
+  """
+  quarterlyApy: Float
+
+  """
+  Quarterly Vault APY including rewards, after deducting the performance fee.
+  """
+  quarterlyNetApy: Float
+
+  """
+  Yearly Vault APY excluding rewards, before deducting the performance fee.
+  """
+  yearlyApy: Float
+
+  """
+  Yearly Vault APY including rewards, after deducting the performance fee.
+  """
+  yearlyNetApy: Float
+
+  """
+  All Time Vault APY excluding rewards, before deducting the performance fee.
+  """
+  allTimeApy: Float
+
+  """
+  All Time Vault APY including rewards, after deducting the performance fee.
+  """
+  allTimeNetApy: Float
+}
+
+enum OrderDirection {
+  Asc
+  Desc
+}
+
+enum MarketOrderBy {
+  UniqueKey
+  Lltv
+  BorrowAssets
+  BorrowAssetsUsd
+  SupplyAssets
+  SupplyAssetsUsd
+  BorrowShares
+  SupplyShares
+  Utilization
+  RateAtUTarget
+  ApyAtTarget
+  SupplyApy
+  NetSupplyApy
+  BorrowApy
+  NetBorrowApy
+  Fee
+  LoanAssetSymbol
+  CollateralAssetSymbol
+  TotalLiquidityUsd
+  AvgBorrowApy
+  AvgNetBorrowApy
+  DailyBorrowApy
+  DailyNetBorrowApy
+  CredoraRiskScore
+  SizeUsd
+}

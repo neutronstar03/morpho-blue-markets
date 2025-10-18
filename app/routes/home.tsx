@@ -1,8 +1,7 @@
 import type { Route } from './+types/home'
+import { AdvancedList } from '~/components/advanced-list'
 import { ConnectButton } from '../components/connect-button'
-import { List } from '../components/list'
 import { Position } from '../components/position'
-import { useCuratedMarkets } from '../lib/hooks/use-market'
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -12,8 +11,6 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export default function HomePage() {
-  const { data: markets, isLoading, error } = useCuratedMarkets(100)
-
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
@@ -34,25 +31,9 @@ export default function HomePage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="w-full">
           <Position />
-          {isLoading && (
-            <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-6">
-              <div className="animate-pulse space-y-4">
-                <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
-                {[...Array.from({ length: 5 })].map((_, i) => (
-                  <div key={i} className="h-12 bg-gray-700 rounded"></div>
-                ))}
-              </div>
-            </div>
-          )}
-          {error && (
-            <div className="bg-red-900/30 border border-red-700 rounded-lg p-6">
-              <div className="text-red-200">
-                <p className="font-medium">Error loading markets</p>
-                <p className="text-sm mt-1">{error.message}</p>
-              </div>
-            </div>
-          )}
-          {markets && <List markets={markets} />}
+          <div className="mt-8">
+            <AdvancedList />
+          </div>
         </div>
       </main>
     </div>
