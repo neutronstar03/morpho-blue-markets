@@ -27,8 +27,7 @@ jobs:
         run: bun run build
       - name: Prepare for GitHub Pages SPA
         run: |
-          cp build/client/index.html build/client/404.html
-          touch build/client/.nojekyll
+          mv build/client/morpho-blue-markets/index.html build/client/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
