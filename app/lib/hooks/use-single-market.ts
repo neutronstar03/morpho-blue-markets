@@ -1,73 +1,70 @@
-import type {
-  CuratedMarket,
-  CuratedMarketJSON,
-  FormattedMarket,
-  FrontendMarket,
-} from '../types'
+import type { Market } from '../graphql-types'
+import type { FormattedMarket, FrontendMarket } from '../types'
 import { useQuery } from '@tanstack/react-query'
+import { request } from 'graphql-request'
+import { GetMarketDocument } from '../graphql/market'
 
-// @deprecated: we will not use JSON file in future, but rely directly on graphql queries
+const MORPHO_API_URL = 'https://blue-api.morpho.org/graphql'
 
-// Types are now in app/lib/types.ts
-
-// Hook to fetch curated markets from JSON
-export function useCuratedMarkets(limit: number = 20) {
+export function useMarketQuery(uniqueKey?: string, chainId?: number) {
   return useQuery({
-    queryKey: ['curated-markets', limit],
+    queryKey: ['market', uniqueKey, chainId],
     queryFn: async () => {
-      const response = await fetch('/curated-markets.json')
-      if (!response.ok) {
-        throw new Error('Could not fetch curated markets')
-      }
-      const data = (await response.json()) as CuratedMarketJSON
-
-      const markets: FrontendMarket[] = (data.markets || [])
-        .slice(0, limit)
-        .map(formatCuratedMarket)
-
-      return markets
+      if (!uniqueKey || !chainId)
+        return null
+      const { marketByUniqueKey } = await request(
+        MORPHO_API_URL,
+        GetMarketDocument,
+        {
+          uniqueKey,
+          chainId,
+        },
+      )
+      return marketByUniqueKey as Market
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!uniqueKey && !!chainId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   })
 }
 
-// Hook to fetch a single market
-export function useMarket(marketId?: string) {
-  const { data: markets, ...rest } = useCuratedMarkets(1000)
-  const market = markets?.find(m => m.id === marketId)
-
+// Utility function to format a market from GraphQL into the FrontendMarket type
+export function formatGqlMarket(market: Market): FrontendMarket {
   return {
-    ...rest,
-    data: market,
-  }
-}
-
-// Utility function to format a curated market into the standard Market type
-export function formatCuratedMarket(
-  curatedMarket: CuratedMarket,
-): FrontendMarket {
-  return {
-    uniqueKey: curatedMarket.id,
-    id: curatedMarket.id,
-    chainId: curatedMarket.chainId || 1, // Default to mainnet if not specified
-    lltv: curatedMarket.lltv,
-    oracleAddress: curatedMarket.oracleAddress,
-    irmAddress: curatedMarket.irmAddress,
+    uniqueKey: market.uniqueKey,
+    id: market.id,
+    chainId: Number(market.loanAsset.chain.id),
+    lltv: market.lltv,
+    oracleAddress: market.oracle.address,
+    irmAddress: market.irmAddress,
     loanAsset: {
-      address: curatedMarket.loanToken.address,
-      symbol: curatedMarket.loanToken.symbol,
-      name: curatedMarket.loanToken.name,
-      decimals: curatedMarket.loanToken.decimals,
+      address: market.loanAsset.address,
+      symbol: market.loanAsset.symbol,
+      name: market.loanAsset.name,
+      decimals: market.loanAsset.decimals,
     },
     collateralAsset: {
-      address: curatedMarket.collateralToken.address,
-      symbol: curatedMarket.collateralToken.symbol,
-      name: curatedMarket.collateralToken.name,
-      decimals: curatedMarket.collateralToken.decimals,
+      address: market.collateralAsset.address,
+      symbol: market.collateralAsset.symbol,
+      name: market.collateralAsset.name,
+      decimals: market.collateralAsset.decimals,
     },
-    metrics: curatedMarket.metrics,
-    whitelisted: curatedMarket.whitelisted,
-    creationTimestamp: curatedMarket.createdAt,
+    metrics: {
+      supplyApy: market.state.supplyApy,
+      borrowApy: market.state.borrowApy,
+      totalSupply: market.state.supplyAssets.toString(),
+      totalBorrow: market.state.borrowAssets.toString(),
+      utilization: market.state.utilization,
+      tvl: Number(market.state.supplyAssets),
+      // TODO: Add formatted values
+      supplyApyFormatted: `${(market.state.supplyApy * 100).toFixed(2)}%`,
+      borrowApyFormatted: `${(market.state.borrowApy * 100).toFixed(2)}%`,
+      tvlFormatted: '',
+      utilizationFormatted: `${(market.state.utilization * 100).toFixed(2)}%`,
+      lltvFormatted: `${Number(market.lltv) / 1e18}%`,
+      isStablecoinPair: false,
+    },
+    whitelisted: market.whitelisted,
+    creationTimestamp: Number(market.creationTimestamp),
   }
 }
 

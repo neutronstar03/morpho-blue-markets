@@ -1,19 +1,19 @@
 import type { FrontendMarket } from '../lib/types'
+import { useNavigate } from 'react-router'
 import { Fragment } from 'react/jsx-runtime'
 import { formatMarketData } from '../lib/hooks/use-market'
-import { MarketDisplay } from './market-display'
 
-interface MarketListProps {
+interface ListProps {
   markets: FrontendMarket[]
-  selectedMarketId: string | null
-  onMarketSelect: (marketId: string | null) => void
 }
 
-export function MarketList({
-  markets,
-  selectedMarketId,
-  onMarketSelect,
-}: MarketListProps) {
+export function List({ markets }: ListProps) {
+  const navigate = useNavigate()
+
+  const handleMarketClick = (marketId: string, chainId: number) => {
+    navigate(`/market/${marketId}/${chainId}`)
+  }
+
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
       <div className="p-4 border-b border-gray-700">
@@ -64,15 +64,11 @@ export function MarketList({
           <tbody className="bg-gray-800 divide-y divide-gray-700">
             {markets.map((market) => {
               const formatted = formatMarketData(market)
-              const isSelected = selectedMarketId === market.id
               return (
                 <Fragment key={market.id}>
                   <tr
-                    onClick={() =>
-                      onMarketSelect(isSelected ? null : market.id!)}
-                    className={`cursor-pointer hover:bg-gray-700/50 transition-colors ${
-                      isSelected ? 'bg-blue-900/30' : ''
-                    }`}
+                    onClick={() => handleMarketClick(market.id!, market.chainId!)}
+                    className="cursor-pointer hover:bg-gray-700/50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-white">
@@ -105,15 +101,6 @@ export function MarketList({
                       </div>
                     </td>
                   </tr>
-                  {isSelected && (
-                    <tr>
-                      <td colSpan={6} className="p-0">
-                        <div className="p-4 bg-gray-900/50">
-                          <MarketDisplay market={formatted} />
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </Fragment>
               )
             })}

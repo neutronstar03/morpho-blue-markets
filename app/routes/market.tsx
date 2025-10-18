@@ -1,20 +1,34 @@
 import type { Route } from './+types/market'
-import { useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { ConnectButton } from '../components/connect-button'
-import { MarketList } from '../components/market-list'
-import { useCuratedMarkets } from '../lib/hooks/use-market'
+import { MarketDisplay } from '../components/market-display'
+import {
+  formatGqlMarket,
+  formatMarketData,
+  useMarketQuery,
+} from '../lib/hooks/use-single-market'
 
 export function meta(_: Route.MetaArgs) {
   return [
-    { title: 'Morpho Blue Markets' },
-    { name: 'description', content: 'View and interact with Morpho Blue markets' },
+    { title: 'Morpho Blue Market' },
+    { name: 'description', content: 'View market details on Morpho Blue' },
   ]
 }
 
 export default function MarketPage() {
-  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null)
+  const { uniqueKey, chainId } = useParams<{
+    uniqueKey: string
+    chainId: string
+  }>()
+  const {
+    data: market,
+    isLoading,
+    error,
+  } = useMarketQuery(uniqueKey!, Number(chainId))
 
-  const { data: markets, isLoading, error } = useCuratedMarkets(100)
+  const formattedMarket = market
+    ? formatMarketData(formatGqlMarket(market))
+    : null
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -23,9 +37,9 @@ export default function MarketPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-white">
-                Morpho Blue Markets
-              </h1>
+              <Link to="/" className="text-xl font-semibold text-white">
+                &larr; Back to Markets
+              </Link>
             </div>
             <ConnectButton />
           </div>
@@ -34,33 +48,30 @@ export default function MarketPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="w-full">
-          {isLoading && (
-            <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-6">
-              <div className="animate-pulse space-y-4">
-                <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
-                {[...Array.from({ length: 5 })].map((_, i) => (
-                  <div key={i} className="h-12 bg-gray-700 rounded"></div>
-                ))}
-              </div>
+        {isLoading && (
+          <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-6">
+            <p className="text-white">Loading market...</p>
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-900/30 border border-red-700 rounded-lg p-6">
+            <div className="text-red-200">
+              <p className="font-medium">Error loading market</p>
+              <p className="text-sm mt-1">{error.message}</p>
             </div>
-          )}
-          {error && (
-            <div className="bg-red-900/30 border border-red-700 rounded-lg p-6">
-              <div className="text-red-200">
-                <p className="font-medium">Error loading markets</p>
-                <p className="text-sm mt-1">{error.message}</p>
-              </div>
-            </div>
-          )}
-          {markets && (
-            <MarketList
-              markets={markets}
-              selectedMarketId={selectedMarketId}
-              onMarketSelect={setSelectedMarketId}
-            />
-          )}
-        </div>
+          </div>
+        )}
+        {formattedMarket
+          ? (
+              <MarketDisplay market={formattedMarket} />
+            )
+          : (
+              !isLoading && (
+                <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-6">
+                  <p className="text-white">Market not found.</p>
+                </div>
+              )
+            )}
       </main>
     </div>
   )

@@ -139,6 +139,212 @@ input MarketFilters {
   credoraRiskScore_gte: Float
 }
 
+"""Morpho Blue market state"""
+type MarketState {
+  id: ID!
+
+  """Block number of the state"""
+  blockNumber: BigInt
+
+  """
+  Amount borrowed on the market, in underlying units. Amount increases as interests accrue.
+  """
+  borrowAssets: BigInt!
+
+  """
+  Amount supplied on the market, in underlying units. Amount increases as interests accrue.
+  """
+  supplyAssets: BigInt!
+
+  """Amount borrowed on the market, in USD for display purpose"""
+  borrowAssetsUsd: Float
+
+  """Amount supplied on the market, in USD for display purpose"""
+  supplyAssetsUsd: Float
+
+  """
+  Amount borrowed on the market, in market share units. Amount does not increase as interest accrue.
+  """
+  borrowShares: BigInt!
+
+  """
+  Amount supplied on the market, in market share units. Amount does not increase as interest accrue.
+  """
+  supplyShares: BigInt!
+
+  """Amount available to borrow on the market, in underlying units"""
+  liquidityAssets: BigInt!
+
+  """Amount available to borrow on the market, in USD for display purpose"""
+  liquidityAssetsUsd: Float
+
+  """Amount of collateral in the market, in underlying units"""
+  collateralAssets: BigInt
+
+  """Amount of collateral in the market, in USD for display purpose"""
+  collateralAssetsUsd: Float
+
+  """Utilization rate"""
+  utilization: Float!
+
+  """Apy at target utilization"""
+  rateAtUTarget: Float! @deprecated(reason: "Use `apyAtTarget` instead")
+
+  """Apy at target utilization"""
+  apyAtTarget: Float!
+
+  """Rate at target utilization"""
+  rateAtTarget: BigInt
+
+  """Instantaneous Supply APY"""
+  supplyApy: Float!
+
+  """Instantaneous Borrow APY"""
+  borrowApy: Float!
+
+  """Instantaneous Supply APY including rewards"""
+  netSupplyApy: Float
+
+  """Instantaneous Borrow APY including rewards"""
+  netBorrowApy: Float
+
+  """Fee rate"""
+  fee: Float!
+
+  """Collateral price"""
+  price: BigInt
+
+  """Variation of the collateral price over the last 24 hours"""
+  dailyPriceVariation: Float
+
+  """Last update timestamp."""
+  timestamp: BigInt!
+
+  """Market state rewards"""
+  rewards: [MarketStateReward!]
+
+  """
+  Total size of the market. This is the sum of all assets that are allocated or can be reallocated to this market.
+  """
+  size: BigInt!
+
+  """
+  Total size of the market. This is the sum of all assets that are allocated or can be reallocated to this market, in USD for display purpose.
+  """
+  sizeUsd: Float
+
+  """Amount available to borrow on the market, including shared liquidity."""
+  totalLiquidity: BigInt!
+
+  """
+  Amount available to borrow on the market, including shared liquidity, in USD for display purpose.
+  """
+  totalLiquidityUsd: Float
+
+  """
+  6h average supply APY excluding rewards (6h timeframe is subject to change).
+  """
+  avgSupplyApy: Float
+
+  """
+  6h average supply APY including rewards (6h timeframe is subject to change).
+  """
+  avgNetSupplyApy: Float
+
+  """
+  6h average borrow APY excluding rewards (6h timeframe is subject to change).
+  """
+  avgBorrowApy: Float
+
+  """
+  6h average borrow APY including rewards (6h timeframe is subject to change).
+  """
+  avgNetBorrowApy: Float
+
+  """Daily Supply APY excluding rewards"""
+  dailySupplyApy: Float
+
+  """Daily Supply APY including rewards"""
+  dailyNetSupplyApy: Float
+
+  """Daily Borrow APY excluding rewards"""
+  dailyBorrowApy: Float
+
+  """Daily Borrow APY including rewards"""
+  dailyNetBorrowApy: Float
+
+  """Weekly Supply APY excluding rewards"""
+  weeklySupplyApy: Float
+
+  """Weekly Supply APY including rewards"""
+  weeklyNetSupplyApy: Float
+
+  """Weekly Borrow APY excluding rewards"""
+  weeklyBorrowApy: Float
+
+  """Weekly Borrow APY including rewards"""
+  weeklyNetBorrowApy: Float
+
+  """Biweekly Supply APY excluding rewards"""
+  biweeklySupplyApy: Float
+
+  """Biweekly Supply APY including rewards"""
+  biweeklyNetSupplyApy: Float
+
+  """Biweekly Borrow APY excluding rewards"""
+  biweeklyBorrowApy: Float
+
+  """Biweekly Borrow APY including rewards"""
+  biweeklyNetBorrowApy: Float
+
+  """Monthly Supply APY excluding rewards"""
+  monthlySupplyApy: Float
+
+  """Monthly Supply APY including rewards"""
+  monthlyNetSupplyApy: Float
+
+  """Monthly Borrow APY excluding rewards"""
+  monthlyBorrowApy: Float
+
+  """Monthly Borrow APY including rewards"""
+  monthlyNetBorrowApy: Float
+
+  """Quarterly Supply APY excluding rewards"""
+  quarterlySupplyApy: Float
+
+  """Quarterly Supply APY including rewards"""
+  quarterlyNetSupplyApy: Float
+
+  """Quarterly Borrow APY excluding rewards"""
+  quarterlyBorrowApy: Float
+
+  """Quarterly Borrow APY including rewards"""
+  quarterlyNetBorrowApy: Float
+
+  """Yearly Supply APY excluding rewards"""
+  yearlySupplyApy: Float
+
+  """Yearly Supply APY including rewards"""
+  yearlyNetSupplyApy: Float
+
+  """Yearly Borrow APY excluding rewards"""
+  yearlyBorrowApy: Float
+
+  """Yearly Borrow APY including rewards"""
+  yearlyNetBorrowApy: Float
+
+  """All Time Supply APY excluding rewards"""
+  allTimeSupplyApy: Float
+
+  """All Time Supply APY including rewards"""
+  allTimeNetSupplyApy: Float
+
+  """All Time Borrow APY excluding rewards"""
+  allTimeBorrowApy: Float
+
+  """All Time Borrow APY including rewards"""
+  allTimeNetBorrowApy: Float
+}
 
 """Morpho Blue market"""
 type Market {
