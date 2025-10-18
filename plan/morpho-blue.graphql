@@ -651,3 +651,291 @@ type Query {
   ): PaginatedVaultV2Transactions! @deprecated(reason: "WIP")
 }
 
+
+"""Market position"""
+type MarketPosition {
+  id: ID!
+  whitelisted: Boolean!
+
+  """Amount of loan asset supplied, in market shares."""
+  supplyShares: BigInt! @deprecated(reason: "Use `state.supplyShares` instead.")
+
+  """Amount of loan asset supplied, in underlying token units."""
+  supplyAssets: BigInt! @deprecated(reason: "Use `state.supplyAssets` instead.")
+
+  """Amount of loan asset supplied, in USD for display purpose."""
+  supplyAssetsUsd: Float @deprecated(reason: "Use `state.supplyAssetsUsd` instead.")
+
+  """Amount of loan asset borrowed, in market shares."""
+  borrowShares: BigInt! @deprecated(reason: "Use `state.borrowShares` instead.")
+
+  """Amount of loan asset borrowed, in underlying token units."""
+  borrowAssets: BigInt! @deprecated(reason: "Use `state.borrowAssets` instead.")
+
+  """Amount of loan asset borrowed, in USD for display purpose."""
+  borrowAssetsUsd: Float @deprecated(reason: "Use `state.borrowAssetsUsd` instead.")
+
+  """
+  Amount of collateral asset deposited on the market, in underlying token units.
+  """
+  collateral: BigInt! @deprecated(reason: "Use `state.collateral` instead.")
+
+  """
+  Amount of collateral asset deposited on the market, in USD for display purpose.
+  """
+  collateralUsd: Float @deprecated(reason: "Use `state.collateralUsd` instead.")
+
+  """
+  Health factor of the position, computed as collateral value divided by borrow value.
+  """
+  healthFactor: Float
+
+  """
+  Price variation required for the given position to reach its liquidation threshold (scaled by WAD)
+  """
+  priceVariationToLiquidationPrice: Float
+
+  """Current state"""
+  state(useRealtimeApi: Boolean @deprecated(reason: "Internal use only")): MarketPositionState
+
+  """State history"""
+  historicalState: MarketPositionHistory
+  user: User!
+  market: Market!
+}
+
+"""Market position state"""
+type MarketPositionState {
+  id: ID!
+
+  """The latest update timestamp."""
+  timestamp: BigInt!
+
+  """
+  Profit (from the collateral asset's price variation) & Loss (from the loan interest) of the position since its inception, in loan assets.
+  """
+  pnl: BigInt
+
+  """
+  Profit (from the collateral asset's price variation) & Loss (from the loan interest) of the position since its inception, in USD for display purpose.
+  """
+  pnlUsd: Float
+
+  """Return Over Equity of the position since its inception."""
+  roe: Float
+
+  """
+  Return Over Equity of the position since its inception, taking into account prices variation.
+  """
+  roeUsd: Float
+
+  """
+  Profit & Loss (from the loan asset's price variation and interest) of the supply side of the position since its inception, in loan assets.
+  """
+  supplyPnl: BigInt
+
+  """
+  Profit & Loss (from the loan asset's price variation and interest) of the supply side of the position since its inception, in USD for display purpose.
+  """
+  supplyPnlUsd: Float
+
+  """
+  Return Over Equity of the supply side of the position since its inception.
+  """
+  supplyRoe: Float
+
+  """
+  Return Over Equity of the supply side of the position since its inception, taking into account the loan asset's price variation.
+  """
+  supplyRoeUsd: Float
+
+  """
+  Profit & Loss (from the loan asset's price variation and interest) of the borrow side of the position since its inception, in loan assets.
+  """
+  borrowPnl: BigInt
+
+  """
+  Profit & Loss (from the loan asset's price variation and interest) of the borrow side of the position since its inception, in USD for display purpose.
+  """
+  borrowPnlUsd: Float
+
+  """
+  Return Over Equity of the borrow side of the position since its inception.
+  """
+  borrowRoe: Float
+
+  """
+  Return Over Equity of the borrow side of the position since its inception, taking into account the loan asset's price variation.
+  """
+  borrowRoeUsd: Float
+
+  """
+  Profit & Loss (from the collateral asset's price variation) of the collateral of the position since its inception, in USD for display purpose.
+  """
+  collateralPnlUsd: Float
+
+  """
+  Return Over Equity of the collateral of the position since its inception, taking into account the collateral asset's price variation.
+  """
+  collateralRoeUsd: Float
+
+  """
+  Profit & Loss (from the assets' price variation and loan interest) of the margin of the position since its inception, in loan assets.
+  """
+  marginPnl: BigInt
+
+  """
+  Profit & Loss (from the collateral asset's price variation and loan interest) of the margin of the position since its inception, in USD for display purpose.
+  """
+  marginPnlUsd: Float
+
+  """Return Over Equity of the margin of the position since its inception."""
+  marginRoe: Float
+
+  """
+  Return Over Equity of the margin of the position since its inception, taking into account prices variation.
+  """
+  marginRoeUsd: Float
+
+  """The latest collateral assets indexed for this position."""
+  collateral: BigInt!
+
+  """
+  The latest collateral assets indexed for this position, in loan assets.
+  """
+  collateralValue: BigInt
+
+  """The latest collateral assets indexed for this position, in USD."""
+  collateralUsd: Float
+
+  """The latest supply assets indexed for this position."""
+  supplyAssets: BigInt
+
+  """The latest supply assets indexed for this position, in USD."""
+  supplyAssetsUsd: Float
+
+  """The latest supply shares indexed for this position."""
+  supplyShares: BigInt!
+
+  """The latest borrow assets indexed for this position."""
+  borrowAssets: BigInt
+
+  """The latest borrow assets indexed for this position, in USD."""
+  borrowAssetsUsd: Float
+
+  """The latest borrow shares indexed for this position."""
+  borrowShares: BigInt!
+
+  """The latest margin indexed for this position, in loan assets."""
+  margin: BigInt
+
+  """The latest margin indexed for this position, in USD."""
+  marginUsd: Float
+}
+
+
+"""
+Filtering options for market positions. AND operator is used for multiple filters, while OR operator is used for multiple values in the same filter.
+"""
+input MarketPositionFilters {
+  search: String
+
+  """Filter by market id"""
+  marketId_in: [String!]
+
+  """Filter by market unique key"""
+  marketUniqueKey_in: [String!]
+  marketWhitelisted: Boolean
+
+  """Filter by user id"""
+  userId_in: [String!]
+
+  """Filter by user address. Case insensitive."""
+  userAddress_in: [String!]
+
+  """Filter by chain id"""
+  chainId_in: [Int!]
+
+  """Filter by greater than or equal to given health factor"""
+  healthFactor_gte: Float
+
+  """Filter by lower than or equal to given health factor"""
+  healthFactor_lte: Float
+
+  """Filter by greater than or equal to given supply shares"""
+  supplyShares_gte: BigInt
+
+  """Filter by lower than or equal to given supply shares"""
+  supplyShares_lte: BigInt
+
+  """Filter by greater than or equal to given borrow shares"""
+  borrowShares_gte: BigInt
+
+  """Filter by lower than or equal to given borrow shares"""
+  borrowShares_lte: BigInt
+
+  """
+  Filter by greater than or equal to given collateral amount, in underlying token units.
+  """
+  collateral_gte: BigInt
+
+  """
+  Filter by lower than or equal to given collateral amount, in underlying token units.
+  """
+  collateral_lte: BigInt
+}
+
+"""Bad debt realized in the market"""
+type MarketBadDebt {
+  """Amount of bad debt realized in the market in underlying units."""
+  underlying: BigInt!
+
+  """Amount of bad debt realized in the market in USD."""
+  usd: Float
+}
+
+"""Asset"""
+type Asset {
+  id: ID!
+
+  """ERC-20 token contract address"""
+  address: Address!
+  chain: Chain!
+  decimals: Float!
+  name: String!
+  symbol: String!
+  tags: [String!]
+
+  """Token logo URI, for display purpose"""
+  logoURI: String
+
+  """ERC-20 token total supply"""
+  totalSupply: BigInt! @deprecated(reason: "this data is not updated anymore")
+
+  """Current price in USD, for display purpose."""
+  priceUsd: Float
+
+  """Historical price in USD, for display purpose"""
+  historicalPriceUsd(options: TimeseriesOptions = {}): [FloatDataPoint!]
+
+  """Current oracle price in USD, for display purpose."""
+  oraclePriceUsd(timestamp: Float): Float
+
+  """Current spot price in ETH."""
+  spotPriceEth(timestamp: Float): Float @deprecated(reason: "No longer updated. Use `historicalPriceUsd` instead.")
+
+  """Historical spot price in ETH"""
+  historicalSpotPriceEth(options: TimeseriesOptions = {}): [FloatDataPoint!] @deprecated(reason: "No longer updated. Use `historicalPriceUsd` instead.")
+
+  """MetaMorpho vault"""
+  vault: Vault
+
+  """Asset yield"""
+  yield: AssetYield
+
+  """Risk related data on the asset"""
+  riskAnalysis: [RiskAnalysis!]
+
+  """Either the asset is whitelisted or not"""
+  isWhitelisted: Boolean!
+}
