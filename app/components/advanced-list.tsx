@@ -9,6 +9,7 @@ import {
   OrderDirection,
   useMarkets,
 } from '~/lib/hooks/use-list-markets'
+import { formatTimeAgo } from '~/lib/time'
 
 const CONFIG = {
   minSupplyApy: 0.09, // 9% apr
@@ -71,19 +72,6 @@ interface MarketData {
   supplyApr1d: string
   supplyApr7d: string
   whitelisted: boolean
-}
-
-function formatTimeAgo(timestamp: number): string {
-  const now = Date.now()
-  const seconds = Math.floor((now - timestamp) / 1000)
-
-  if (seconds < 5) {
-    return 'just now'
-  }
-  if (seconds < 60) {
-    return `${seconds}s ago`
-  }
-  return `${Math.floor(seconds / 60)}m ago`
 }
 
 interface MarketFiltersProps {
@@ -256,14 +244,18 @@ export function AdvancedList() {
     [aprType, comparison, aprValue],
   )
 
+  const MARKETS_STALE_TIME = 5 * 60 * 1000 // 5 minute
+
   const {
     data: marketsData,
     isLoading,
     refetch,
+    dataUpdatedAt,
   } = useMarkets({
     where,
     orderBy,
     orderDirection,
+    staleTime: MARKETS_STALE_TIME,
   })
 
   const markets = useMemo(() => {
@@ -285,20 +277,20 @@ export function AdvancedList() {
   }, [marketsData])
 
   // State for last updated time
-  const [lastUpdated, setLastUpdated] = useState(Date.now())
   const [timeAgo, setTimeAgo] = useState('')
 
   useEffect(() => {
-    setTimeAgo(formatTimeAgo(lastUpdated))
-    const interval = setInterval(() => {
-      setTimeAgo(formatTimeAgo(lastUpdated))
-    }, 5000) // update every 5 seconds
-    return () => clearInterval(interval)
-  }, [lastUpdated])
+    if (dataUpdatedAt) {
+      setTimeAgo(formatTimeAgo(dataUpdatedAt))
+      const interval = setInterval(() => {
+        setTimeAgo(formatTimeAgo(dataUpdatedAt))
+      }, 5000) // update every 5 seconds
+      return () => clearInterval(interval)
+    }
+  }, [dataUpdatedAt])
 
   const handleRefresh = () => {
     refetch()
-    setLastUpdated(Date.now())
   }
 
   return (

@@ -1,7 +1,50 @@
-import type { QueryMarketPositionsResult } from '../graphql-types'
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
 import { graphqlClient } from '../graphql/client'
+
+export interface MarketPosition {
+  id: string
+  user: {
+    id: string
+  }
+  market: {
+    uniqueKey: string
+    morphoBlue: {
+      chain: {
+        id: number
+      }
+    }
+    loanAsset: {
+      symbol: string
+      address: string
+      decimals: number
+    }
+    collateralAsset: {
+      symbol: string
+      address: string
+      decimals: number
+    }
+    badDebt: { usd: number }
+    realizedBadDebt: { usd: number }
+    state: {
+      avgSupplyApy: number
+      netSupplyApy: number
+      supplyAssets: string
+      supplyShares: string
+    }
+  }
+  state: {
+    supplyShares: string
+    borrowShares: string
+    collateral: string
+  }
+}
+
+export interface QueryMarketPositionsResult {
+  marketPositions: {
+    items: MarketPosition[]
+  }
+}
 
 const userMarketPositionsQuery = gql`
   query GetUserMarketPositions($userAddress: String!) {

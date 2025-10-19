@@ -154,6 +154,7 @@ interface UseMarketsProps {
   orderDirection: OrderDirection
   first?: number
   skip?: number
+  staleTime?: number
 }
 
 export function useMarkets({
@@ -162,6 +163,7 @@ export function useMarkets({
   orderDirection,
   first = 100,
   skip = 0,
+  staleTime = 1 * 60 * 1000, // 1 minute
 }: UseMarketsProps) {
   return useQuery<QueryMarketsResult>({
     queryKey: ['markets', where, orderBy, orderDirection, first, skip],
@@ -173,6 +175,6 @@ export function useMarkets({
         first,
         skip,
       }),
-    staleTime: 1 * 60 * 1000, // 1 minute
+    staleTime,
   })
 }

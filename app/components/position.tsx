@@ -1,23 +1,11 @@
-import type { MarketPosition as MarketPositionType } from '../lib/graphql-types'
+import type { MarketPosition as MarketPositionType } from '../lib/hooks/use-market-positions'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { useMarketPositions } from '../lib/hooks/use-market-positions'
-
-function formatTimeAgo(timestamp: number): string {
-  const now = Date.now()
-  const seconds = Math.floor((now - timestamp) / 1000)
-
-  if (seconds < 5) {
-    return 'just now'
-  }
-  if (seconds < 60) {
-    return `${seconds}s ago`
-  }
-  return `${Math.floor(seconds / 60)}m ago`
-}
+import { formatTimeAgo } from '../lib/time'
 
 function formatAmount(amount: number, decimals: number) {
   if (Number.isNaN(amount) || amount === 0) {

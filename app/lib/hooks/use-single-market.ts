@@ -1,10 +1,47 @@
-import type { Market } from '../graphql-types'
 import type { FormattedMarket, FrontendMarket } from '../types'
 import { useQuery } from '@tanstack/react-query'
 import { request } from 'graphql-request'
 import { GetMarketDocument } from '../graphql/market'
 
 const MORPHO_API_URL = 'https://blue-api.morpho.org/graphql'
+
+export interface Market {
+  id: string
+  uniqueKey: string
+  lltv: string
+  oracle: {
+    address: string
+  }
+  irmAddress: string
+  creationTimestamp: string
+  whitelisted: boolean
+  loanAsset: {
+    address: string
+    symbol: string
+    name: string | null
+    decimals: number | null
+    chain: {
+      id: string
+    }
+  }
+  collateralAsset: {
+    address: string
+    symbol: string
+    name: string | null
+    decimals: number | null
+    chain: {
+      id: string
+    }
+  }
+  state: {
+    supplyApy: number
+    borrowApy: number
+    supplyAssets: string
+    borrowAssets: string
+    utilization: number
+    price: string
+  }
+}
 
 export function useMarketQuery(uniqueKey?: string, chainId?: number) {
   return useQuery({
@@ -55,7 +92,6 @@ export function formatGqlMarket(market: Market): FrontendMarket {
       totalBorrow: market.state.borrowAssets.toString(),
       utilization: market.state.utilization,
       tvl: Number(market.state.supplyAssets),
-      // TODO: Add formatted values
       supplyApyFormatted: `${(market.state.supplyApy * 100).toFixed(2)}%`,
       borrowApyFormatted: `${(market.state.borrowApy * 100).toFixed(2)}%`,
       tvlFormatted: '',
