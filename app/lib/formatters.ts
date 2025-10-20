@@ -23,3 +23,13 @@ export function formatMarketSize(supplyAssetsUsd: number | undefined): string {
 
   return `$${value.toFixed(1)}`
 }
+
+export function formatAmount(amount: number, decimals: number) {
+  if (Number.isNaN(amount) || amount === 0) {
+    return '0.00'
+  }
+  return amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: decimals,
+  })
+}

@@ -3,19 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
-import { formatTimeAgo } from '../lib/formatters'
+import { formatAmount, formatTimeAgo } from '../lib/formatters'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { useMarketPositions } from '../lib/hooks/use-market-positions'
-
-function formatAmount(amount: number, decimals: number) {
-  if (Number.isNaN(amount) || amount === 0) {
-    return '0.00'
-  }
-  return amount.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: decimals,
-  })
-}
 
 function PositionListItem({ position }: { position: MarketPositionType }) {
   const marketSupplyAssets = BigInt(position.market.state.supplyAssets)

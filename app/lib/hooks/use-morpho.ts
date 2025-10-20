@@ -1,3 +1,4 @@
+import type { SupportedChain } from '../addresses'
 import type { FormattedMarket } from '../types'
 import { useMemo } from 'react'
 import { erc20Abi, formatUnits, parseUnits } from 'viem'
@@ -8,7 +9,7 @@ import { SIMPLIFIED_MORPHO_BLUE_ABI } from './simplified.abi'
 
 export function getMorphoBlueAddress(chainId?: number): `0x${string}` {
   const chainName = getSupportedChainName(chainId)
-  return chainName ? morphoAddressOnChain[chainName] : morphoAddressOnChain.Ethereum
+  return chainName in morphoAddressOnChain ? morphoAddressOnChain[chainName as SupportedChain] : morphoAddressOnChain.Ethereum
 }
 
 export const TOKEN_DECIMALS: Record<string, number> = {

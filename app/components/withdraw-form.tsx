@@ -2,6 +2,7 @@ import type { FormattedMarket } from '~/lib/types'
 import { useMemo, useState } from 'react'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
+import { formatAmount } from '~/lib/formatters'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '../lib/hooks/use-morpho'
 import { Button } from './ui/button'
@@ -10,10 +11,6 @@ interface WithdrawFormProps {
   market: FormattedMarket
   loanTokenSymbol: string
   onSuccess?: () => void
-}
-
-function formatAmount(amount: number, decimals: number) {
-  return Number.isNaN(amount) ? '0' : (amount).toLocaleString(undefined, { maximumFractionDigits: decimals })
 }
 
 export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFormProps) {

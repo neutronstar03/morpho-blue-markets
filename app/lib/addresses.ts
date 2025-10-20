@@ -1,4 +1,4 @@
-type SupportedChain = 'Ethereum' | 'Base' | 'Arbitrum' | 'Polygon' | 'HyperEVM' | 'Unichain' | 'Katana'
+export type SupportedChain = 'Ethereum' | 'Base' | 'Arbitrum' | 'Polygon' | 'HyperEVM' | 'Unichain' | 'Katana'
 
 export const morphoAddressOnChain = {
   Ethereum: '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb',
@@ -8,7 +8,7 @@ export const morphoAddressOnChain = {
   HyperEVM: '0x68e37dE8d93d3496ae143F2E900490f6280C57cD',
   Unichain: '0x8f5ae9cddb9f68de460c77730b018ae7e04a140a',
   Katana: '0xD50F2DffFd62f94Ee4AEd9ca05C61d0753268aBc',
-} satisfies Record<SupportedChain, `0x${string}`>
+} as const satisfies Record<SupportedChain, `0x${string}`>
 
 export const supportedChains = Object.keys(morphoAddressOnChain) as SupportedChain[]
 
@@ -23,8 +23,9 @@ export const supportedChainsID = {
 } as const
 
 export type SupportedChainID = keyof typeof supportedChainsID
+export type UnknownChainName = `Chain ${number}`
 
-export function getSupportedChainName(chainId?: number): SupportedChain | string {
+export function getSupportedChainName(chainId?: number): SupportedChain | UnknownChainName {
   const chainName = supportedChainsID[chainId as SupportedChainID]
   return chainName ?? `Chain ${chainId}`
 }

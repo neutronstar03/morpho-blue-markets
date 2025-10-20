@@ -1,8 +1,8 @@
 export interface MarketAsset {
   address: string
   symbol: string
-  decimals?: number | null
-  name?: string | null
+  decimals: number
+  name: string
 }
 
 export interface FrontendMarket {
