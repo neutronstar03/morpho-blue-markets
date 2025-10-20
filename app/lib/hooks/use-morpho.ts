@@ -1,8 +1,9 @@
 import type { SupportedChain } from '../addresses'
-import type { FormattedMarket } from '../types'
+import type { SingleMorphoMarket } from './use-market'
 import { useMemo } from 'react'
 import { erc20Abi, formatUnits, parseUnits } from 'viem'
 import { useAccount, useReadContract, useSimulateContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useNetworkContext } from '~/lib/contexts/network'
 import { getSupportedChainName, morphoAddressOnChain } from '../addresses'
 import { tokenAmountToWei } from '../tokens'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from './simplified.abi'
@@ -51,6 +52,8 @@ export function formatTokenBalance(balance: bigint | undefined, tokenAddress: st
 
 export function useTokenApproval(tokenAddress: string, amount: string, userAddress?: string) {
   const { chainId } = useAccount()
+  const { requiredChainId } = useNetworkContext()
+  const isWrongNetwork = requiredChainId && chainId !== requiredChainId
   const spender = getMorphoBlueAddress(chainId)
   const isValidAmount = !!amount && Number.parseFloat(amount) > 0
 
@@ -60,7 +63,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     functionName: 'allowance',
     args: userAddress ? [userAddress as `0x${string}`, spender] : undefined,
     query: {
-      enabled: !!userAddress,
+      enabled: !!userAddress && !isWrongNetwork,
     },
   })
 
@@ -76,7 +79,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     functionName: 'approve',
     args: approveArgs,
     query: {
-      enabled: isValidAmount,
+      enabled: isValidAmount && !isWrongNetwork,
     },
   })
 
@@ -101,21 +104,26 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
 
 // Hook for checking token balance in wallet
 export function useTokenBalance(tokenAddress: string, userAddress?: string) {
+  const { chainId } = useAccount()
+  const { requiredChainId } = useNetworkContext()
+  const isWrongNetwork = requiredChainId && chainId !== requiredChainId
   return useReadContract({
     address: tokenAddress as `0x${string}`,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: userAddress ? [userAddress as `0x${string}`] : undefined,
     query: {
-      enabled: !!userAddress,
+      enabled: !!userAddress && !isWrongNetwork,
       refetchInterval: 30000, // Refetch every 30 seconds
     },
   })
 }
 
 // Hook for supplying to a market
-export function useSupply(market: FormattedMarket, amount: string, loanTokenDecimals: number) {
+export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenDecimals: number) {
   const { chainId, address: userAddress } = useAccount()
+  const { requiredChainId } = useNetworkContext()
+  const isWrongNetwork = requiredChainId && chainId !== requiredChainId
   const isValidAmount = !!amount && Number.parseFloat(amount) > 0
 
   const supplyArgs = useMemo(() => {
@@ -127,7 +135,7 @@ export function useSupply(market: FormattedMarket, amount: string, loanTokenDeci
         collateralToken: market.collateralAsset?.address as `0x${string}`,
         oracle: market.oracleAddress as `0x${string}`,
         irm: market.irmAddress as `0x${string}`,
-        lltv: BigInt(market.lltvRaw),
+        lltv: BigInt(market.lltv),
       },
       tokenAmountToWei(amount, loanTokenDecimals),
       BigInt(0), // shares (0 for max)
@@ -142,7 +150,7 @@ export function useSupply(market: FormattedMarket, amount: string, loanTokenDeci
     functionName: 'supply',
     args: supplyArgs as any,
     query: {
-      enabled: isValidAmount && !!userAddress && !!market,
+      enabled: isValidAmount && !!userAddress && !!market && !isWrongNetwork,
     },
   })
 
@@ -163,8 +171,10 @@ export function useSupply(market: FormattedMarket, amount: string, loanTokenDeci
 }
 
 // Hook for withdrawing from a market
-export function useWithdraw(market: FormattedMarket, sharesIn: string) {
+export function useWithdraw(market: SingleMorphoMarket, sharesIn: string) {
   const { chainId, address: userAddress } = useAccount()
+  const { requiredChainId } = useNetworkContext()
+  const isWrongNetwork = requiredChainId && chainId !== requiredChainId
   const isValidAmount = !!sharesIn && Number.parseFloat(sharesIn) > 0
 
   const withdrawArgs = useMemo(() => {
@@ -176,7 +186,7 @@ export function useWithdraw(market: FormattedMarket, sharesIn: string) {
         collateralToken: market.collateralAsset?.address as `0x${string}`,
         oracle: market.oracleAddress as `0x${string}`,
         irm: market.irmAddress as `0x${string}`,
-        lltv: BigInt(market.lltvRaw),
+        lltv: BigInt(market.lltv),
       },
       0n, // assets
       parseUnits(sharesIn, 18), // shares
@@ -191,7 +201,7 @@ export function useWithdraw(market: FormattedMarket, sharesIn: string) {
     functionName: 'withdraw',
     args: withdrawArgs as any,
     query: {
-      enabled: isValidAmount && !!userAddress && !!market,
+      enabled: isValidAmount && !!userAddress && !!market && !isWrongNetwork,
     },
   })
 
@@ -213,6 +223,8 @@ export function useWithdraw(market: FormattedMarket, sharesIn: string) {
 
 export function useUserPosition(marketKey: string, userAddress: string | undefined) {
   const { chainId } = useAccount()
+  const { requiredChainId } = useNetworkContext()
+  const isWrongNetwork = requiredChainId && chainId !== requiredChainId
 
   return useReadContract({
     address: getMorphoBlueAddress(chainId),
@@ -223,13 +235,15 @@ export function useUserPosition(marketKey: string, userAddress: string | undefin
       userAddress as `0x${string}`,
     ],
     query: {
-      enabled: !!userAddress && !!marketKey,
+      enabled: !!userAddress && !!marketKey && !isWrongNetwork,
     },
   })
 }
 
 export function useMarket(marketKey: string) {
   const { chainId } = useAccount()
+  const { requiredChainId } = useNetworkContext()
+  const isWrongNetwork = requiredChainId && chainId !== requiredChainId
 
   return useReadContract({
     address: getMorphoBlueAddress(chainId),
@@ -237,7 +251,7 @@ export function useMarket(marketKey: string) {
     functionName: 'market',
     args: [marketKey as any],
     query: {
-      enabled: !!marketKey,
+      enabled: !!marketKey && !isWrongNetwork,
     },
   })
 }

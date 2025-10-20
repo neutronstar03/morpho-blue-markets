@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
+import { getSupportedChainName } from '~/lib/addresses'
 import { useNetworkContext } from '~/lib/contexts/network'
-import { getChainName } from '~/lib/hooks/use-single-market'
 import { Button } from './ui/button'
 
 export function Header({ children }: { children: ReactNode }) {
@@ -29,7 +29,7 @@ export function Header({ children }: { children: ReactNode }) {
                 >
                   Switch to
                   {' '}
-                  {getChainName(requiredChainId)}
+                  {getSupportedChainName(requiredChainId)}
                 </Button>
               </div>
             )}

@@ -73,13 +73,6 @@ const userMarketPositionsQuery = gql`
               id
             }
           }
-        }
-        state {
-          supplyShares
-          borrowShares
-          collateral
-        }
-        market {
           badDebt {
             usd
           }
@@ -92,6 +85,11 @@ const userMarketPositionsQuery = gql`
             supplyAssets
             supplyShares
           }
+        }
+        state {
+          supplyShares
+          borrowShares
+          collateral
         }
       }
     }

@@ -13,6 +13,7 @@ import {
   OrderDirection,
   useMarkets,
 } from '~/lib/hooks/use-list-markets'
+import { Card } from './ui/card'
 
 const CONFIG = {
   minSupplyApy: 0.09, // 9% apr
@@ -328,7 +329,7 @@ export function AdvancedList() {
       : 'supply'
 
   return (
-    <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
+    <Card>
       <div className="p-4 border-b border-gray-700 flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <h2 className="text-xl font-bold text-white">Advanced Markets</h2>
@@ -363,6 +364,6 @@ export function AdvancedList() {
       />
 
       <MarketTable markets={markets} isLoading={isLoading} rateType={displayRateType} />
-    </div>
+    </Card>
   )
 }

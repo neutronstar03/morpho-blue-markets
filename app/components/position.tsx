@@ -1,20 +1,17 @@
 import type { MarketPosition as MarketPositionType } from '../lib/hooks/use-market-positions'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
-import { formatAmount, formatTimeAgo } from '../lib/formatters'
+import { formatAmount, formatAmountSpecific, formatTimeAgo } from '../lib/formatters'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { useMarketPositions } from '../lib/hooks/use-market-positions'
+import { Card } from './ui/card'
 
 function PositionListItem({ position }: { position: MarketPositionType }) {
   const marketSupplyAssets = BigInt(position.market.state.supplyAssets)
   const marketSupplyShares = BigInt(position.market.state.supplyShares)
   const userSupplyShares = BigInt(position.state.supplyShares)
-  const userBorrowShares = BigInt(position.state.borrowShares)
-  const userCollateral = BigInt(position.state.collateral)
   const loanDecimals = position.market.loanAsset.decimals
-  const collateralDecimals = position.market.collateralAsset.decimals || 18
 
   const suppliedAssets = useMemo(() => {
     if (marketSupplyShares === 0n)
@@ -56,37 +53,10 @@ function PositionListItem({ position }: { position: MarketPositionType }) {
           <p className="text-gray-300">
             <span className="text-gray-400">Supply:</span>
             {' '}
-            {formatAmount(
-              Number(formatUnits(suppliedAssets, loanDecimals)),
-              loanDecimals,
-            )}
+            {formatAmountSpecific(suppliedAssets, loanDecimals)}
             {' '}
             {position.market.loanAsset.symbol}
           </p>
-
-          {userCollateral > 0n && (
-            <p className="text-gray-300">
-              <span className="text-gray-400">Collateral:</span>
-              {' '}
-              {formatAmount(
-                Number(formatUnits(userCollateral, collateralDecimals)),
-                collateralDecimals,
-              )}
-              {' '}
-              {position.market.collateralAsset.symbol}
-            </p>
-          )}
-
-          {userBorrowShares > 0n && (
-            <p className="text-gray-300">
-              <span className="text-gray-400">Borrow Shares:</span>
-              {' '}
-              {formatAmount(
-                Number(formatUnits(userBorrowShares, loanDecimals)),
-                loanDecimals,
-              )}
-            </p>
-          )}
         </div>
       </li>
     </Link>
@@ -111,7 +81,7 @@ function PositionClient() {
 
   if (!isConnected) {
     return (
-      <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden mb-8">
+      <Card className="mb-8">
         <div className="p-4 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white">My Position</h2>
         </div>
@@ -120,40 +90,40 @@ function PositionClient() {
             Please connect your wallet to see your positions.
           </p>
         </div>
-      </div>
+      </Card>
     )
   }
 
   if (isLoading) {
     return (
-      <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden mb-8">
+      <Card className="mb-8">
         <div className="p-4 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white">My Position</h2>
         </div>
         <div className="p-6">
           <p className="text-gray-400">Loading your positions...</p>
         </div>
-      </div>
+      </Card>
     )
   }
 
   if (error) {
     return (
-      <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden mb-8">
+      <Card className="mb-8">
         <div className="p-4 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white">My Position</h2>
         </div>
         <div className="p-6">
           <p className="text-red-400">Error loading your positions.</p>
         </div>
-      </div>
+      </Card>
     )
   }
 
   const positions = data?.marketPositions.items ?? []
 
   return (
-    <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden mb-8">
+    <Card className="mb-8">
       <div className="p-4 border-b border-gray-700 flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <h2 className="text-xl font-bold text-white">My Position</h2>
@@ -190,7 +160,7 @@ function PositionClient() {
                 </ul>
               )}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -203,14 +173,14 @@ export function Position() {
 
   if (!isClient) {
     return (
-      <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden mb-8">
+      <Card className="mb-8">
         <div className="p-4 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white">My Position</h2>
         </div>
         <div className="p-6">
           <p className="text-gray-400">Loading position...</p>
         </div>
-      </div>
+      </Card>
     )
   }
 

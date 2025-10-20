@@ -1,7 +1,7 @@
-import type { FormattedMarket } from '~/lib/types'
+import type { SingleMorphoMarket } from '~/lib/hooks/use-market'
 
 interface MarketMetricsProps {
-  market: FormattedMarket
+  market: SingleMorphoMarket
 }
 
 export function MarketMetrics({ market }: MarketMetricsProps) {

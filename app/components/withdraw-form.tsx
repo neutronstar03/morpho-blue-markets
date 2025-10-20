@@ -1,14 +1,14 @@
-import type { FormattedMarket } from '~/lib/types'
+import type { SingleMorphoMarket } from '~/lib/hooks/use-market'
 import { useMemo, useState } from 'react'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
-import { formatAmount } from '~/lib/formatters'
+import { formatNumber } from '~/lib/formatters'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '../lib/hooks/use-morpho'
 import { Button } from './ui/button'
 
 interface WithdrawFormProps {
-  market: FormattedMarket
+  market: SingleMorphoMarket
   loanTokenSymbol: string
   onSuccess?: () => void
 }
@@ -18,8 +18,8 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   const [amount, setAmount] = useState('')
   const { address } = useAccount()
 
-  const { data: position } = useUserPosition(market.id, address)
-  const { data: marketData } = useMarket(market.id)
+  const { data: position } = useUserPosition(market.uniqueKey, address)
+  const { data: marketData } = useMarket(market.uniqueKey)
 
   const maxWithdrawableShares = useMemo(() => {
     if (!position || !position[0])
@@ -171,7 +171,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
               </>
             )
           : (
-              `Withdraw ${(formatAmount(Number.parseFloat(amount) * sharesToAssetsRatio, market.loanAsset.decimals!))} ${loanTokenSymbol}`
+              `Withdraw ${(formatNumber(Number.parseFloat(amount) * sharesToAssetsRatio, market.loanAsset.decimals!))} ${loanTokenSymbol}`
             )}
       </Button>
 

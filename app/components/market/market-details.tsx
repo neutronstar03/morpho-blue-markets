@@ -1,125 +1,124 @@
-import type { FormattedMarket } from '~/lib/types'
-import { useChains } from 'wagmi'
-
-function formatAddress(address: string) {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`
-}
-
-function formatDate(isoDate: string) {
-  return new Date(isoDate).toLocaleDateString()
-}
+import type { SingleMorphoMarket } from '~/lib/hooks/use-market'
+import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
+import { formatLltv, formatPercent, formatUsd } from '~/lib/formatters'
+import { Card } from '../ui/card'
 
 interface MarketDetailsProps {
-  market: FormattedMarket
+  market: SingleMorphoMarket
+}
+
+function DetailRow({
+  label,
+  value,
+  subValue,
+}: {
+  label: React.ReactNode
+  value: React.ReactNode
+  subValue?: React.ReactNode
+}) {
+  return (
+    <div className="flex justify-between items-center py-2 border-b border-gray-700/50 last:border-b-0">
+      <span className="text-gray-400 text-sm">{label}</span>
+      <div className="text-right">
+        <span className="text-white font-medium">{value}</span>
+        {subValue && <div className="text-xs text-gray-500">{subValue}</div>}
+      </div>
+    </div>
+  )
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <h3 className="text-lg font-semibold text-white mt-6 mb-2 border-b-2 border-blue-500 pb-1">
+      {title}
+    </h3>
+  )
 }
 
 export function MarketDetails({ market }: MarketDetailsProps) {
-  const chains = useChains()
-  const currentChain = chains.find(chain => chain.id === market.chainId)
-  const explorerUrl = currentChain?.blockExplorers?.default.url
-
-  const getAddressUrl = (address: string) =>
-    explorerUrl ? `${explorerUrl}/address/${address}` : undefined
-  const getTokenUrl = (address: string) =>
-    explorerUrl ? `${explorerUrl}/token/${address}` : undefined
-
   return (
-    <div className="p-6">
-      <h3 className="text-lg font-semibold text-white mb-4">Market Details</h3>
+    <Card className="p-6 bg-gray-800/50">
+      <h2 className="text-xl font-semibold text-white mb-4">Market Details</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Assets */}
-        <div>
-          <h4 className="font-medium text-gray-200 mb-3">Assets</h4>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-400">Loan Token:</span>
-              <div className="text-right">
-                <p className="font-medium text-white">{market.loanAsset.symbol}</p>
-                {market.loanAsset.name && (
-                  <p className="text-sm text-gray-400">{market.loanAsset.name}</p>
-                )}
-                <p className="font-mono text-xs text-gray-500">
-                  <a
-                    href={getTokenUrl(market.loanAsset.address)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-blue-400 transition-colors"
-                  >
-                    {formatAddress(market.loanAsset.address)}
-                  </a>
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Collateral Token:</span>
-              <div className="text-right">
-                <p className="font-medium text-white">{market.collateralAsset.symbol}</p>
-                {market.collateralAsset.name && (
-                  <p className="text-sm text-gray-400">{market.collateralAsset.name}</p>
-                )}
-                <p className="font-mono text-xs text-gray-500">
-                  <a
-                    href={getTokenUrl(market.collateralAsset.address)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-blue-400 transition-colors"
-                  >
-                    {formatAddress(market.collateralAsset.address)}
-                  </a>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+      <DetailRow
+        label="Total Supply"
+        value={formatUsd(market.state.supplyAssetsUsd)}
+      />
+      <DetailRow
+        label="Total Borrow"
+        value={formatUsd(market.state.borrowAssetsUsd)}
+      />
+      <DetailRow
+        label="Utilization"
+        value={formatPercent(market.state.utilization)}
+      />
+      <DetailRow label="LLTV" value={formatLltv(market.lltv)} />
 
-        {/* Parameters */}
-        <div>
-          <h4 className="font-medium text-gray-200 mb-3">Parameters</h4>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-400">Oracle:</span>
-              <a
-                href={getAddressUrl(market.oracleAddress)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-xs text-gray-300 hover:text-blue-400 transition-colors"
-              >
-                {formatAddress(market.oracleAddress)}
-              </a>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Interest Rate Model:</span>
-              <a
-                href={getAddressUrl(market.irmAddress)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-xs text-gray-300 hover:text-blue-400 transition-colors"
-              >
-                {formatAddress(market.irmAddress)}
-              </a>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Whitelisted:</span>
-              <span className="font-medium text-white">{market.whitelisted ? 'Yes' : 'No'}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SectionTitle title="Collateral" />
+      <DetailRow
+        label="Daily Price Variation"
+        value={formatPercent(market.state.dailyPriceVariation)}
+      />
+      <DetailRow
+        label="Whitelisted"
+        value={
+          market.whitelisted
+            ? (
+                <CheckCircleIcon className="h-5 w-5 text-green-500 inline-block" />
+              )
+            : (
+                <XCircleIcon className="h-5 w-5 text-red-500 inline-block" />
+              )
+        }
+      />
 
-      {/* Creation Info */}
-      <div className="mt-6 pt-6 border-t border-gray-700">
-        <div className="flex justify-between text-sm text-gray-400">
-          <span>
-            Created:
-            {formatDate(market.createdAt)}
-          </span>
-          <span>
-            Borrow APY:
-            {market.borrowApyFormatted}
-          </span>
-        </div>
-      </div>
-    </div>
+      <SectionTitle title="Risk" />
+      <DetailRow label="Bad Debt" value={formatUsd(market.badDebt.usd)} />
+      <DetailRow
+        label="Realized Bad Debt"
+        value={formatUsd(market.realizedBadDebt.usd)}
+      />
+      <DetailRow
+        label="Supplying Vaults"
+        value={market.supplyingVaults.length}
+      />
+
+      <SectionTitle title="Supply APY" />
+      <DetailRow
+        label="Current"
+        value={formatPercent(market.state.netSupplyApy)}
+      />
+
+      <DetailRow
+        label="Daily"
+        value={formatPercent(market.state.dailyNetSupplyApy)}
+      />
+      <DetailRow
+        label="Weekly"
+        value={formatPercent(market.state.weeklyNetSupplyApy)}
+      />
+      <DetailRow
+        label="Average"
+        value={formatPercent(market.state.avgNetSupplyApy)}
+      />
+
+      <SectionTitle title="Borrow APY" />
+      <DetailRow
+        label="Current"
+        value={formatPercent(market.state.netBorrowApy)}
+      />
+      <DetailRow
+        label="Daily"
+        value={formatPercent(market.state.dailyNetBorrowApy)}
+      />
+      <DetailRow
+        label="Weekly"
+        value={formatPercent(market.state.weeklyNetBorrowApy)}
+      />
+      <DetailRow
+        label="Average"
+        value={formatPercent(market.state.avgNetBorrowApy)}
+      />
+    </Card>
   )
 }
