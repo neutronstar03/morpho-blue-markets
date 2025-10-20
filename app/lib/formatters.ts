@@ -65,12 +65,6 @@ export function formatLltv(value: string) {
   return formatPercent(numericValue)
 }
 
-// export function formatAmountFromString(amount: string, decimals: number) {
-//   if (!amount)
-//     return '0.00'
-//   return formatAmount(BigInt(amount), decimals)
-// }
-
 export function formatUsd(value: number): string {
   if (Number.isNaN(value) || typeof value === 'undefined')
     return '$0.00'
