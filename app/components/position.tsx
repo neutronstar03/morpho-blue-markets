@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
+import { formatTimeAgo } from '../lib/formatters'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { useMarketPositions } from '../lib/hooks/use-market-positions'
-import { formatTimeAgo } from '../lib/time'
 
 function formatAmount(amount: number, decimals: number) {
   if (Number.isNaN(amount) || amount === 0) {

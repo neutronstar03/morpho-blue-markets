@@ -9,7 +9,7 @@ export interface MorphoMarket {
   irmAddress: string
   morphoBlue: {
     chain: {
-      id: string
+      id: number
     }
   }
   loanAsset: {

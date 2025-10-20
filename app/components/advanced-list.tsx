@@ -3,13 +3,16 @@ import type {
   MarketFilters as TypeMarketFilters,
 } from '~/lib/hooks/use-list-markets'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import LinkNewWindow from '~/assets/link-new-window.svg?react'
+import { getSupportedChainName } from '~/lib/addresses'
+import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
+
 import {
   MarketOrderBy,
   OrderDirection,
   useMarkets,
 } from '~/lib/hooks/use-list-markets'
-import { formatTimeAgo } from '~/lib/time'
 
 const CONFIG = {
   minSupplyApy: 0.09, // 9% apr
@@ -17,22 +20,14 @@ const CONFIG = {
   minTvlUsd: 50000, // $50k minimum TVL
 }
 
-const CHAIN_NAMES: { [key: number]: string } = {
-  1: 'Ethereum',
-  8453: 'Base',
-  42161: 'Arbitrum',
-  137: 'Polygon',
-  999: 'HyperEVM',
-}
-
 function buildWhereClause(
-  aprType: string,
-  comparison: string,
+  aprType: string, // 'supply' or 'borrow'
+  comparison: string, // '>' or '<'
   aprValue: number,
 ): TypeMarketFilters {
   const where: TypeMarketFilters = {
     supplyAssetsUsd_gte: CONFIG.minTvlUsd,
-    supplyApy_gte: CONFIG.minSupplyApy,
+    // this upper bound is configured because there are many unused markets with sky high APRs
     supplyApy_lte: CONFIG.maxSupplyApy,
   }
 
@@ -71,6 +66,9 @@ interface MarketData {
   supplyApr: string
   supplyApr1d: string
   supplyApr7d: string
+  borrowApr: string
+  borrowApr1d: string
+  borrowApr7d: string
   whitelisted: boolean
 }
 
@@ -136,23 +134,9 @@ function MarketFilters({
           onChange={e => setOrderBy(e.target.value)}
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="Lltv">Lltv</option>
-          <option value="BorrowAssetsUsd">BorrowAssetsUsd</option>
-          <option value="SupplyAssetsUsd">SupplyAssetsUsd</option>
-          <option value="SupplyShares">SupplyShares</option>
-          <option value="Utilization">Utilization</option>
-          <option value="RateAtUTarget">RateAtUTarget</option>
-          <option value="ApyAtTarget">ApyAtTarget</option>
-          <option value="SupplyApy">SupplyApy</option>
-          <option value="NetSupplyApy">NetSupplyApy</option>
-          <option value="BorrowApy">BorrowApy</option>
-          <option value="NetBorrowApy">NetBorrowApy</option>
-          <option value="TotalLiquidityUsd">TotalLiquidityUsd</option>
-          <option value="AvgBorrowApy">AvgBorrowApy</option>
-          <option value="AvgNetBorrowApy">AvgNetBorrowApy</option>
-          <option value="DailyBorrowApy">DailyBorrowApy</option>
-          <option value="DailyNetBorrowApy">DailyNetBorrowApy</option>
-          <option value="SizeUsd">SizeUsd</option>
+          <option value="NetSupplyApy">Supply APY</option>
+          <option value="NetBorrowApy">Borrow APY</option>
+          <option value="SizeUsd">Size USD</option>
         </select>
         <select
           value={orderDirection}
@@ -171,11 +155,10 @@ function MarketFilters({
 interface MarketTableProps {
   markets: MarketData[]
   isLoading: boolean
+  rateType: 'supply' | 'borrow'
 }
 
-function MarketTable({ markets, isLoading }: MarketTableProps) {
-  const navigate = useNavigate()
-
+function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -183,6 +166,9 @@ function MarketTable({ markets, isLoading }: MarketTableProps) {
       </div>
     )
   }
+  const rateLabel = rateType === 'supply' ? 'Supply' : 'Borrow'
+  const rateColorClass = rateType === 'supply' ? 'text-green-300' : 'text-blue-300'
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-700">
@@ -192,9 +178,21 @@ function MarketTable({ markets, isLoading }: MarketTableProps) {
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Chain Name</th>
             <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Market Size</th>
             <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Utilization %</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Supply APR</th>
-            <th scope="col" className="hidden md:table-cell px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Supply APR 1d</th>
-            <th scope="col" className="hidden lg:table-cell px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Supply APR 7d</th>
+            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+              {rateLabel}
+              {' '}
+              APR
+            </th>
+            <th scope="col" className="hidden md:table-cell px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+              {rateLabel}
+              {' '}
+              APR 1d
+            </th>
+            <th scope="col" className="hidden lg:table-cell px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+              {rateLabel}
+              {' '}
+              APR 7d
+            </th>
             <th scope="col" className="hidden md:table-cell px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Whitelisted</th>
           </tr>
         </thead>
@@ -202,16 +200,39 @@ function MarketTable({ markets, isLoading }: MarketTableProps) {
           {markets.map(market => (
             <tr
               key={market.id}
-              className="hover:bg-gray-700/50 transition-colors cursor-pointer"
-              onClick={() => navigate(`/market/${market.id}/${market.chainId}`)}
+              className="hover:bg-gray-700/50 transition-colors relative"
             >
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{market.market}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                <div className="flex items-center gap-2">
+                  <Link
+                    to={`/market/${market.id}/${market.chainId}`}
+                    className="hover:text-blue-400 transition-colors"
+                  >
+                    {market.market}
+                  </Link>
+                  <a
+                    href={`https://app.morpho.org/${market.chainName.toLowerCase()}/market/${market.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white hover:text-blue-400 transition-colors relative z-10 flex items-center"
+                    title="Open in Morpho official UI"
+                  >
+                    <LinkNewWindow className="w-5 h-5" />
+                  </a>
+                </div>
+              </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{market.chainName}</td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.marketSize}</td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilization}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-300">{market.supplyApr}</td>
-              <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-right text-sm text-green-300">{market.supplyApr1d}</td>
-              <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-right text-sm text-green-300">{market.supplyApr7d}</td>
+              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
+                {rateType === 'supply' ? market.supplyApr : market.borrowApr}
+              </td>
+              <td className={`hidden md:table-cell px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
+                {rateType === 'supply' ? market.supplyApr1d : market.borrowApr1d}
+              </td>
+              <td className={`hidden lg:table-cell px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
+                {rateType === 'supply' ? market.supplyApr7d : market.borrowApr7d}
+              </td>
               <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-center text-sm">
                 <span
                   className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -262,16 +283,23 @@ export function AdvancedList() {
     if (!marketsData?.markets.items)
       return []
 
-    return marketsData.markets.items.map((market: MorphoMarket) => ({
+    return marketsData.markets.items.filter((market) => {
+      if (market.collateralAsset == null || market.loanAsset == null)
+        return false
+      return true
+    }).map((market: MorphoMarket) => ({
       id: market.uniqueKey,
       market: `${market.collateralAsset.symbol}/${market.loanAsset.symbol}`,
       chainId: Number(market.morphoBlue.chain.id),
-      chainName: CHAIN_NAMES[Number(market.morphoBlue.chain.id)] ?? 'Unknown',
-      marketSize: `$${(market.state.supplyAssetsUsd ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+      chainName: getSupportedChainName(market.morphoBlue.chain.id),
+      marketSize: formatMarketSize(market.state.supplyAssetsUsd),
       utilization: `${(market.state.utilization * 100).toFixed(2)}%`,
       supplyApr: `${(market.state.netSupplyApy * 100).toFixed(2)}%`,
       supplyApr1d: `${(market.state.dailyNetSupplyApy * 100).toFixed(2)}%`,
       supplyApr7d: `${(market.state.weeklyNetSupplyApy * 100).toFixed(2)}%`,
+      borrowApr: `${(market.state.netBorrowApy * 100).toFixed(2)}%`,
+      borrowApr1d: `${(market.state.dailyNetBorrowApy * 100).toFixed(2)}%`,
+      borrowApr7d: `${(market.state.weeklyNetBorrowApy * 100).toFixed(2)}%`,
       whitelisted: market.whitelisted,
     }))
   }, [marketsData])
@@ -292,6 +320,12 @@ export function AdvancedList() {
   const handleRefresh = () => {
     refetch()
   }
+
+  // Determine which rate type to display based on filter or order by
+  const displayRateType: 'supply' | 'borrow'
+    = aprType === 'borrow' || orderBy === MarketOrderBy.NetBorrowApy
+      ? 'borrow'
+      : 'supply'
 
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
@@ -328,7 +362,7 @@ export function AdvancedList() {
         setOrderDirection={setOrderDirection as (value: string) => void}
       />
 
-      <MarketTable markets={markets} isLoading={isLoading} />
+      <MarketTable markets={markets} isLoading={isLoading} rateType={displayRateType} />
     </div>
   )
 }
