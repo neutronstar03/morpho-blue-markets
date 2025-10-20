@@ -1,6 +1,8 @@
 import type { Route } from './+types/home'
+import { useEffect } from 'react'
 import { AdvancedList } from '~/components/advanced-list'
-import { ConnectButton } from '../components/connect-button'
+import { Header } from '~/components/header'
+import { useNetworkContext } from '~/lib/contexts/network'
 import { Position } from '../components/position'
 
 export function meta(_: Route.MetaArgs) {
@@ -11,21 +13,20 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export default function HomePage() {
+  const { setRequiredChainId } = useNetworkContext()
+
+  useEffect(() => {
+    setRequiredChainId(null)
+  }, [setRequiredChainId])
+
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <header className="bg-gray-800 shadow-lg border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-white">
-                Morpho Blue Markets
-              </h1>
-            </div>
-            <ConnectButton />
-          </div>
-        </div>
-      </header>
+      <Header>
+        <h1 className="text-xl font-semibold text-white">
+          Morpho Blue Markets
+        </h1>
+      </Header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

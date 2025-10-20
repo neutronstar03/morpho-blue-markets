@@ -1,9 +1,11 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { darkTheme, RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { WagmiProvider } from 'wagmi'
+import { NetworkProvider } from './contexts/network'
 import { config } from './wagmi'
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -21,7 +23,11 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <NetworkProvider>
+          <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
+        </NetworkProvider>
+      </QueryClientProvider>
     </WagmiProvider>
   )
 }

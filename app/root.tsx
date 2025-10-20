@@ -10,6 +10,7 @@ import {
 } from 'react-router'
 import { Providers } from './lib/providers'
 import './app.css'
+import '@rainbow-me/rainbowkit/styles.css'
 
 export const links: Route.LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },

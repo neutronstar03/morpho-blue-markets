@@ -9,6 +9,7 @@
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.9",
     "@react-router/node": "^7.9.4",
     "@react-router/serve": "^7.9.4",
     "@tanstack/react-query": "^5.90.2",

@@ -1,6 +1,8 @@
 import type { Route } from './+types/market'
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ConnectButton } from '../components/connect-button'
+import { Header } from '~/components/header'
+import { useNetworkContext } from '~/lib/contexts/network'
 import { MarketDisplay } from '../components/market-display'
 import {
   formatGqlMarket,
@@ -20,6 +22,16 @@ export default function MarketPage() {
     uniqueKey: string
     chainId: string
   }>()
+  const { setRequiredChainId } = useNetworkContext()
+
+  useEffect(() => {
+    const requiredChainId = chainId ? Number(chainId) : null
+    setRequiredChainId(requiredChainId)
+
+    return () => {
+      setRequiredChainId(null)
+    }
+  }, [chainId, setRequiredChainId])
   const {
     data: market,
     isLoading,
@@ -33,18 +45,11 @@ export default function MarketPage() {
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <header className="bg-gray-800 shadow-lg border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link to="/" className="text-xl font-semibold text-white">
-                &larr; Back to Markets
-              </Link>
-            </div>
-            <ConnectButton />
-          </div>
-        </div>
-      </header>
+      <Header>
+        <Link to="/" className="text-xl font-semibold text-white">
+          &larr; Back to Markets
+        </Link>
+      </Header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
