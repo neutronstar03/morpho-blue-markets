@@ -1,11 +1,11 @@
-import type { SingleMorphoMarket } from '~/lib/hooks/use-market'
+import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { useEffect, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
+import { formatTokenBalance, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '../lib/hooks/rpc/use-morpho'
 import { useIsClient } from '../lib/hooks/use-is-client'
-import { formatTokenBalance, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '../lib/hooks/use-morpho'
 import { Button } from './ui/button'
 
 interface DepositFormProps {
@@ -17,6 +17,7 @@ interface DepositFormProps {
 export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormProps) {
   const isClient = useIsClient()
   const [amount, setAmount] = useState('')
+  const [showSuccess, setShowSuccess] = useState(false)
   const { address } = useAccount()
   const [debouncedAmount] = useDebounce(amount, 500)
   const isAmountDebounced = amount === debouncedAmount
@@ -49,6 +50,12 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
       refetchApproval?.()
     }
   }, [isApproveSuccess, refetchApproval])
+
+  useEffect(() => {
+    if (isSupplySuccess) {
+      setShowSuccess(true)
+    }
+  }, [isSupplySuccess])
 
   const handleMaxClick = () => {
     if (tokenBalance) {
@@ -87,7 +94,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
   const hasError = supplyError || approveError
   const isSuccess = isSupplySuccess
 
-  if (isSuccess) {
+  if (isSuccess && showSuccess) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
         <div className="flex items-center">
@@ -102,7 +109,10 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
           <div className="ml-auto pl-3">
             <div className="-mx-1.5 -my-1.5">
               <button
-                onClick={() => onSuccess?.()}
+                onClick={() => {
+                  setShowSuccess(false)
+                  onSuccess?.()
+                }}
                 className="inline-flex bg-green-50 rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-50 focus:ring-green-600"
               >
                 <span className="sr-only">Dismiss</span>

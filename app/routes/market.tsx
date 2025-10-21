@@ -7,7 +7,7 @@ import { useNetworkContext } from '~/lib/contexts/network'
 import { MarketDisplay } from '../components/market-display'
 import {
   useMarketQuery,
-} from '../lib/hooks/use-market'
+} from '../lib/hooks/graphql/use-market'
 
 export function meta(_: Route.MetaArgs) {
   return [

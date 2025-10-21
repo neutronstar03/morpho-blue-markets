@@ -1,17 +1,28 @@
-import type { MarketPosition as MarketPositionType } from '../lib/hooks/use-market-positions'
+import type {
+  LiveMarketPosition,
+} from '../lib/hooks/rpc/use-live-market-positions'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
-import { formatAmount, formatAmountSpecific, formatTimeAgo } from '../lib/formatters'
+import { formatAmountSpecific, formatTimeAgo } from '../lib/formatters'
+import {
+  useLiveMarketPositions,
+} from '../lib/hooks/rpc/use-live-market-positions'
 import { useIsClient } from '../lib/hooks/use-is-client'
-import { useMarketPositions } from '../lib/hooks/use-market-positions'
+import { useRefreshWithCooldown } from '../lib/hooks/use-refresh-with-cooldown'
 import { Card } from './ui/card'
 
-function PositionListItem({ position }: { position: MarketPositionType }) {
+function PositionListItem({
+  position,
+  chainId,
+}: {
+  position: LiveMarketPosition
+  chainId: number
+}) {
   const marketSupplyAssets = BigInt(position.market.state.supplyAssets)
   const marketSupplyShares = BigInt(position.market.state.supplyShares)
-  const userSupplyShares = BigInt(position.state.supplyShares)
-  const loanDecimals = position.market.loanAsset.decimals
+  const userSupplyShares = BigInt(position.userState.supplyShares)
+  const loanDecimals = position.market.loanAsset.decimals ?? 18
 
   const suppliedAssets = useMemo(() => {
     if (marketSupplyShares === 0n)
@@ -22,7 +33,7 @@ function PositionListItem({ position }: { position: MarketPositionType }) {
   const netSupplyApy = position.market.state.netSupplyApy * 100 // Convert to percentage
 
   return (
-    <Link to={`/market/${position.market.uniqueKey}/${position.market.morphoBlue.chain.id}`}>
+    <Link to={`/market/${position.market.uniqueKey}/${chainId}`}>
       <li className="mb-4 p-4 bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors duration-200 cursor-pointer">
         <div className="flex justify-between items-start mb-2">
           <div>
@@ -36,7 +47,7 @@ function PositionListItem({ position }: { position: MarketPositionType }) {
             <p className="text-xs text-gray-500">
               Chain ID:
               {' '}
-              {position.market.morphoBlue.chain.id}
+              {chainId}
             </p>
           </div>
           <div className="text-right">
@@ -64,10 +75,16 @@ function PositionListItem({ position }: { position: MarketPositionType }) {
 }
 
 function PositionClient() {
-  const { isConnected, address } = useAccount()
-  const { data, isLoading, error, refetch, dataUpdatedAt } = useMarketPositions(address)
+  const { isConnected, chain } = useAccount()
+  const {
+    data: positions,
+    isLoading,
+    refetch,
+    dataUpdatedAt,
+  } = useLiveMarketPositions()
 
   const [timeAgo, setTimeAgo] = useState('')
+  const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
 
   useEffect(() => {
     if (dataUpdatedAt > 0) {
@@ -107,21 +124,6 @@ function PositionClient() {
     )
   }
 
-  if (error) {
-    return (
-      <Card className="mb-8">
-        <div className="p-4 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white">My Position</h2>
-        </div>
-        <div className="p-6">
-          <p className="text-red-400">Error loading your positions.</p>
-        </div>
-      </Card>
-    )
-  }
-
-  const positions = data?.marketPositions.items ?? []
-
   return (
     <Card className="mb-8">
       <div className="p-4 border-b border-gray-700 flex justify-between items-center">
@@ -137,10 +139,11 @@ function PositionClient() {
           )}
         </div>
         <button
-          onClick={() => refetch()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
+          onClick={() => handleRefresh()}
+          disabled={isRefreshing || isCooldown}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
         >
-          Refresh
+          {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
         </button>
       </div>
       <div className="p-6">
@@ -148,15 +151,21 @@ function PositionClient() {
           ? (
               <p className="text-gray-400">Loading your positions...</p>
             )
-          : positions.length === 0
+          : positions && positions.length === 0
             ? (
                 <p className="text-gray-400">You have no open positions.</p>
               )
             : (
                 <ul>
-                  {positions.map((position: MarketPositionType) => (
-                    <PositionListItem key={position.id} position={position} />
-                  ))}
+                  {positions
+                    && chain?.id
+                    && positions.map((position: LiveMarketPosition) => (
+                      <PositionListItem
+                        key={position.market.uniqueKey}
+                        position={position}
+                        chainId={chain.id}
+                      />
+                    ))}
                 </ul>
               )}
       </div>

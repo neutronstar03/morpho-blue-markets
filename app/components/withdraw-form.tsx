@@ -1,11 +1,11 @@
-import type { SingleMorphoMarket } from '~/lib/hooks/use-market'
+import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { formatNumber } from '~/lib/formatters'
+import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '../lib/hooks/rpc/use-morpho'
 import { useIsClient } from '../lib/hooks/use-is-client'
-import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '../lib/hooks/use-morpho'
 import { Button } from './ui/button'
 
 interface WithdrawFormProps {
@@ -17,6 +17,7 @@ interface WithdrawFormProps {
 export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFormProps) {
   const isClient = useIsClient()
   const [amount, setAmount] = useState('')
+  const [showSuccess, setShowSuccess] = useState(false)
   const { address } = useAccount()
 
   const { data: position } = useUserPosition(market.uniqueKey, address)
@@ -55,6 +56,12 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   } = useWithdraw(market, amount)
   const { isSuccess: isWithdrawSuccess, isLoading: isWithdrawLoading } = useTransactionStatus(withdrawHash)
 
+  useEffect(() => {
+    if (isWithdrawSuccess) {
+      setShowSuccess(true)
+    }
+  }, [isWithdrawSuccess])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -85,7 +92,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   const hasError = withdrawError
   const isSuccess = isWithdrawSuccess
 
-  if (isSuccess) {
+  if (isSuccess && showSuccess) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
         <div className="flex items-center">
@@ -100,7 +107,10 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
           <div className="ml-auto pl-3">
             <div className="-mx-1.5 -my-1.5">
               <button
-                onClick={onSuccess}
+                onClick={() => {
+                  setShowSuccess(false)
+                  onSuccess?.()
+                }}
                 className="inline-flex bg-green-50 rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-50 focus:ring-green-600"
               >
                 <span className="sr-only">Dismiss</span>

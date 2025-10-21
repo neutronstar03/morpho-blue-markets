@@ -1,7 +1,7 @@
 import type {
   MorphoMarket,
   MarketFilters as TypeMarketFilters,
-} from '~/lib/hooks/use-list-markets'
+} from '~/lib/hooks/graphql/use-list-markets'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
@@ -12,7 +12,8 @@ import {
   MarketOrderBy,
   OrderDirection,
   useMarkets,
-} from '~/lib/hooks/use-list-markets'
+} from '~/lib/hooks/graphql/use-list-markets'
+import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { Card } from './ui/card'
 
 const CONFIG = {
@@ -307,6 +308,7 @@ export function AdvancedList() {
 
   // State for last updated time
   const [timeAgo, setTimeAgo] = useState('')
+  const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
 
   useEffect(() => {
     if (dataUpdatedAt) {
@@ -317,10 +319,6 @@ export function AdvancedList() {
       return () => clearInterval(interval)
     }
   }, [dataUpdatedAt])
-
-  const handleRefresh = () => {
-    refetch()
-  }
 
   // Determine which rate type to display based on filter or order by
   const displayRateType: 'supply' | 'borrow'
@@ -343,10 +341,11 @@ export function AdvancedList() {
           )}
         </div>
         <button
-          onClick={handleRefresh}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
+          onClick={() => handleRefresh()}
+          disabled={isRefreshing || isCooldown}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
         >
-          Refresh
+          {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
         </button>
       </div>
 

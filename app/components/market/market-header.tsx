@@ -1,4 +1,4 @@
-import type { SingleMorphoMarket } from '~/lib/hooks/use-market'
+import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { getSupportedChainName } from '~/lib/addresses'
 import { getExplorerUrl } from '~/lib/explorer'

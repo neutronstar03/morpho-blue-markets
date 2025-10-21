@@ -1,4 +1,4 @@
-import type { SingleMorphoMarket } from '~/lib/hooks/use-market'
+import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { formatLltv, formatPercent, formatUsd } from '~/lib/formatters'
 import { Card } from '../ui/card'

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
-import { graphqlClient } from '../graphql/client'
+import { graphqlClient } from '../../graphql/client'
 
 export interface MorphoMarket {
   uniqueKey: string

@@ -1,10 +1,10 @@
-import type { SingleMorphoMarket } from '~/lib/hooks/use-market'
+import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useMemo } from 'react'
 import { useAccount, useChainId } from 'wagmi'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { formatAmountSpecific } from '../../lib/formatters'
 import { useIsClient } from '../../lib/hooks/use-is-client'
-import { useMarket, useUserPosition } from '../../lib/hooks/use-morpho'
+import { useMarket, useUserPosition } from '../../lib/hooks/rpc/use-morpho'
 
 interface UserPositionProps {
   market: SingleMorphoMarket

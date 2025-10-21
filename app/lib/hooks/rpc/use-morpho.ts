@@ -1,11 +1,11 @@
-import type { SupportedChain } from '../addresses'
-import type { SingleMorphoMarket } from './use-market'
+import type { SupportedChain } from '../../addresses'
+import type { SingleMorphoMarket } from '../graphql/use-market'
 import { useMemo } from 'react'
 import { erc20Abi, formatUnits, parseUnits } from 'viem'
 import { useAccount, useReadContract, useSimulateContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { useNetworkContext } from '~/lib/contexts/network'
-import { getSupportedChainName, morphoAddressOnChain } from '../addresses'
-import { tokenAmountToWei } from '../tokens'
+import { getSupportedChainName, morphoAddressOnChain } from '../../addresses'
+import { tokenAmountToWei } from '../../tokens'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from './simplified.abi'
 
 export function getMorphoBlueAddress(chainId?: number): `0x${string}` {

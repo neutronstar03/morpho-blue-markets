@@ -1,3 +1,5 @@
+import type { Abi } from 'viem'
+
 export const SIMPLIFIED_MORPHO_BLUE_ABI = [
   {
     inputs: [
@@ -81,4 +83,4 @@ export const SIMPLIFIED_MORPHO_BLUE_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
-] as const
+] as const satisfies Abi

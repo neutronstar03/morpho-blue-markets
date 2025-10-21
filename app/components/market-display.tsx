@@ -1,4 +1,4 @@
-import type { SingleMorphoMarket } from '~/lib/hooks/use-market'
+import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { MarketActions } from './market/market-actions'
 import { MarketDetails } from './market/market-details'
 import { MarketHeader } from './market/market-header'

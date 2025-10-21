@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
-import { graphqlClient } from '../graphql/client'
+import { graphqlClient } from '../../graphql/client'
+
+// @deprecated: use useLiveMarketPositions instead
 
 export interface MarketPosition {
   id: string
