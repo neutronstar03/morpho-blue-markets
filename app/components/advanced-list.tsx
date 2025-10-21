@@ -1,3 +1,4 @@
+import type { SupportedChain } from '~/lib/addresses'
 import type {
   MorphoMarket,
   MarketFilters as TypeMarketFilters,
@@ -5,9 +6,8 @@ import type {
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
-import { getSupportedChainName } from '~/lib/addresses'
+import { getSupportedChainName, supportedChains } from '~/lib/addresses'
 import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
-
 import {
   MarketOrderBy,
   OrderDirection,
@@ -20,6 +20,16 @@ const CONFIG = {
   minSupplyApy: 0.09, // 9% apr
   maxSupplyApy: 2, // 200% max apr
   minTvlUsd: 50000, // $50k minimum TVL
+}
+
+const CHAIN_LABELS: Record<SupportedChain, string> = {
+  Ethereum: 'Ethereum',
+  Base: 'Base',
+  Arbitrum: 'Arbitrum',
+  Polygon: 'Polygon',
+  HyperEVM: 'HyperEVM',
+  Unichain: 'Unichain',
+  Katana: 'Katana',
 }
 
 function buildWhereClause(
@@ -85,6 +95,8 @@ interface MarketFiltersProps {
   setOrderBy: (value: string) => void
   orderDirection: string
   setOrderDirection: (value: string) => void
+  chainFilter: 'ALL' | SupportedChain
+  setChainFilter: (value: 'ALL' | SupportedChain) => void
 }
 
 function MarketFilters({
@@ -98,9 +110,24 @@ function MarketFilters({
   setOrderBy,
   orderDirection,
   setOrderDirection,
+  chainFilter,
+  setChainFilter,
 }: MarketFiltersProps) {
   return (
     <div className="p-4 flex flex-wrap items-center gap-4 bg-gray-900/50 border-b border-gray-700">
+      <div className="flex items-center space-x-2">
+        <span className="text-sm font-medium text-gray-300">Filter by Chain:</span>
+        <select
+          value={chainFilter}
+          onChange={e => setChainFilter(e.target.value as 'ALL' | SupportedChain)}
+          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="ALL">ALL</option>
+          {supportedChains.map(chain => (
+            <option key={chain} value={chain}>{CHAIN_LABELS[chain]}</option>
+          ))}
+        </select>
+      </div>
       <div className="flex items-center space-x-2">
         <span className="text-sm font-medium text-gray-300">Filter:</span>
         <select
@@ -261,6 +288,7 @@ export function AdvancedList() {
   const [aprValue, setAprValue] = useState(12)
   const [orderBy, setOrderBy] = useState<MarketOrderBy>(MarketOrderBy.NetSupplyApy)
   const [orderDirection, setOrderDirection] = useState<OrderDirection>(OrderDirection.Desc)
+  const [chainFilter, setChainFilter] = useState<'ALL' | SupportedChain>('ALL')
 
   const where = useMemo(
     () => buildWhereClause(aprType, comparison, aprValue),
@@ -288,6 +316,11 @@ export function AdvancedList() {
     return marketsData.markets.items.filter((market) => {
       if (market.collateralAsset == null || market.loanAsset == null)
         return false
+      if (chainFilter !== 'ALL') {
+        const marketChainName = getSupportedChainName(market.morphoBlue.chain.id) as SupportedChain
+        if (marketChainName !== chainFilter)
+          return false
+      }
       return true
     }).map((market: MorphoMarket) => ({
       id: market.uniqueKey,
@@ -304,7 +337,7 @@ export function AdvancedList() {
       borrowApr7d: `${(market.state.weeklyNetBorrowApy * 100).toFixed(2)}%`,
       whitelisted: market.whitelisted,
     }))
-  }, [marketsData])
+  }, [marketsData, chainFilter])
 
   // State for last updated time
   const [timeAgo, setTimeAgo] = useState('')
@@ -360,6 +393,8 @@ export function AdvancedList() {
         setOrderBy={setOrderBy as (value: string) => void}
         orderDirection={orderDirection}
         setOrderDirection={setOrderDirection as (value: string) => void}
+        chainFilter={chainFilter}
+        setChainFilter={setChainFilter}
       />
 
       <MarketTable markets={markets} isLoading={isLoading} rateType={displayRateType} />
