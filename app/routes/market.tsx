@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Header } from '~/components/header'
 import { Card } from '~/components/ui/card'
+import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { MarketDisplay } from '../components/market-display'
 import {
@@ -47,7 +48,7 @@ export default function MarketPage() {
       </Header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Main>
         {isLoading && (
           <Card className="p-6">
             <p className="text-white">Loading market...</p>
@@ -72,7 +73,7 @@ export default function MarketPage() {
                 </Card>
               )
             )}
-      </main>
+      </Main>
     </div>
   )
 }

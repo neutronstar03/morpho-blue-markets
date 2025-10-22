@@ -74,6 +74,7 @@ interface MarketData {
   chainId: number
   chainName: string
   marketSize: string
+  beforeTarget: string
   utilization: string
   supplyApr: string
   supplyApr1d: string
@@ -204,25 +205,26 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
         <thead className="bg-gray-900/50">
           <tr>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Chain Name</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Market Size</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Utilization %</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Chain</th>
+            <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Size $</th>
+            <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">before 90%</th>
+            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">usage %</th>
             <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
               {rateLabel}
               {' '}
               APR
             </th>
-            <th scope="col" className="hidden md:table-cell px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
               {rateLabel}
               {' '}
               APR 1d
             </th>
-            <th scope="col" className="hidden lg:table-cell px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
               {rateLabel}
               {' '}
               APR 7d
             </th>
-            <th scope="col" className="hidden md:table-cell px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Whitelisted</th>
+            <th scope="col" className="hidden lg:table-cell px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Whitelisted</th>
           </tr>
         </thead>
         <tbody className="bg-gray-800 divide-y divide-gray-700">
@@ -251,18 +253,19 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{market.chainName}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.marketSize}</td>
+              <td className="px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.marketSize}</td>
+              <td className="px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.beforeTarget}</td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilization}</td>
               <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
                 {rateType === 'supply' ? market.supplyApr : market.borrowApr}
               </td>
-              <td className={`hidden md:table-cell px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
+              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
                 {rateType === 'supply' ? market.supplyApr1d : market.borrowApr1d}
               </td>
-              <td className={`hidden lg:table-cell px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
+              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
                 {rateType === 'supply' ? market.supplyApr7d : market.borrowApr7d}
               </td>
-              <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-center text-sm">
+              <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-center text-sm">
                 <span
                   className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     market.whitelisted
@@ -328,6 +331,10 @@ export function AdvancedList() {
       chainId: Number(market.morphoBlue.chain.id),
       chainName: getSupportedChainName(market.morphoBlue.chain.id),
       marketSize: formatMarketSize(market.state.supplyAssetsUsd),
+      beforeTarget:
+        market.state.utilization > 0.9
+          ? formatMarketSize((market.state.utilization - 0.9) * (market.state.supplyAssetsUsd ?? 0))
+          : '',
       utilization: `${(market.state.utilization * 100).toFixed(2)}%`,
       supplyApr: `${(market.state.netSupplyApy * 100).toFixed(2)}%`,
       supplyApr1d: `${(market.state.dailyNetSupplyApy * 100).toFixed(2)}%`,

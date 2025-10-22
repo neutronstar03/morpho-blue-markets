@@ -2,6 +2,7 @@ import type { Route } from './+types/home'
 import { useEffect } from 'react'
 import { AdvancedList } from '~/components/advanced-list'
 import { Header } from '~/components/header'
+import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { Position } from '../components/position'
 
@@ -29,14 +30,14 @@ export default function HomePage() {
       </Header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Main>
         <div className="w-full">
           <Position />
           <div className="mt-8">
             <AdvancedList />
           </div>
         </div>
-      </main>
+      </Main>
     </div>
   )
 }
