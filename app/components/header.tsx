@@ -4,6 +4,7 @@ import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { Button } from './ui/button'
+import { Container } from './ui/container'
 
 export function Header({ children }: { children: ReactNode }) {
   const { requiredChainId } = useNetworkContext()
@@ -15,7 +16,7 @@ export function Header({ children }: { children: ReactNode }) {
     = isConnected && requiredChainId && chainId !== requiredChainId
   return (
     <header className="bg-gray-800 shadow-lg border-b border-gray-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Container>
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">{children}</div>
           <div className="flex items-center gap-4">
@@ -36,7 +37,7 @@ export function Header({ children }: { children: ReactNode }) {
             <ConnectButton />
           </div>
         </div>
-      </div>
+      </Container>
     </header>
   )
 }
