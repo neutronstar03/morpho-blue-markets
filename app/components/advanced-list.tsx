@@ -25,7 +25,7 @@ const CHAIN_LABELS: Record<SupportedChain, string> = {
   Base: 'Base',
   Arbitrum: 'Arbitrum',
   Polygon: 'Polygon',
-  HyperEVM: 'HyperEVM',
+  Hyperliquid: 'Hyperliquid',
   Unichain: 'Unichain',
   Katana: 'Katana',
 }
