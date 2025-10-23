@@ -1,8 +1,5 @@
 import type { SupportedChain } from '~/lib/addresses'
-import type {
-  MorphoMarket,
-  MarketFilters as TypeMarketFilters,
-} from '~/lib/hooks/graphql/use-list-markets'
+import type { MorphoMarket, MarketFilters as TypeMarketFilters } from '~/lib/hooks/graphql/use-list-markets'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
@@ -13,6 +10,7 @@ import {
   OrderDirection,
   useMarkets,
 } from '~/lib/hooks/graphql/use-list-markets'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { Card } from './ui/card'
 
@@ -67,6 +65,8 @@ function buildWhereClause(
   return where
 }
 
+type Setter<T> = (value: T | ((prev: T) => T)) => void
+
 // This is a placeholder type. We'll define the exact fields later.
 interface MarketData {
   id: string
@@ -86,18 +86,18 @@ interface MarketData {
 }
 
 interface MarketFiltersProps {
-  aprType: string
-  setAprType: (value: string) => void
-  comparison: string
-  setComparison: (value: string) => void
+  aprType: 'supply' | 'borrow'
+  setAprType: Setter<'supply' | 'borrow'>
+  comparison: '>' | '<'
+  setComparison: Setter<'>' | '<'>
   aprValue: number
-  setAprValue: (value: number) => void
-  orderBy: string
-  setOrderBy: (value: string) => void
-  orderDirection: string
-  setOrderDirection: (value: string) => void
+  setAprValue: Setter<number>
+  orderBy: MarketOrderBy
+  setOrderBy: Setter<MarketOrderBy>
+  orderDirection: OrderDirection
+  setOrderDirection: Setter<OrderDirection>
   chainFilter: 'ALL' | SupportedChain
-  setChainFilter: (value: 'ALL' | SupportedChain) => void
+  setChainFilter: Setter<'ALL' | SupportedChain>
 }
 
 function MarketFilters({
@@ -133,7 +133,7 @@ function MarketFilters({
         <span className="text-sm font-medium text-gray-300">Filter:</span>
         <select
           value={aprType}
-          onChange={e => setAprType(e.target.value)}
+          onChange={e => setAprType(e.target.value as 'supply' | 'borrow')}
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="supply">Supply APR</option>
@@ -141,7 +141,7 @@ function MarketFilters({
         </select>
         <select
           value={comparison}
-          onChange={e => setComparison(e.target.value)}
+          onChange={e => setComparison(e.target.value as '>' | '<')}
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value=">">{'>'}</option>
@@ -161,7 +161,7 @@ function MarketFilters({
         <span className="text-sm font-medium text-gray-300">Order by:</span>
         <select
           value={orderBy}
-          onChange={e => setOrderBy(e.target.value)}
+          onChange={e => setOrderBy(e.target.value as MarketOrderBy)}
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="NetSupplyApy">Supply APY</option>
@@ -170,8 +170,7 @@ function MarketFilters({
         </select>
         <select
           value={orderDirection}
-          onChange={e =>
-            setOrderDirection(e.target.value as OrderDirection)}
+          onChange={e => setOrderDirection(e.target.value as OrderDirection)}
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="Desc">Desc</option>
@@ -286,12 +285,12 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
 
 export function AdvancedList() {
   // State for filters
-  const [aprType, setAprType] = useState('supply')
-  const [comparison, setComparison] = useState('>')
-  const [aprValue, setAprValue] = useState(12)
-  const [orderBy, setOrderBy] = useState<MarketOrderBy>(MarketOrderBy.NetSupplyApy)
-  const [orderDirection, setOrderDirection] = useState<OrderDirection>(OrderDirection.Desc)
-  const [chainFilter, setChainFilter] = useState<'ALL' | SupportedChain>('ALL')
+  const [aprType, setAprType] = useLocalStorage<'supply' | 'borrow'>('advanced-list:aprType', 'supply')
+  const [comparison, setComparison] = useLocalStorage<'>' | '<'>('advanced-list:comparison', '>')
+  const [aprValue, setAprValue] = useLocalStorage<number>('advanced-list:aprValue', 12)
+  const [orderBy, setOrderBy] = useLocalStorage<MarketOrderBy>('advanced-list:orderBy', MarketOrderBy.NetSupplyApy)
+  const [orderDirection, setOrderDirection] = useLocalStorage<OrderDirection>('advanced-list:orderDirection', OrderDirection.Desc)
+  const [chainFilter, setChainFilter] = useLocalStorage<'ALL' | SupportedChain>('advanced-list:chainFilter', 'ALL')
 
   const where = useMemo(
     () => buildWhereClause(aprType, comparison, aprValue),
@@ -397,9 +396,9 @@ export function AdvancedList() {
         aprValue={aprValue}
         setAprValue={setAprValue}
         orderBy={orderBy}
-        setOrderBy={setOrderBy as (value: string) => void}
+        setOrderBy={setOrderBy}
         orderDirection={orderDirection}
-        setOrderDirection={setOrderDirection as (value: string) => void}
+        setOrderDirection={setOrderDirection}
         chainFilter={chainFilter}
         setChainFilter={setChainFilter}
       />
