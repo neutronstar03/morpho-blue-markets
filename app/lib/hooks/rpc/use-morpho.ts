@@ -46,6 +46,24 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
   const spender = getMorphoBlueAddress(chainId)
   const isValidAmount = !!amount && Number.parseFloat(amount) > 0
 
+  // USDT (mainnet) is a non-standard ERC20: approve/transfer/transferFrom return no value.
+  // Use a no-return ABI for simulate(decode) to avoid "returned no data" errors.
+  const USDT_MAINNET_ADDRESS = '0xdac17f958d2ee523a2206206994597c13d831ec7'
+  const isUsdtMainnet = tokenAddress?.toLowerCase() === USDT_MAINNET_ADDRESS
+  const USDT_APPROVE_NO_RETURN_ABI = [
+    {
+      type: 'function',
+      name: 'approve',
+      stateMutability: 'nonpayable',
+      inputs: [
+        { name: 'spender', type: 'address' },
+        { name: 'amount', type: 'uint256' },
+      ],
+      outputs: [],
+    },
+  ] as const
+  const approveSimAbi = isUsdtMainnet ? USDT_APPROVE_NO_RETURN_ABI : erc20Abi
+
   const { data: allowance, refetch } = useReadContract({
     address: tokenAddress as `0x${string}`,
     abi: erc20Abi,
@@ -68,7 +86,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     isFetching: isSimulating,
   } = useSimulateContract({
     address: tokenAddress as `0x${string}`,
-    abi: erc20Abi,
+    abi: approveSimAbi,
     functionName: 'approve',
     args: approveArgs,
     query: {
@@ -84,9 +102,13 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     }
   }
 
+  const isAllowanceReady = allowance !== undefined
+  const requiredAmount = isValidAmount ? parseTokenAmount(amount, decimals) : 0n
+
   return {
     allowance: allowance ? formatTokenAmount(allowance, decimals) : '0',
-    needsApproval: isValidAmount && allowance !== undefined ? parseTokenAmount(amount, decimals) > allowance : false,
+    needsApproval: isValidAmount ? (!isAllowanceReady || requiredAmount > (allowance ?? 0n)) : false,
+    isAllowanceReady,
     approve: handleApprove,
     hash,
     isPending,

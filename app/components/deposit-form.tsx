@@ -23,13 +23,6 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
   const isAmountDebounced = amount === debouncedAmount
 
   const {
-    supply,
-    hash: supplyHash,
-    isPending: isSupplying,
-    error: supplyError,
-    isSimulating: isSimulatingSupply,
-  } = useSupply(market, debouncedAmount, market.loanAsset.decimals!)
-  const {
     needsApproval,
     approve,
     hash: approveHash,
@@ -37,7 +30,19 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
     error: approveError,
     refetch: refetchApproval,
     isSimulating: isSimulatingApproval,
+    isAllowanceReady,
   } = useTokenApproval(market.loanAsset.address, debouncedAmount, address, market.loanAsset.decimals)
+
+  // Gate supply simulation until allowance is known and sufficient
+  const guardedAmount = isAllowanceReady && !needsApproval ? debouncedAmount : ''
+
+  const {
+    supply,
+    hash: supplyHash,
+    isPending: isSupplying,
+    error: supplyError,
+    isSimulating: isSimulatingSupply,
+  } = useSupply(market, guardedAmount, market.loanAsset.decimals!)
 
   const { data: tokenBalance } = useTokenBalance(market.loanAsset.address, address)
   const formattedBalance = formatTokenBalance(tokenBalance, market.loanAsset.decimals)
@@ -90,8 +95,9 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
     }
   }
 
-  const isLoading = isSupplying || isApprovingToken || isSupplyLoading || isApproveLoading || isSimulatingSupply || isSimulatingApproval
-  const hasError = supplyError || approveError
+  const isLoading = isSupplying || isApprovingToken || isSupplyLoading || isApproveLoading || isSimulatingSupply || isSimulatingApproval || (!needsApproval && !isAllowanceReady && !!amount)
+  const effectiveSupplyError = (!isAllowanceReady || needsApproval) ? undefined : supplyError
+  const hasError = effectiveSupplyError || approveError
   const isSuccess = isSupplySuccess
 
   if (isSuccess && showSuccess) {
@@ -191,27 +197,29 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
       {hasError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
           <p className="text-sm text-red-800">
-            {supplyError?.message || approveError?.message || 'Transaction failed'}
+            {effectiveSupplyError?.message || approveError?.message || 'Transaction failed'}
           </p>
         </div>
       )}
 
       <Button
         type="submit"
-        disabled={!amount || isLoading || !address || !isAmountDebounced}
+        disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount)}
         className="w-full"
       >
         {isLoading
           ? (
               <>
                 <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" aria-hidden="true" />
-                {isSimulatingApproval
-                  ? 'Preparing approval...'
-                  : isApprovingToken || isApproveLoading
-                    ? 'Approving...'
-                    : isSimulatingSupply
-                      ? 'Preparing deposit...'
-                      : 'Depositing...'}
+                {(!isAllowanceReady && !!amount)
+                  ? 'Checking allowance...'
+                  : isSimulatingApproval
+                    ? 'Preparing approval...'
+                    : isApprovingToken || isApproveLoading
+                      ? 'Approving...'
+                      : isSimulatingSupply
+                        ? 'Preparing deposit...'
+                        : 'Depositing...'}
               </>
             )
           : needsApproval
