@@ -367,22 +367,23 @@ export function AdvancedList() {
 
   return (
     <Card>
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-xl font-bold text-white">Advanced Markets</h2>
-          {timeAgo && (
-            <span className="text-sm text-gray-400">
-              (Updated
-              {' '}
-              {timeAgo}
-              )
-            </span>
-          )}
+      <div className="p-4 border-b border-gray-700 flex items-center">
+        <div className="flex flex-col items-start space-y-1 md:flex-row md:items-center md:space-x-4 md:space-y-0">
+          <h2 className="text-xl font-bold text-white">Markets</h2>
+          <span className="hidden md:inline-block text-sm text-gray-400 tabular-nums pr-4 w-32 text-right">
+            (Updated
+            {' '}
+            {timeAgo || '—'}
+            )
+          </span>
+          <span className="md:hidden text-xs text-gray-500">
+            {timeAgo || '—'}
+          </span>
         </div>
         <button
           onClick={() => handleRefresh()}
           disabled={isRefreshing || isCooldown}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
+          className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
         >
           {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
         </button>

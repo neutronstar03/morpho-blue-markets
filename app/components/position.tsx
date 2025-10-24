@@ -4,7 +4,7 @@ import type {
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
-import { formatAmountSpecific, formatTimeAgo } from '../lib/formatters'
+import { formatAmountSpecific, formatTimeAgo, formatUsd } from '../lib/formatters'
 import { useMarketQuery } from '../lib/hooks/graphql/use-market'
 import {
   useLiveMarketPositions,
@@ -130,11 +130,44 @@ function PositionClient() {
     }
   }, [dataUpdatedAt])
 
+  const portfolio = useMemo(() => {
+    if (!positions || !positions.length)
+      return { dailyUsd: undefined as number | undefined, weightedAprPct: undefined as number | undefined }
+
+    let totalPrincipalUsd = 0
+    let totalDailyUsd = 0
+    let totalAprWeighted = 0
+
+    for (const p of positions) {
+      const marketSupplyShares = BigInt(p.market.state.supplyShares)
+      const userSupplyShares = BigInt(p.userState.supplyShares)
+      const marketSupplyUsd = p.market.state.supplyAssetsUsd
+
+      if (marketSupplyShares === 0n || typeof marketSupplyUsd !== 'number')
+        continue
+
+      const shareRatio = Number(userSupplyShares) / Number(marketSupplyShares)
+      if (!Number.isFinite(shareRatio) || shareRatio <= 0)
+        continue
+
+      const userPrincipalUsd = marketSupplyUsd * shareRatio
+      const dailyRate = (p.market.state.netSupplyApy || 0) / 365
+      const dailyUsd = userPrincipalUsd * dailyRate
+
+      totalPrincipalUsd += userPrincipalUsd
+      totalDailyUsd += dailyUsd
+      totalAprWeighted += userPrincipalUsd * (p.market.state.netSupplyApy || 0)
+    }
+
+    const weightedAprPct = totalPrincipalUsd > 0 ? (totalAprWeighted / totalPrincipalUsd) * 100 : undefined
+    return { dailyUsd: totalDailyUsd || undefined, weightedAprPct }
+  }, [positions])
+
   if (!isConnected) {
     return (
       <Card className="mb-8">
         <div className="p-4 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white">My Position</h2>
+          <h2 className="text-xl font-bold text-white">Positions</h2>
         </div>
         <div className="p-6">
           <p className="text-gray-400">
@@ -149,7 +182,7 @@ function PositionClient() {
     return (
       <Card className="mb-8">
         <div className="p-4 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white">My Position</h2>
+          <h2 className="text-xl font-bold text-white">Positions</h2>
         </div>
         <div className="p-6">
           <p className="text-gray-400">Loading your positions...</p>
@@ -160,25 +193,36 @@ function PositionClient() {
 
   return (
     <Card className="mb-8">
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-xl font-bold text-white">My Position</h2>
-          {timeAgo && (
-            <span className="text-sm text-gray-400">
-              (Updated
-              {' '}
-              {timeAgo}
-              )
-            </span>
-          )}
+      <div className="p-4 border-b border-gray-700 flex items-center">
+        <div className="flex flex-col items-start space-y-1 md:flex-row md:items-center md:space-x-4 md:space-y-0">
+          <h2 className="text-xl font-bold text-white">Positions</h2>
+          <span className="hidden md:inline-block text-sm text-gray-400 tabular-nums pr-4 w-32 text-right">
+            (Updated
+            {' '}
+            {timeAgo || '—'}
+            )
+          </span>
+          <span className="md:hidden text-xs text-gray-500">
+            {timeAgo || '—'}
+          </span>
         </div>
-        <button
-          onClick={() => handleRefresh()}
-          disabled={isRefreshing || isCooldown}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
-        >
-          {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
-        </button>
+        <div className="ml-auto flex items-center space-x-6">
+          <div className="text-right">
+            <p className="text-xs text-gray-400">Weighted APR</p>
+            <p className="text-sm text-white">{portfolio.weightedAprPct != null ? `${portfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-400">Daily USD</p>
+            <p className="text-sm text-white">{portfolio.dailyUsd != null ? formatUsd(portfolio.dailyUsd) : '—'}</p>
+          </div>
+          <button
+            onClick={() => handleRefresh()}
+            disabled={isRefreshing || isCooldown}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
+          >
+            {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
+          </button>
+        </div>
       </div>
       <div className="p-6">
         {isLoading
@@ -218,7 +262,7 @@ export function Position() {
     return (
       <Card className="mb-8">
         <div className="p-4 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white">My Position</h2>
+          <h2 className="text-xl font-bold text-white">Positions</h2>
         </div>
         <div className="p-6">
           <p className="text-gray-400">Loading position...</p>

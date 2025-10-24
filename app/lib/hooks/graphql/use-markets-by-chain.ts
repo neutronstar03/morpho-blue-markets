@@ -22,6 +22,7 @@ export interface SupplyMarketData {
     netSupplyApy: number
     supplyAssets: string
     supplyShares: string
+    supplyAssetsUsd?: number
   }
 }
 
@@ -70,6 +71,7 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
           netSupplyApy
           supplyAssets
           supplyShares
+          supplyAssetsUsd
         }
       }
     }
