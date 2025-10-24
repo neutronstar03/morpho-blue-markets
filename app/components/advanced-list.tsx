@@ -16,7 +16,7 @@ import { Card } from './ui/card'
 
 const CONFIG = {
   minSupplyApy: 0.09, // 9% apr
-  maxSupplyApy: 2, // 200% max apr
+  maxSupplyApy: 10, // 200% max apr
   minTvlUsd: 50000, // $50k minimum TVL
 }
 
