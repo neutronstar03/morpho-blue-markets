@@ -197,10 +197,7 @@ function PositionClient() {
         <div className="flex flex-col items-start space-y-1 md:flex-row md:items-center md:space-x-4 md:space-y-0">
           <h2 className="text-xl font-bold text-white">Positions</h2>
           <span className="hidden md:inline-block text-sm text-gray-400 tabular-nums pr-4 w-32 text-right">
-            (Updated
-            {' '}
             {timeAgo || '—'}
-            )
           </span>
           <span className="md:hidden text-xs text-gray-500">
             {timeAgo || '—'}
