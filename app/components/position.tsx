@@ -5,11 +5,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { formatAmountSpecific, formatTimeAgo } from '../lib/formatters'
+import { useMarketQuery } from '../lib/hooks/graphql/use-market'
 import {
   useLiveMarketPositions,
 } from '../lib/hooks/rpc/use-live-market-positions'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { useRefreshWithCooldown } from '../lib/hooks/use-refresh-with-cooldown'
+import { useTokenLiquidity } from '../lib/hooks/use-token-liquidity'
 import { Card } from './ui/card'
 
 function PositionListItem({
@@ -31,6 +33,33 @@ function PositionListItem({
   }, [userSupplyShares, marketSupplyAssets, marketSupplyShares])
 
   const netSupplyApy = position.market.state.netSupplyApy * 100 // Convert to percentage
+
+  // Liquidity for collateral token on this chain (aggregated), approximated 50% usable
+  const { data: liquidityStr } = useTokenLiquidity({
+    chainId,
+    tokenAddress: position.market.collateralAsset.address,
+  })
+  const liquidityUsd = liquidityStr ? Number(liquidityStr) : undefined
+  const effectiveLiquidityUsd = liquidityUsd != null ? liquidityUsd / 2 : undefined
+
+  // Fetch full market to get USD supply for SAFUNESS computation
+  const { data: fullMarket } = useMarketQuery(position.market.uniqueKey, chainId)
+  const totalSupplyUsd = fullMarket?.state.supplyAssetsUsd
+
+  const safuness
+    = totalSupplyUsd && totalSupplyUsd > 0 && effectiveLiquidityUsd != null
+      ? effectiveLiquidityUsd / totalSupplyUsd
+      : undefined
+
+  function safunessColor(ratio: number | undefined) {
+    if (ratio == null)
+      return 'text-gray-400'
+    if (ratio >= 5)
+      return 'text-green-400'
+    if (ratio >= 3)
+      return 'text-yellow-400'
+    return 'text-red-400'
+  }
 
   return (
     <Link to={`/market/${position.market.uniqueKey}/${chainId}`}>
@@ -56,6 +85,11 @@ function PositionListItem({
               {' '}
               {netSupplyApy.toFixed(2)}
               %
+            </p>
+            <p className={`text-sm ${safunessColor(safuness)}`}>
+              SAFU:
+              {' '}
+              {safuness != null ? `${safuness.toFixed(2)}x` : '—'}
             </p>
           </div>
         </div>

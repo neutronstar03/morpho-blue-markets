@@ -1,6 +1,8 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
+import { useState } from 'react'
 import { formatLltv, formatPercent, formatUsd } from '~/lib/formatters'
+import { useTokenLiquidity } from '~/lib/hooks/use-token-liquidity'
 import { Card } from '../ui/card'
 
 interface MarketDetailsProps {
@@ -36,6 +38,31 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 export function MarketDetails({ market }: MarketDetailsProps) {
+  const { data: liquidityStr, isLoading: isLiqLoading } = useTokenLiquidity({
+    chainId: market.morphoBlue.chain.id,
+    tokenAddress: market.collateralAsset.address,
+  })
+  const liquidityUsd = liquidityStr ? Number(liquidityStr) : undefined
+  const effectiveLiquidityUsd = liquidityUsd != null ? liquidityUsd / 2 : undefined
+  const totalSupplyUsd = market.state.supplyAssetsUsd
+  const safuness = effectiveLiquidityUsd != null && totalSupplyUsd > 0 ? (effectiveLiquidityUsd / totalSupplyUsd) : undefined
+
+  const [showLiqInfo, setShowLiqInfo] = useState(false)
+  const [showSafuInfo, setShowSafuInfo] = useState(false)
+
+  const liqTip = 'Estimated aggregate DEX liquidity for this collateral token on this chain. We conservatively assume ~50% of pool liquidity is directly usable in the collateral token.'
+  const safuTip = 'SAFUNESS = usable liquidity / total supply. 1.0x means usable liquidity equals total supply; liquidation may incur significant price impact. Assumes ~50% in collateral. ≥3.0x safer, <1.0x risky.'
+
+  function safunessColor(ratio: number | undefined) {
+    if (ratio == null)
+      return 'text-gray-400'
+    if (ratio >= 5)
+      return 'text-green-400'
+    if (ratio >= 3)
+      return 'text-yellow-400'
+    return 'text-red-400'
+  }
+
   return (
     <Card className="p-6 bg-gray-800/50">
       <h2 className="text-xl font-semibold text-white mb-4">Market Details</h2>
@@ -55,6 +82,90 @@ export function MarketDetails({ market }: MarketDetailsProps) {
       <DetailRow label="LLTV" value={formatLltv(market.lltv)} />
 
       <SectionTitle title="Collateral" />
+      <DetailRow
+        label="Cumulative Liquidity"
+        value={isLiqLoading ? 'Loading…' : (liquidityUsd != null ? formatUsd(liquidityUsd) : '—')}
+        subValue={(
+          <>
+            {!showLiqInfo
+              ? (
+                  <>
+                    Aggregated across pools (supposing liquidity in collateral is ~50% of liquidity in the pool)
+                    <button
+                      type="button"
+                      className="ml-2 underline cursor-pointer"
+                      onClick={() => setShowLiqInfo(true)}
+                    >
+                      Learn more
+                    </button>
+                  </>
+                )
+              : (
+                  <>
+                    {liqTip}
+                    <button
+                      type="button"
+                      className="ml-2 underline cursor-pointer"
+                      onClick={() => setShowLiqInfo(false)}
+                    >
+                      Hide
+                    </button>
+                  </>
+                )}
+          </>
+        )}
+      />
+      <DetailRow
+        label="Liquidity / Total Supply (SAFUNESS)"
+        value={safuness != null
+          ? (
+              <span className={safunessColor(safuness)}>
+                {safuness.toFixed(2)}
+                x
+              </span>
+            )
+          : '—'}
+        subValue={(
+          <>
+            {!showSafuInfo
+              ? (
+                  <>
+                    1.0x ≈ enough liquidity equals total supply (not price-impact free)
+                    <button
+                      type="button"
+                      className="ml-2 underline cursor-pointer"
+                      onClick={() => setShowSafuInfo(true)}
+                    >
+                      Learn more
+                    </button>
+                  </>
+                )
+              : (
+                  <>
+                    {safuTip}
+                    <div className="mt-1">
+                      <span className="text-green-400">≥ 5.0x</span>
+                      {' '}
+                      very safe ·
+                      <span className="text-yellow-400">≥ 3.0x</span>
+                      {' '}
+                      decent ·
+                      <span className="text-red-400">&lt; 3.0x</span>
+                      {' '}
+                      caution
+                    </div>
+                    <button
+                      type="button"
+                      className="ml-2 underline cursor-pointer"
+                      onClick={() => setShowSafuInfo(false)}
+                    >
+                      Hide
+                    </button>
+                  </>
+                )}
+          </>
+        )}
+      />
       <DetailRow
         label="Daily Price Variation"
         value={formatPercent(market.state.dailyPriceVariation)}
