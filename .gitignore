@@ -8,3 +8,6 @@
 
 # Curated markets
 public/curated-markets.json
+
+# Huge graphql schema
+morpho.full.schema.graphql

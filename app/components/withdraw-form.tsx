@@ -7,6 +7,7 @@ import { formatNumber } from '~/lib/formatters'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '../lib/hooks/rpc/use-morpho'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { Button } from './ui/button'
+import { PercentageControl } from './ui/percentage-control'
 
 interface WithdrawFormProps {
   market: SingleMorphoMarket
@@ -16,7 +17,8 @@ interface WithdrawFormProps {
 
 export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFormProps) {
   const isClient = useIsClient()
-  const [amount, setAmount] = useState('')
+  // percentage string (0 - 100)
+  const [percentage, setPercentage] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const { address } = useAccount()
 
@@ -41,11 +43,26 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
     return formatUnits(assets, market.loanAsset.decimals!)
   }, [position, marketData, market.loanAsset.decimals])
 
-  const sharesToAssetsRatio = useMemo(() => {
-    if (!maxWithdrawableShares || !maxWithdrawableAssets || !marketData)
-      return 0
-    return Number.parseFloat(maxWithdrawableAssets) / Number.parseFloat(maxWithdrawableShares)
-  }, [maxWithdrawableShares, maxWithdrawableAssets, marketData])
+  // Derived assets preview handled directly from percentage and max assets
+
+  // Convert percentage into shares string (18 decimals) for the withdraw hook
+  const totalSharesWei = useMemo(() => {
+    return position && position[0] ? position[0] : 0n
+  }, [position])
+
+  const sharesToWithdrawWei = useMemo(() => {
+    const pct = Number.parseFloat(percentage)
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
+      return 0n
+    // Use fixed-point math to avoid float precision when scaling percentage
+    const SCALE = 10000 // supports 0.01% precision
+    const pctScaled = BigInt(Math.round(pct * SCALE))
+    return (totalSharesWei * pctScaled) / (BigInt(100) * BigInt(SCALE))
+  }, [percentage, totalSharesWei])
+
+  const sharesToWithdraw = useMemo(() => {
+    return formatUnits(sharesToWithdrawWei, 18)
+  }, [sharesToWithdrawWei])
 
   const {
     withdraw,
@@ -53,7 +70,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
     isPending: isWithdrawing,
     error: withdrawError,
     isSimulating: isSimulatingWithdraw,
-  } = useWithdraw(market, amount)
+  } = useWithdraw(market, sharesToWithdraw)
   const { isSuccess: isWithdrawSuccess, isLoading: isWithdrawLoading } = useTransactionStatus(withdrawHash)
 
   useEffect(() => {
@@ -65,7 +82,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!amount || !address || !isClient)
+    if (!percentage || !address || !isClient)
       return
 
     try {
@@ -76,21 +93,21 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
     }
   }
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    // Only allow numbers and decimals
-    if (/^\d*(?:\.\d*)?$/.test(value)) {
-      setAmount(value)
-    }
-  }
+  // Input handling is encapsulated in PercentageControl
 
   const handleMaxClick = () => {
-    setAmount(maxWithdrawableShares)
+    setPercentage('100')
   }
 
   const isLoading = isWithdrawing || isWithdrawLoading || isSimulatingWithdraw
   const hasError = withdrawError
   const isSuccess = isWithdrawSuccess
+  const percentNumber = Number.parseFloat(percentage) || 0
+  const isPercentInvalid = !percentage || percentNumber <= 0 || percentNumber > 100
+  const assetsAtPercent = useMemo(() => {
+    const maxAssets = Number.parseFloat(maxWithdrawableAssets) || 0
+    return (percentNumber / 100) * maxAssets
+  }, [percentNumber, maxWithdrawableAssets])
 
   if (isSuccess && showSuccess) {
     return (
@@ -125,39 +142,54 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="withdraw-amount" className="block text-sm font-medium text-gray-700 mb-2">
-          Amount to Withdraw (in shares)
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            id="withdraw-amount"
-            value={amount}
-            onChange={handleAmountChange}
-            placeholder="0.0"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleMaxClick}
-            className="px-3"
-          >
-            Max
-          </Button>
-        </div>
-        {maxWithdrawableShares && Number.parseFloat(maxWithdrawableShares) > 0 && (
-          <p className="text-xs text-gray-500 mt-1">
+      <PercentageControl
+        label="Percentage to Withdraw"
+        percentage={percentage}
+        onChange={setPercentage}
+        onMax={handleMaxClick}
+        leftHelper={(
+          <>
             Max available:
             {' '}
-            {maxWithdrawableShares}
+            <span className="text-gray-200">{maxWithdrawableShares}</span>
             {' '}
             shares
-          </p>
+          </>
         )}
-      </div>
+        rightHelper={(
+          <>
+            ≈
+            {' '}
+            {formatNumber(assetsAtPercent, market.loanAsset.decimals!)}
+            {' '}
+            {loanTokenSymbol}
+            {' '}
+            ·
+            {' '}
+            {sharesToWithdraw}
+            {' '}
+            shares
+          </>
+        )}
+        desktopCta={(
+          <Button
+            type="submit"
+            disabled={isPercentInvalid || isLoading || !address}
+            className="w-full"
+          >
+            {isLoading
+              ? (
+                  <>
+                    <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" aria-hidden="true" />
+                    {isSimulatingWithdraw ? 'Preparing...' : 'Withdraw'}
+                  </>
+                )
+              : (
+                  `Withdraw ${formatNumber(assetsAtPercent, market.loanAsset.decimals!)} ${loanTokenSymbol}`
+                )}
+          </Button>
+        )}
+      />
 
       {hasError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -167,23 +199,26 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
         </div>
       )}
 
-      <Button
-        type="submit"
-        disabled={!amount || isLoading || !address || Number.parseFloat(amount) > Number.parseFloat(maxWithdrawableShares)}
-        className="w-full"
-        variant="outline"
-      >
-        {isLoading
-          ? (
-              <>
-                <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-600" aria-hidden="true" />
-                {isSimulatingWithdraw ? 'Preparing withdrawal...' : 'Withdrawing...'}
-              </>
-            )
-          : (
-              `Withdraw ${formatNumber(Number.parseFloat(amount) * sharesToAssetsRatio, market.loanAsset.decimals!)} ${loanTokenSymbol}`
-            )}
-      </Button>
+      {/* Mobile CTA */}
+      <div className="md:hidden">
+        <Button
+          type="submit"
+          disabled={isPercentInvalid || isLoading || !address}
+          className="w-full"
+          variant="outline"
+        >
+          {isLoading
+            ? (
+                <>
+                  <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-300" aria-hidden="true" />
+                  {isSimulatingWithdraw ? 'Preparing withdrawal...' : 'Withdrawing...'}
+                </>
+              )
+            : (
+                `Withdraw ${formatNumber(assetsAtPercent, market.loanAsset.decimals!)} ${loanTokenSymbol}`
+              )}
+        </Button>
+      </div>
 
       {!address && (
         <p className="text-sm text-gray-500 text-center">
@@ -191,9 +226,9 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
         </p>
       )}
 
-      {Number.parseFloat(amount) > Number.parseFloat(maxWithdrawableShares) && (
+      {percentNumber > 100 && (
         <p className="text-sm text-red-600 text-center">
-          Amount exceeds available balance
+          Percentage exceeds 100%
         </p>
       )}
     </form>

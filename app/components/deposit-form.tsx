@@ -1,12 +1,13 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { formatTokenBalance, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '../lib/hooks/rpc/use-morpho'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { Button } from './ui/button'
+import { PercentageControl } from './ui/percentage-control'
 
 interface DepositFormProps {
   market: SingleMorphoMarket
@@ -16,9 +17,30 @@ interface DepositFormProps {
 
 export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormProps) {
   const isClient = useIsClient()
-  const [amount, setAmount] = useState('')
+  const [percentage, setPercentage] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const { address } = useAccount()
+
+  // Wallet balance
+  const { data: tokenBalance } = useTokenBalance(market.loanAsset.address, address)
+  const formattedBalance = formatTokenBalance(tokenBalance, market.loanAsset.decimals)
+
+  // Derive amount from percentage of wallet balance
+  const amountWei = useMemo(() => {
+    const pct = Number.parseFloat(percentage)
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100 || !tokenBalance)
+      return 0n
+    const SCALE = 10000
+    const pctScaled = BigInt(Math.round(pct * SCALE))
+    return (tokenBalance * pctScaled) / (BigInt(100) * BigInt(SCALE))
+  }, [percentage, tokenBalance])
+
+  const amount = useMemo(() => {
+    if (!amountWei)
+      return ''
+    return formatUnits(amountWei, market.loanAsset.decimals!)
+  }, [amountWei, market.loanAsset.decimals])
+
   const [debouncedAmount] = useDebounce(amount, 500)
   const isAmountDebounced = amount === debouncedAmount
 
@@ -44,9 +66,6 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
     isSimulating: isSimulatingSupply,
   } = useSupply(market, guardedAmount, market.loanAsset.decimals!)
 
-  const { data: tokenBalance } = useTokenBalance(market.loanAsset.address, address)
-  const formattedBalance = formatTokenBalance(tokenBalance, market.loanAsset.decimals)
-
   const { isSuccess: isSupplySuccess, isLoading: isSupplyLoading } = useTransactionStatus(supplyHash)
   const { isSuccess: isApproveSuccess, isLoading: isApproveLoading } = useTransactionStatus(approveHash)
 
@@ -63,9 +82,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
   }, [isSupplySuccess])
 
   const handleMaxClick = () => {
-    if (tokenBalance) {
-      setAmount(formatUnits(tokenBalance, market.loanAsset.decimals!))
-    }
+    setPercentage('100')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,13 +104,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
     }
   }
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    // Only allow numbers and decimals
-    if (/^\d*(?:\.\d*)?$/.test(value)) {
-      setAmount(value)
-    }
-  }
+  // Input handled by PercentageControl
 
   const isLoading = isSupplying || isApprovingToken || isSupplyLoading || isApproveLoading || isSimulatingSupply || isSimulatingApproval || (!needsApproval && !isAllowanceReady && !!amount)
   const effectiveSupplyError = (!isAllowanceReady || needsApproval) ? undefined : supplyError
@@ -133,44 +144,62 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="deposit-amount" className="block text-sm font-medium text-gray-700 mb-2">
-          Amount to Deposit (
-          {loanTokenSymbol}
-          )
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            id="deposit-amount"
-            value={amount}
-            onChange={handleAmountChange}
-            placeholder="0.0"
-            className="w-full flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleMaxClick}
-            className="px-3"
-            disabled={!tokenBalance}
-          >
-            Max
-          </Button>
-        </div>
-        {address && (
-          <div className="text-sm text-gray-600 mt-1">
-            Wallet balance:
+      <PercentageControl
+        label="Percentage to Deposit"
+        percentage={percentage}
+        onChange={setPercentage}
+        onMax={handleMaxClick}
+        leftHelper={address
+          ? (
+              <>
+                Wallet balance:
+                {' '}
+                <span className="text-gray-200">{formattedBalance}</span>
+                {' '}
+                {loanTokenSymbol}
+              </>
+            )
+          : undefined}
+        rightHelper={(
+          <>
+            ≈
             {' '}
-            <span className="font-medium">
-              {formattedBalance}
-              {' '}
-              {loanTokenSymbol}
-            </span>
-          </div>
+            {amount || '0'}
+            {' '}
+            {loanTokenSymbol}
+          </>
         )}
-      </div>
+        desktopCta={(
+          <Button
+            type="submit"
+            disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount)}
+            className="w-full"
+          >
+            {isLoading
+              ? (
+                  <>
+                    <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" aria-hidden="true" />
+                    {(!isAllowanceReady && !!amount)
+                      ? 'Checking allowance...'
+                      : isSimulatingApproval
+                        ? 'Preparing approval...'
+                        : isApprovingToken || isApproveLoading
+                          ? 'Approving...'
+                          : isSimulatingSupply
+                            ? 'Preparing deposit...'
+                            : 'Depositing...'}
+                  </>
+                )
+              : needsApproval
+                ? (
+                    `Approve ${loanTokenSymbol}`
+                  )
+                : (
+                    `Deposit ${amount || '0'} ${loanTokenSymbol}`
+                  )}
+          </Button>
+        )}
+      />
 
       {isApproveSuccess && !needsApproval && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
@@ -202,34 +231,37 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
         </div>
       )}
 
-      <Button
-        type="submit"
-        disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount)}
-        className="w-full"
-      >
-        {isLoading
-          ? (
-              <>
-                <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" aria-hidden="true" />
-                {(!isAllowanceReady && !!amount)
-                  ? 'Checking allowance...'
-                  : isSimulatingApproval
-                    ? 'Preparing approval...'
-                    : isApprovingToken || isApproveLoading
-                      ? 'Approving...'
-                      : isSimulatingSupply
-                        ? 'Preparing deposit...'
-                        : 'Depositing...'}
-              </>
-            )
-          : needsApproval
+      {/* Mobile CTA */}
+      <div className="md:hidden">
+        <Button
+          type="submit"
+          disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount)}
+          className="w-full"
+        >
+          {isLoading
             ? (
-                `Approve ${loanTokenSymbol}`
+                <>
+                  <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" aria-hidden="true" />
+                  {(!isAllowanceReady && !!amount)
+                    ? 'Checking allowance...'
+                    : isSimulatingApproval
+                      ? 'Preparing approval...'
+                      : isApprovingToken || isApproveLoading
+                        ? 'Approving...'
+                        : isSimulatingSupply
+                          ? 'Preparing deposit...'
+                          : 'Depositing...'}
+                </>
               )
-            : (
-                `Deposit ${amount || '0'} ${loanTokenSymbol}`
-              )}
-      </Button>
+            : needsApproval
+              ? (
+                  `Approve ${loanTokenSymbol}`
+                )
+              : (
+                  `Deposit ${amount || '0'} ${loanTokenSymbol}`
+                )}
+        </Button>
+      </div>
 
       {!address && (
         <p className="text-sm text-gray-500 text-center">
