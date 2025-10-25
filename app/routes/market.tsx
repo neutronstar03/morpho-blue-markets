@@ -42,8 +42,12 @@ export default function MarketPage() {
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
       <Header>
-        <Link to="/" className="text-xl font-semibold text-white">
-          &larr; Back to Markets
+        <Link
+          to="/"
+          className="text-xl font-semibold text-white"
+        >
+          <span className="sm:hidden">&larr; Back</span>
+          <span className="hidden sm:inline">&larr; Back to Markets</span>
         </Link>
       </Header>
 

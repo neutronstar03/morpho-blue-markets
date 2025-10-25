@@ -28,13 +28,18 @@ export function Header({ children }: { children: ReactNode }) {
                   onClick={() => switchChain({ chainId: requiredChainId })}
                   className="border-purple-600 text-purple-500 hover:bg-purple-700 hover:text-white cursor-pointer"
                 >
-                  Switch to
-                  {' '}
-                  {getSupportedChainName(requiredChainId)}
+                  <span className="hidden sm:inline">
+                    Switch to
+                    {' '}
+                    {getSupportedChainName(requiredChainId)}
+                  </span>
+                  <span className="sm:hidden">
+                    Switch Network
+                  </span>
                 </Button>
               </div>
             )}
-            <ConnectButton />
+            <ConnectButton accountStatus={{ smallScreen: 'avatar', largeScreen: 'full' }} />
           </div>
         </div>
       </Container>
