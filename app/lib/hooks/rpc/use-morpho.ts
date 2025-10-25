@@ -130,7 +130,7 @@ export function useTokenBalance(tokenAddress: string, userAddress?: string) {
     args: userAddress ? [userAddress as `0x${string}`] : undefined,
     query: {
       enabled: !!userAddress && !isWrongNetwork,
-      refetchInterval: 10 * 1000, // Refetch every 30 seconds
+      refetchInterval: 5 * 1000, // Refetch every 5 seconds
     },
   })
 }
