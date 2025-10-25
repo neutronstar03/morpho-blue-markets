@@ -2,9 +2,9 @@ import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useMemo } from 'react'
 import { useAccount, useChainId } from 'wagmi'
 import { useNetworkContext } from '~/lib/contexts/network'
-import { formatAmountSpecific } from '../../lib/formatters'
-import { useIsClient } from '../../lib/hooks/use-is-client'
-import { useMarket, useUserPosition } from '../../lib/hooks/rpc/use-morpho'
+import { formatBigintShort } from '~/lib/formatters'
+import { useMarket, useUserPosition } from '~/lib/hooks/rpc/use-morpho'
+import { useIsClient } from '~/lib/hooks/use-is-client'
 
 interface UserPositionProps {
   market: SingleMorphoMarket
@@ -96,12 +96,12 @@ export function UserPosition({ market }: UserPositionProps) {
                     <p className="text-gray-400">Supplied:</p>
                     <div className="text-right">
                       <p className="font-medium text-white">
-                        {formatAmountSpecific(suppliedAssets, loanDecimals)}
+                        {formatBigintShort(suppliedAssets, loanDecimals)}
                         {' '}
                         {market.loanAsset.symbol}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {formatAmountSpecific(userSupplyShares, loanDecimals)}
+                        {formatBigintShort(userSupplyShares, 18)}
                         {' '}
                         shares
                       </p>

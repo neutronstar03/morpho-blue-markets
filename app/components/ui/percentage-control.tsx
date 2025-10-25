@@ -60,7 +60,7 @@ export function PercentageControl({
             <button
               type="button"
               onClick={onMax}
-              className="px-3 h-full flex items-center justify-center rounded-md border border-white/10 text-sm text-gray-200 hover:bg-white/10"
+              className="px-3 h-9 inline-flex items-center justify-center rounded-md border border-white/10 text-sm text-gray-200 hover:bg-white/10 cursor-pointer"
             >
               Max
             </button>

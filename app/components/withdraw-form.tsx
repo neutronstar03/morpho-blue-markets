@@ -3,7 +3,7 @@ import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/s
 import { useEffect, useMemo, useState } from 'react'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
-import { formatNumber } from '~/lib/formatters'
+import { formatDecimalStringShort, formatTokenAmountShort } from '~/lib/formatters'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '../lib/hooks/rpc/use-morpho'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { Button } from './ui/button'
@@ -151,7 +151,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
           <>
             Max available:
             {' '}
-            <span className="text-gray-200">{maxWithdrawableShares}</span>
+            <span className="text-gray-200">{formatDecimalStringShort(maxWithdrawableShares)}</span>
             {' '}
             shares
           </>
@@ -160,13 +160,13 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
           <>
             ≈
             {' '}
-            {formatNumber(assetsAtPercent, market.loanAsset.decimals!)}
+            {formatTokenAmountShort(assetsAtPercent)}
             {' '}
             {loanTokenSymbol}
             {' '}
             ·
             {' '}
-            {sharesToWithdraw}
+            {formatDecimalStringShort(sharesToWithdraw)}
             {' '}
             shares
           </>
@@ -185,7 +185,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
                   </>
                 )
               : (
-                  `Withdraw ${formatNumber(assetsAtPercent, market.loanAsset.decimals!)} ${loanTokenSymbol}`
+                  `Withdraw ${formatTokenAmountShort(assetsAtPercent)} ${loanTokenSymbol}`
                 )}
           </Button>
         )}
@@ -215,7 +215,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
                 </>
               )
             : (
-                `Withdraw ${formatNumber(assetsAtPercent, market.loanAsset.decimals!)} ${loanTokenSymbol}`
+                `Withdraw ${formatTokenAmountShort(assetsAtPercent)} ${loanTokenSymbol}`
               )}
         </Button>
       </div>

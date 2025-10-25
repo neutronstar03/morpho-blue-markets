@@ -24,7 +24,7 @@ export function MarketActions({ market }: MarketActionsProps) {
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
               activeTab === 'deposit'
                 ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer'
             }`}
             onClick={() => setActiveTab('deposit')}
           >
@@ -34,7 +34,7 @@ export function MarketActions({ market }: MarketActionsProps) {
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
               activeTab === 'withdraw'
                 ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer'
             }`}
             onClick={() => setActiveTab('withdraw')}
           >

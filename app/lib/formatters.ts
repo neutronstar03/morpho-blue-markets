@@ -85,3 +85,50 @@ export function formatPercent(value: number): string {
     maximumFractionDigits: 2,
   }).format(value)
 }
+
+// Formats token amounts for UI with readable precision and compact notation for large values.
+// - Large (>= 1,000,000): compact (e.g. 1.23M)
+// - 1,000 to < 1,000,000: up to 2 fraction digits
+// - 1 to < 1,000: up to 4 fraction digits
+// - < 1: up to 6 fraction digits (with a floor display for very small non-zero values)
+export function formatTokenAmountShort(amount: number): string {
+  if (!Number.isFinite(amount) || typeof amount === 'undefined' || amount === 0)
+    return '0'
+
+  const abs = Math.abs(amount)
+
+  // Extremely small but non-zero values
+  if (abs < 0.000001)
+    return amount < 0 ? '<-0.000001' : '<0.000001'
+
+  if (abs >= 1_000_000) {
+    return new Intl.NumberFormat('en-US', {
+      notation: 'compact',
+      maximumFractionDigits: 2,
+    }).format(amount)
+  }
+
+  const options: Intl.NumberFormatOptions
+    = abs >= 1_000
+      ? { minimumFractionDigits: 0, maximumFractionDigits: 2 }
+      : abs >= 1
+        ? { minimumFractionDigits: 0, maximumFractionDigits: 4 }
+        : { minimumFractionDigits: 2, maximumFractionDigits: 6 }
+
+  return amount.toLocaleString('en-US', options)
+}
+
+// Convenience helper to format decimal strings (e.g., results of formatUnits) succinctly.
+export function formatDecimalStringShort(value: string): string {
+  const asNumber = Number.parseFloat(value)
+  return formatTokenAmountShort(asNumber)
+}
+
+// Short formatter for bigint amounts given token decimals.
+// Converts to decimal via formatUnits, then applies the short token amount rules.
+export function formatBigintShort(amount: bigint, decimals: number): string {
+  if (amount === 0n)
+    return '0'
+  const asNumber = Number.parseFloat(formatUnits(amount, decimals))
+  return formatTokenAmountShort(asNumber)
+}

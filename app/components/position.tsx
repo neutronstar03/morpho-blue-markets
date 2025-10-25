@@ -1,17 +1,17 @@
 import type {
   LiveMarketPosition,
-} from '../lib/hooks/rpc/use-live-market-positions'
+} from '~/lib/hooks/rpc/use-live-market-positions'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
-import { formatAmountSpecific, formatTimeAgo, formatUsd } from '../lib/formatters'
-import { useMarketQuery } from '../lib/hooks/graphql/use-market'
+import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
+import { useMarketQuery } from '~/lib/hooks/graphql/use-market'
 import {
   useLiveMarketPositions,
-} from '../lib/hooks/rpc/use-live-market-positions'
-import { useIsClient } from '../lib/hooks/use-is-client'
-import { useRefreshWithCooldown } from '../lib/hooks/use-refresh-with-cooldown'
-import { useTokenLiquidity } from '../lib/hooks/use-token-liquidity'
+} from '~/lib/hooks/rpc/use-live-market-positions'
+import { useIsClient } from '~/lib/hooks/use-is-client'
+import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
+import { useTokenLiquidity } from '~/lib/hooks/use-token-liquidity'
 import { Card } from './ui/card'
 
 function PositionListItem({
@@ -98,7 +98,7 @@ function PositionListItem({
           <p className="text-gray-300">
             <span className="text-gray-400">Supply:</span>
             {' '}
-            {formatAmountSpecific(suppliedAssets, loanDecimals)}
+            {formatBigintShort(suppliedAssets, loanDecimals)}
             {' '}
             {position.market.loanAsset.symbol}
           </p>

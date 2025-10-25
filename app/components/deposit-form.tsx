@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
-import { formatTokenBalance, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '../lib/hooks/rpc/use-morpho'
+import { formatBigintShort, formatDecimalStringShort } from '~/lib/formatters'
+import { useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '../lib/hooks/rpc/use-morpho'
 import { useIsClient } from '../lib/hooks/use-is-client'
 import { Button } from './ui/button'
 import { PercentageControl } from './ui/percentage-control'
@@ -23,7 +24,6 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
 
   // Wallet balance
   const { data: tokenBalance } = useTokenBalance(market.loanAsset.address, address)
-  const formattedBalance = formatTokenBalance(tokenBalance, market.loanAsset.decimals)
 
   // Derive amount from percentage of wallet balance
   const amountWei = useMemo(() => {
@@ -40,6 +40,14 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
       return ''
     return formatUnits(amountWei, market.loanAsset.decimals!)
   }, [amountWei, market.loanAsset.decimals])
+
+  const displayAmountShort = useMemo(() => {
+    return amount ? formatDecimalStringShort(amount) : '0'
+  }, [amount])
+
+  const displayBalanceShort = useMemo(() => {
+    return tokenBalance ? formatBigintShort(tokenBalance, market.loanAsset.decimals!) : '0'
+  }, [tokenBalance, market.loanAsset.decimals])
 
   const [debouncedAmount] = useDebounce(amount, 500)
   const isAmountDebounced = amount === debouncedAmount
@@ -154,7 +162,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
               <>
                 Wallet balance:
                 {' '}
-                <span className="text-gray-200">{formattedBalance}</span>
+                <span className="text-gray-200">{displayBalanceShort}</span>
                 {' '}
                 {loanTokenSymbol}
               </>
@@ -164,7 +172,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
           <>
             ≈
             {' '}
-            {amount || '0'}
+            {displayAmountShort}
             {' '}
             {loanTokenSymbol}
           </>
@@ -195,7 +203,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
                     `Approve ${loanTokenSymbol}`
                   )
                 : (
-                    `Deposit ${amount || '0'} ${loanTokenSymbol}`
+                    `Deposit ${displayAmountShort} ${loanTokenSymbol}`
                   )}
           </Button>
         )}
@@ -258,7 +266,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
                   `Approve ${loanTokenSymbol}`
                 )
               : (
-                  `Deposit ${amount || '0'} ${loanTokenSymbol}`
+                  `Deposit ${displayAmountShort} ${loanTokenSymbol}`
                 )}
         </Button>
       </div>
