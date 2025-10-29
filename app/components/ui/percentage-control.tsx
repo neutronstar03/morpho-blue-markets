@@ -23,15 +23,10 @@ export function PercentageControl({
 
   const handlePercentInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
-    if (/^\d*(?:\.\d*)?$/.test(value)) {
-      const num = Number.parseFloat(value)
-      if (Number.isNaN(num)) {
-        onChange(value)
-      }
-      else {
-        const clamped = Math.max(0, Math.min(100, num))
-        onChange(clamped.toString())
-      }
+
+    // Allow empty input, digits, decimal point, and decimal numbers
+    if (/^(?:\d+(?:\.\d*)?|\.\d*)$/.test(value) || value === '') {
+      onChange(value)
     }
   }
 
