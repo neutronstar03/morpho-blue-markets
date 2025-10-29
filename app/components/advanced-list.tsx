@@ -3,7 +3,7 @@ import type { MorphoMarket, MarketFilters as TypeMarketFilters } from '~/lib/hoo
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
-import { getSupportedChainName, supportedChains } from '~/lib/addresses'
+import { getSupportedChainName, supportedChainIdMap, supportedChains } from '~/lib/addresses'
 import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
 import {
   MarketOrderBy,
@@ -30,10 +30,13 @@ const CHAIN_LABELS: Record<SupportedChain, string> = {
   Katana: 'Katana',
 }
 
+type MarketChainFilter = 'ALL' | SupportedChain
+
 function buildWhereClause(
   aprType: string, // 'supply' or 'borrow'
   comparison: string, // '>' or '<'
   aprValue: number,
+  chainFilter: MarketChainFilter,
 ): TypeMarketFilters {
   const where: TypeMarketFilters = {
     supplyAssetsUsd_gte: CONFIG.minTvlUsd,
@@ -60,6 +63,11 @@ function buildWhereClause(
       // '<'
       where.borrowApy_lte = aprValueDecimal
     }
+  }
+
+  if (chainFilter !== 'ALL') {
+    const filteredChainId = supportedChainIdMap.get(chainFilter)!
+    where.chainId_in = [filteredChainId]
   }
 
   return where
@@ -91,7 +99,6 @@ function getMarketSideColors(side: MarketSide) {
   }
 }
 
-// This is a placeholder type. We'll define the exact fields later.
 interface MarketData {
   id: string
   market: string
@@ -120,8 +127,8 @@ interface MarketFiltersProps {
   setOrderBy: Setter<MarketOrderBy>
   orderDirection: OrderDirection
   setOrderDirection: Setter<OrderDirection>
-  chainFilter: 'ALL' | SupportedChain
-  setChainFilter: Setter<'ALL' | SupportedChain>
+  chainFilter: MarketChainFilter
+  setChainFilter: Setter<MarketChainFilter>
   rateType: MarketSide
 }
 
@@ -159,7 +166,7 @@ function MarketFilters({
         <span className="text-sm font-medium text-gray-300">Filter by Chain:</span>
         <select
           value={chainFilter}
-          onChange={e => setChainFilter(e.target.value as 'ALL' | SupportedChain)}
+          onChange={e => setChainFilter(e.target.value as MarketChainFilter)}
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="ALL">ALL</option>
@@ -329,11 +336,11 @@ export function AdvancedList() {
   const [aprValue, setAprValue] = useLocalStorage<number>('advanced-list:aprValue', 12)
   const [orderBy, setOrderBy] = useLocalStorage<MarketOrderBy>('advanced-list:orderBy', MarketOrderBy.NetSupplyApy)
   const [orderDirection, setOrderDirection] = useLocalStorage<OrderDirection>('advanced-list:orderDirection', OrderDirection.Desc)
-  const [chainFilter, setChainFilter] = useLocalStorage<'ALL' | SupportedChain>('advanced-list:chainFilter', 'ALL')
+  const [chainFilter, setChainFilter] = useLocalStorage<MarketChainFilter>('advanced-list:chainFilter', 'ALL')
 
   const where = useMemo(
-    () => buildWhereClause(aprType, comparison, aprValue),
-    [aprType, comparison, aprValue],
+    () => buildWhereClause(aprType, comparison, aprValue, chainFilter),
+    [aprType, comparison, aprValue, chainFilter],
   )
 
   const MARKETS_STALE_TIME = 5 * 60 * 1000 // 5 minute
@@ -397,11 +404,6 @@ export function AdvancedList() {
     return marketsData.markets.items.filter((market) => {
       if (market.collateralAsset == null || market.loanAsset == null)
         return false
-      if (chainFilter !== 'ALL') {
-        const marketChainName = getSupportedChainName(market.morphoBlue.chain.id) as SupportedChain
-        if (marketChainName !== chainFilter)
-          return false
-      }
       return true
     }).map((market: MorphoMarket) => ({
       id: market.uniqueKey,
@@ -424,7 +426,7 @@ export function AdvancedList() {
       borrowApr7d: `${(market.state.weeklyNetBorrowApy * 100).toFixed(2)}%`,
       whitelisted: market.whitelisted,
     }))
-  }, [marketsData, chainFilter, displayRateType])
+  }, [marketsData, displayRateType])
 
   // State for last updated time
   const [timeAgo, setTimeAgo] = useState('')

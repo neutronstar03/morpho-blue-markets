@@ -146,6 +146,7 @@ export interface MarketFilters {
   supplyAssetsUsd_gte?: number
   borrowApy_gte?: number
   borrowApy_lte?: number
+  chainId_in?: number[]
 }
 
 interface UseMarketsProps {

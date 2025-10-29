@@ -12,20 +12,27 @@ export const morphoAddressOnChain = {
 
 export const supportedChains = Object.keys(morphoAddressOnChain) as SupportedChain[]
 
-export const supportedChainsID = {
-  1: 'Ethereum',
-  8453: 'Base',
-  42161: 'Arbitrum',
-  137: 'Polygon',
-  130: 'Unichain',
-  999: 'Hyperliquid',
-  747474: 'Katana',
-} as const
-
-export type SupportedChainID = keyof typeof supportedChainsID
+export type SupportedChainId = 1 | 8453 | 42161 | 137 | 130 | 999 | 747474
 export type UnknownChainName = `Chain ${number}`
 
-export function getSupportedChainName(chainId?: number): SupportedChain | UnknownChainName {
-  const chainName = supportedChainsID[chainId as SupportedChainID]
+export const supportedChainMap = new Map<number, SupportedChain>([
+  [1, 'Ethereum'],
+  [8453, 'Base'],
+  [42161, 'Arbitrum'],
+  [137, 'Polygon'],
+  [130, 'Unichain'],
+  [999, 'Hyperliquid'],
+  [747474, 'Katana'],
+])
+
+// Reverse map: chainName -> chainId
+export const supportedChainIdMap = new Map<SupportedChain, number>(
+  Array.from(supportedChainMap.entries()).map(([id, name]) => [name, id]),
+)
+
+export function getSupportedChainName(chainId: number): SupportedChain | UnknownChainName {
+  if (chainId == null)
+    throw new Error('Missing chain id')
+  const chainName = supportedChainMap.get(chainId)
   return chainName ?? `Chain ${chainId}`
 }
