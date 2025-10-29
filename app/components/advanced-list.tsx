@@ -17,7 +17,7 @@ import { Card } from './ui/card'
 const CONFIG = {
   minSupplyApy: 0.09, // 9% apr
   maxSupplyApy: 10, // 200% max apr
-  minTvlUsd: 50000, // $50k minimum TVL
+  minTvlUsd: 20000, // $20k minimum TVL
 }
 
 const CHAIN_LABELS: Record<SupportedChain, string> = {
@@ -66,6 +66,30 @@ function buildWhereClause(
 }
 
 type Setter<T> = (value: T | ((prev: T) => T)) => void
+type MarketSide = 'supply' | 'borrow'
+
+/**
+ * Returns color scheme classes based on market side.
+ * Provides consistent dark orange theme for borrow mode and default gray for supply.
+ */
+function getMarketSideColors(side: MarketSide) {
+  if (side === 'borrow') {
+    return {
+      background: 'bg-orange-950/50',
+      backgroundLight: 'bg-orange-950/30',
+      hover: 'hover:bg-orange-900/50',
+      border: 'border-orange-800/30',
+      rateText: 'text-orange-300',
+    }
+  }
+  return {
+    background: 'bg-gray-900/50',
+    backgroundLight: 'bg-gray-800',
+    hover: 'hover:bg-gray-700/50',
+    border: 'border-gray-700',
+    rateText: 'text-green-300',
+  }
+}
 
 // This is a placeholder type. We'll define the exact fields later.
 interface MarketData {
@@ -86,8 +110,8 @@ interface MarketData {
 }
 
 interface MarketFiltersProps {
-  aprType: 'supply' | 'borrow'
-  setAprType: Setter<'supply' | 'borrow'>
+  aprType: MarketSide
+  setAprType: Setter<MarketSide>
   comparison: '>' | '<'
   setComparison: Setter<'>' | '<'>
   aprValue: number
@@ -98,6 +122,7 @@ interface MarketFiltersProps {
   setOrderDirection: Setter<OrderDirection>
   chainFilter: 'ALL' | SupportedChain
   setChainFilter: Setter<'ALL' | SupportedChain>
+  rateType: MarketSide
 }
 
 function MarketFilters({
@@ -113,9 +138,23 @@ function MarketFilters({
   setOrderDirection,
   chainFilter,
   setChainFilter,
+  rateType,
 }: MarketFiltersProps) {
+  const colors = getMarketSideColors(rateType)
+
+  function onChangeDirection(value: MarketSide) {
+    const prevMarketSide = aprType
+    if (value !== prevMarketSide) {
+      setOrderBy(value === 'supply' ? MarketOrderBy.NetSupplyApy : MarketOrderBy.NetBorrowApy)
+      setOrderDirection(value === 'supply' ? OrderDirection.Desc : OrderDirection.Asc)
+      setComparison(value === 'supply' ? '>' : '<')
+      setAprValue(value === 'supply' ? 12 : 4)
+    }
+    setAprType(value)
+  }
+
   return (
-    <div className="p-4 flex flex-wrap items-center gap-4 bg-gray-900/50 border-b border-gray-700">
+    <div className={`p-4 flex flex-wrap items-center gap-4 ${colors.background} border-b ${colors.border}`}>
       <div className="flex items-center space-x-2">
         <span className="text-sm font-medium text-gray-300">Filter by Chain:</span>
         <select
@@ -133,7 +172,7 @@ function MarketFilters({
         <span className="text-sm font-medium text-gray-300">Filter:</span>
         <select
           value={aprType}
-          onChange={e => setAprType(e.target.value as 'supply' | 'borrow')}
+          onChange={e => onChangeDirection(e.target.value as MarketSide)}
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="supply">Supply APR</option>
@@ -184,7 +223,7 @@ function MarketFilters({
 interface MarketTableProps {
   markets: MarketData[]
   isLoading: boolean
-  rateType: 'supply' | 'borrow'
+  rateType: MarketSide
 }
 
 function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
@@ -196,12 +235,12 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
     )
   }
   const rateLabel = rateType === 'supply' ? 'Supply' : 'Borrow'
-  const rateColorClass = rateType === 'supply' ? 'text-green-300' : 'text-blue-300'
+  const colors = getMarketSideColors(rateType)
 
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-700">
-        <thead className="bg-gray-900/50">
+        <thead className={colors.background}>
           <tr>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Chain</th>
@@ -226,11 +265,11 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
             <th scope="col" className="hidden lg:table-cell px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Whitelisted</th>
           </tr>
         </thead>
-        <tbody className="bg-gray-800 divide-y divide-gray-700">
+        <tbody className={`${colors.backgroundLight} divide-y divide-gray-700`}>
           {markets.map(market => (
             <tr
               key={market.id}
-              className="hover:bg-gray-700/50 transition-colors relative"
+              className={`${colors.hover} transition-colors relative`}
             >
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                 <div className="flex items-center gap-2">
@@ -255,13 +294,13 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
               <td className="px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.marketSize}</td>
               <td className="px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.beforeTarget}</td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilization}</td>
-              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
+              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
                 {rateType === 'supply' ? market.supplyApr : market.borrowApr}
               </td>
-              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
+              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
                 {rateType === 'supply' ? market.supplyApr1d : market.borrowApr1d}
               </td>
-              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${rateColorClass}`}>
+              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
                 {rateType === 'supply' ? market.supplyApr7d : market.borrowApr7d}
               </td>
               <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-center text-sm">
@@ -285,7 +324,7 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
 
 export function AdvancedList() {
   // State for filters
-  const [aprType, setAprType] = useLocalStorage<'supply' | 'borrow'>('advanced-list:aprType', 'supply')
+  const [aprType, setAprType] = useLocalStorage<MarketSide>('advanced-list:aprType', 'supply')
   const [comparison, setComparison] = useLocalStorage<'>' | '<'>('advanced-list:comparison', '>')
   const [aprValue, setAprValue] = useLocalStorage<number>('advanced-list:aprValue', 12)
   const [orderBy, setOrderBy] = useLocalStorage<MarketOrderBy>('advanced-list:orderBy', MarketOrderBy.NetSupplyApy)
@@ -311,6 +350,46 @@ export function AdvancedList() {
     staleTime: MARKETS_STALE_TIME,
   })
 
+  // Determine which rate type to display based on filter or order by
+  const displayRateType: MarketSide
+    = aprType === 'borrow' || orderBy === MarketOrderBy.NetBorrowApy
+      ? 'borrow'
+      : 'supply'
+
+  /**
+   * Computes the beforeTarget value based on the display rate type.
+   * - For 'supply': shows excess utilization above 90% (only when > 90%)
+   * - For 'borrow': shows how much more can be borrowed before hitting 90% utilization (only when < 90%)
+   */
+  function computeBeforeTarget(
+    utilization: number,
+    supplyAssetsUsd: number | null | undefined,
+    borrowAssetsUsd: number | null | undefined,
+    rateType: MarketSide,
+  ): string {
+    const supplyUsd = supplyAssetsUsd ?? 0
+    const borrowUsd = borrowAssetsUsd ?? 0
+    const targetUtilization = 0.9
+
+    if (rateType === 'supply') {
+      // For supply: show excess above 90%
+      if (utilization > targetUtilization) {
+        return formatMarketSize((utilization - targetUtilization) * supplyUsd)
+      }
+      return ''
+    }
+    else {
+      // For borrow: show how much more can be borrowed before hitting 90%
+      // Target borrow at 90% = 0.9 * supply, so additional borrowable = (0.9 * supply) - current borrow
+      if (utilization < targetUtilization) {
+        const targetBorrowUsd = targetUtilization * supplyUsd
+        const additionalBorrowable = targetBorrowUsd - borrowUsd
+        return formatMarketSize(Math.max(0, additionalBorrowable))
+      }
+      return ''
+    }
+  }
+
   const markets = useMemo(() => {
     if (!marketsData?.markets.items)
       return []
@@ -330,10 +409,12 @@ export function AdvancedList() {
       chainId: Number(market.morphoBlue.chain.id),
       chainName: getSupportedChainName(market.morphoBlue.chain.id),
       marketSize: formatMarketSize(market.state.supplyAssetsUsd),
-      beforeTarget:
-        market.state.utilization > 0.9
-          ? formatMarketSize((market.state.utilization - 0.9) * (market.state.supplyAssetsUsd ?? 0))
-          : '',
+      beforeTarget: computeBeforeTarget(
+        market.state.utilization,
+        market.state.supplyAssetsUsd,
+        market.state.borrowAssetsUsd,
+        displayRateType,
+      ),
       utilization: `${(market.state.utilization * 100).toFixed(2)}%`,
       supplyApr: `${(market.state.netSupplyApy * 100).toFixed(2)}%`,
       supplyApr1d: `${(market.state.dailyNetSupplyApy * 100).toFixed(2)}%`,
@@ -343,7 +424,7 @@ export function AdvancedList() {
       borrowApr7d: `${(market.state.weeklyNetBorrowApy * 100).toFixed(2)}%`,
       whitelisted: market.whitelisted,
     }))
-  }, [marketsData, chainFilter])
+  }, [marketsData, chainFilter, displayRateType])
 
   // State for last updated time
   const [timeAgo, setTimeAgo] = useState('')
@@ -359,15 +440,11 @@ export function AdvancedList() {
     }
   }, [dataUpdatedAt])
 
-  // Determine which rate type to display based on filter or order by
-  const displayRateType: 'supply' | 'borrow'
-    = aprType === 'borrow' || orderBy === MarketOrderBy.NetBorrowApy
-      ? 'borrow'
-      : 'supply'
+  const colors = getMarketSideColors(displayRateType)
 
   return (
-    <Card>
-      <div className="p-4 border-b border-gray-700 flex items-center">
+    <Card className={`border ${colors.border} ${colors.backgroundLight}`}>
+      <div className={`p-4 border-b ${colors.border} flex items-center`}>
         <div className="flex flex-col items-start space-y-1 md:flex-row md:items-center md:space-x-4 md:space-y-0">
           <h2 className="text-xl font-bold text-white">Markets</h2>
           <span className="hidden md:inline-block text-sm text-gray-400 tabular-nums pr-4 w-32 text-right">
@@ -399,6 +476,7 @@ export function AdvancedList() {
         setOrderDirection={setOrderDirection}
         chainFilter={chainFilter}
         setChainFilter={setChainFilter}
+        rateType={displayRateType}
       />
 
       <MarketTable markets={markets} isLoading={isLoading} rateType={displayRateType} />
