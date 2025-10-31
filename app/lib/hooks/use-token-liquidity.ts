@@ -1,4 +1,4 @@
-import type { SupportedChain } from '~/lib/addresses'
+import type { SupportedChainName } from '~/lib/addresses'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { getSupportedChainName } from '~/lib/addresses'
@@ -32,7 +32,7 @@ export interface UseTokenLiquidityArgs {
 }
 
 function mapChainToGeckoNetwork(chainId?: number): GeckoNetworkSlug | undefined {
-  const chainName = getSupportedChainName(chainId) as SupportedChain | `Chain ${number}`
+  const chainName = getSupportedChainName(chainId) as SupportedChainName
   switch (chainName) {
     case 'Ethereum':
       return 'eth'

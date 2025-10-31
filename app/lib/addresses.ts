@@ -30,9 +30,13 @@ export const supportedChainIdMap = new Map<SupportedChain, number>(
   Array.from(supportedChainMap.entries()).map(([id, name]) => [name, id]),
 )
 
-export function getSupportedChainName(chainId: number): SupportedChain | UnknownChainName {
+export type SupportedChainName = SupportedChain | UnknownChainName
+export function getSupportedChainName(
+  chainId?: number,
+  defaultChain: SupportedChain = 'Ethereum',
+): SupportedChainName {
   if (chainId == null)
-    throw new Error('Missing chain id')
+    return defaultChain
   const chainName = supportedChainMap.get(chainId)
   return chainName ?? `Chain ${chainId}`
 }
