@@ -48,8 +48,10 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
 
   // USDT (mainnet) is a non-standard ERC20: approve/transfer/transferFrom return no value.
   // Use a no-return ABI for simulate(decode) to avoid "returned no data" errors.
+  // IMPORTANT: Must check both address AND chainId (mainnet = 1) to avoid false positives
   const USDT_MAINNET_ADDRESS = '0xdac17f958d2ee523a2206206994597c13d831ec7'
-  const isUsdtMainnet = tokenAddress?.toLowerCase() === USDT_MAINNET_ADDRESS
+  const MAINNET_CHAIN_ID = 1
+  const isUsdtMainnet = chainId === MAINNET_CHAIN_ID && tokenAddress?.toLowerCase() === USDT_MAINNET_ADDRESS.toLowerCase()
   const USDT_APPROVE_NO_RETURN_ABI = [
     {
       type: 'function',
@@ -63,6 +65,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     },
   ] as const
   const approveSimAbi = isUsdtMainnet ? USDT_APPROVE_NO_RETURN_ABI : erc20Abi
+  const approveWriteAbi = isUsdtMainnet ? USDT_APPROVE_NO_RETURN_ABI : erc20Abi
 
   const { data: allowance, refetch } = useReadContract({
     address: tokenAddress as `0x${string}`,
@@ -94,11 +97,23 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     },
   })
 
-  const { writeContract: approve, data: hash, isPending, error: writeError } = useWriteContract()
+  const { writeContract, data: hash, isPending, error: writeError } = useWriteContract()
 
   const handleApprove = () => {
-    if (simulateData?.request) {
-      approve(simulateData.request)
+    if (!simulateData?.request || !approveArgs)
+      return
+    // For USDT mainnet, explicitly pass the ABI to ensure proper encoding
+    // This avoids issues with wagmi's transaction encoding for non-standard ERC20 tokens
+    if (isUsdtMainnet) {
+      writeContract({
+        address: tokenAddress as `0x${string}`,
+        abi: approveWriteAbi,
+        functionName: 'approve',
+        args: approveArgs,
+      })
+    }
+    else {
+      writeContract(simulateData.request)
     }
   }
 
