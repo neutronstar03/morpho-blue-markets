@@ -3,7 +3,7 @@ import type { MorphoMarket, MarketFilters as TypeMarketFilters } from '~/lib/hoo
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
-import { getSupportedChainName, supportedChainIdMap, supportedChains } from '~/lib/addresses'
+import { getSupportedChainName, supportedChainIdMap } from '~/lib/addresses'
 import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
 import {
   MarketOrderBy,
@@ -18,16 +18,6 @@ const CONFIG = {
   minSupplyApy: 0.09, // 9% apr
   maxSupplyApy: 10, // 200% max apr
   minTvlUsd: 20000, // $20k minimum TVL
-}
-
-const CHAIN_LABELS: Record<SupportedChain, string> = {
-  Ethereum: 'Ethereum',
-  Base: 'Base',
-  Arbitrum: 'Arbitrum',
-  Polygon: 'Polygon',
-  Hyperliquid: 'Hyperliquid',
-  Unichain: 'Unichain',
-  Katana: 'Katana',
 }
 
 type MarketChainFilter = 'ALL' | SupportedChain
@@ -170,8 +160,8 @@ function MarketFilters({
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="ALL">ALL</option>
-          {supportedChains.map(chain => (
-            <option key={chain} value={chain}>{CHAIN_LABELS[chain]}</option>
+          {Array.from(supportedChainIdMap.keys()).map(chainName => (
+            <option key={chainName} value={chainName}>{chainName}</option>
           ))}
         </select>
       </div>

@@ -1,6 +1,6 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { defineChain, fallback, http } from 'viem'
-import { arbitrum, base, katana, mainnet, polygon, unichain } from 'wagmi/chains'
+import { arbitrum, base, katana, mainnet, optimism, polygon, unichain } from 'wagmi/chains'
 
 const hyperEvm = defineChain({
   id: 999,
@@ -30,7 +30,7 @@ const hyperEvm = defineChain({
 export const config = getDefaultConfig({
   appName: 'Morpho Blue Markets',
   projectId: '0d13744a3dd855198cde1538ca87976d',
-  chains: [arbitrum, base, katana, mainnet, polygon, unichain, hyperEvm],
+  chains: [arbitrum, base, katana, mainnet, optimism, polygon, unichain, hyperEvm],
   transports: {
     [mainnet.id]: fallback([
       http('https://ethereum-rpc.publicnode.com'),
@@ -68,6 +68,16 @@ export const config = getDefaultConfig({
       http('https://polygon-bor-rpc.publicnode.com'),
       http('https://polygon.drpc.org'),
       http('https://endpoints.omniatech.io/v1/matic/mainnet/public'),
+    ], { rank: false, retryCount: 2 }),
+    [optimism.id]: fallback([
+      http('https://1rpc.io/op'),
+      http('https://optimism-rpc.publicnode.com'),
+      http('https://optimism.meowrpc.com'),
+      http('https://optimism.drpc.org'),
+      http('https://api.stateless.solutions/optimism/v1/demo'),
+      http('https://endpoints.omniatech.io/v1/op/mainnet/public'),
+      http('https://0xrpc.io/op'),
+      http('https://public-op-mainnet.fastnode.io'),
     ], { rank: false, retryCount: 2 }),
   },
 })

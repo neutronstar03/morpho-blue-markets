@@ -6,11 +6,12 @@ import { getSupportedChainName } from '~/lib/addresses'
 type GeckoNetworkSlug
   = | 'eth' // Ethereum
     | 'base'
-    | 'arb' // Arbitrum
+    | 'arbitrum'
     | 'polygon'
     | 'unichain'
     | 'hyperliquid'
     | 'katana'
+    | 'optimism'
 
 interface GeckoPoolResource {
   id: string
@@ -39,7 +40,7 @@ function mapChainToGeckoNetwork(chainId?: number): GeckoNetworkSlug | undefined 
     case 'Base':
       return 'base'
     case 'Arbitrum':
-      return 'arb'
+      return 'arbitrum'
     case 'Polygon':
       return 'polygon'
     case 'Unichain':
@@ -48,6 +49,8 @@ function mapChainToGeckoNetwork(chainId?: number): GeckoNetworkSlug | undefined 
       return 'hyperliquid'
     case 'Katana':
       return 'katana'
+    case 'Optimism':
+      return 'optimism'
     default:
       return undefined
   }
