@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useAccount } from 'wagmi'
 import { DepositForm } from '../deposit-form'
 import { WithdrawForm } from '../withdraw-form'
-import { UserPosition } from './user-position'
+import { MarketPosition } from './market-position'
 
 interface MarketActionsProps {
   market: SingleMorphoMarket
@@ -16,7 +16,7 @@ export function MarketActions({ market }: MarketActionsProps) {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <UserPosition market={market} />
+        <MarketPosition market={market} />
       </div>
       <div className="pt-6 border-t border-gray-700">
         <div className="flex gap-3 mb-6">

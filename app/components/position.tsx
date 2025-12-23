@@ -14,6 +14,16 @@ import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { useTokenLiquidity } from '~/lib/hooks/use-token-liquidity'
 import { Card } from './ui/card'
 
+// This component is the general position in the homepage
+
+interface Portfolio {
+  dailyUsd: number | undefined
+  weightedAprPct: number | undefined
+  totalAssets: bigint | undefined
+  totalAssetsSymbol: string | undefined
+  totalAssetsDecimals: number | undefined
+}
+
 function PositionListItem({
   position,
   chainId,
@@ -130,13 +140,29 @@ function PositionClient() {
     }
   }, [dataUpdatedAt])
 
-  const portfolio = useMemo(() => {
+  const portfolio = useMemo((): Portfolio => {
     if (!positions || !positions.length)
-      return { dailyUsd: undefined as number | undefined, weightedAprPct: undefined as number | undefined }
+      return { dailyUsd: undefined, weightedAprPct: undefined, totalAssets: undefined, totalAssetsSymbol: undefined, totalAssetsDecimals: undefined }
+
+    let totalAssets: bigint | undefined
+    let totalAssetsSymbol: string | undefined
+    let totalAssetsDecimals: number | undefined
 
     let totalPrincipalUsd = 0
     let totalDailyUsd = 0
     let totalAprWeighted = 0
+
+    // Check if all positions have the same loan asset
+    const firstLoanAssetAddress = positions[0]?.market.loanAsset.address
+    const firstLoanAssetSymbol = positions[0]?.market.loanAsset.symbol
+    const firstLoanAssetDecimals = positions[0]?.market.loanAsset.decimals ?? 18
+    const allSameAsset = positions.every(p => p.market.loanAsset.address === firstLoanAssetAddress)
+
+    if (allSameAsset && firstLoanAssetAddress) {
+      totalAssets = 0n
+      totalAssetsSymbol = firstLoanAssetSymbol
+      totalAssetsDecimals = firstLoanAssetDecimals
+    }
 
     for (const p of positions) {
       const marketSupplyShares = BigInt(p.market.state.supplyShares)
@@ -157,10 +183,25 @@ function PositionClient() {
       totalPrincipalUsd += userPrincipalUsd
       totalDailyUsd += dailyUsd
       totalAprWeighted += userPrincipalUsd * (p.market.state.netSupplyApy || 0)
+
+      // Calculate total assets if all positions have the same asset
+      if (allSameAsset && totalAssets !== undefined) {
+        const marketSupplyAssets = BigInt(p.market.state.supplyAssets)
+        if (marketSupplyShares > 0n) {
+          const suppliedAssets = (userSupplyShares * marketSupplyAssets) / marketSupplyShares
+          totalAssets += suppliedAssets
+        }
+      }
     }
 
     const weightedAprPct = totalPrincipalUsd > 0 ? (totalAprWeighted / totalPrincipalUsd) * 100 : undefined
-    return { dailyUsd: totalDailyUsd || undefined, weightedAprPct }
+    return {
+      dailyUsd: totalDailyUsd || undefined,
+      weightedAprPct,
+      totalAssets: totalAssets === 0n ? undefined : totalAssets,
+      totalAssetsSymbol,
+      totalAssetsDecimals,
+    }
   }, [positions])
 
   if (!isConnected) {
@@ -221,7 +262,7 @@ function PositionClient() {
           </button>
         </div>
       </div>
-      <div className="p-6">
+      <div className="pt-6 px-4">
         {isLoading
           ? (
               <p className="text-gray-400">Loading your positions...</p>
@@ -244,6 +285,22 @@ function PositionClient() {
                 </ul>
               )}
       </div>
+      {portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null && (
+        <div
+          className="
+            flex flex-row justify-center items-center mx-4 mb-4
+            sm:justify-end
+            gap-1 sm:gap-2
+          "
+        >
+          <p className="text-xs text-gray-400 whitespace-nowrap">Total Assets</p>
+          <p className="text-sm text-white whitespace-nowrap">
+            {formatBigintShort(portfolio.totalAssets, portfolio.totalAssetsDecimals)}
+            {' '}
+            {portfolio.totalAssetsSymbol}
+          </p>
+        </div>
+      )}
     </Card>
   )
 }

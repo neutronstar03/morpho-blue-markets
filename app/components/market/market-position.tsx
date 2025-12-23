@@ -6,11 +6,13 @@ import { formatBigintShort } from '~/lib/formatters'
 import { useMarket, useUserPosition } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 
-interface UserPositionProps {
+// While having similar name as position.tsx, this component is specific to a single market
+
+interface MarketPositionProps {
   market: SingleMorphoMarket
 }
 
-export function UserPosition({ market }: UserPositionProps) {
+export function MarketPosition({ market }: MarketPositionProps) {
   const isClient = useIsClient()
   const { address } = useAccount()
   const chainId = useChainId()
