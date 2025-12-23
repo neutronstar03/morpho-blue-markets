@@ -262,7 +262,7 @@ function PositionClient() {
           </button>
         </div>
       </div>
-      <div className="pt-6 px-4">
+      <div className="py-6 px-4">
         {isLoading
           ? (
               <p className="text-gray-400">Loading your positions...</p>
@@ -284,23 +284,23 @@ function PositionClient() {
                     ))}
                 </ul>
               )}
+        {portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null && (
+          <div
+            className="
+              flex flex-row justify-center items-center mx-4
+              sm:justify-end
+              gap-1 sm:gap-2
+            "
+          >
+            <p className="text-xs text-gray-400 whitespace-nowrap">Total Assets</p>
+            <p className="text-sm text-white whitespace-nowrap">
+              {formatBigintShort(portfolio.totalAssets, portfolio.totalAssetsDecimals)}
+              {' '}
+              {portfolio.totalAssetsSymbol}
+            </p>
+          </div>
+        )}
       </div>
-      {portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null && (
-        <div
-          className="
-            flex flex-row justify-center items-center mx-4 mb-4
-            sm:justify-end
-            gap-1 sm:gap-2
-          "
-        >
-          <p className="text-xs text-gray-400 whitespace-nowrap">Total Assets</p>
-          <p className="text-sm text-white whitespace-nowrap">
-            {formatBigintShort(portfolio.totalAssets, portfolio.totalAssetsDecimals)}
-            {' '}
-            {portfolio.totalAssetsSymbol}
-          </p>
-        </div>
-      )}
     </Card>
   )
 }

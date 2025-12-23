@@ -102,9 +102,7 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
       // Filter out positions with zero shares (no actual position)
       return (result.marketPositions.items || []).filter((p) => {
         const supplyShares = BigInt(p.state.supplyShares || '0')
-        const borrowShares = BigInt(p.state.borrowShares || '0')
-        const collateral = BigInt(p.state.collateral || '0')
-        return supplyShares > 0n || borrowShares > 0n || collateral > 0n
+        return supplyShares > 0n
       })
     },
     enabled: !!userAddress && !!chainId,
