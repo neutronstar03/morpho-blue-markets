@@ -25,6 +25,8 @@ jobs:
         run: bun install
       - name: Build project
         run: bun run build
+        env:
+          VITE_GIT_SHA: ${{ github.sha }}
       - name: Prepare for GitHub Pages SPA
         run: |
           mv build/client/morpho-blue-markets/index.html build/client/

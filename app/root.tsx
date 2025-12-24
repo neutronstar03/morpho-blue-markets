@@ -8,6 +8,7 @@ import {
   Scripts,
   ScrollRestoration,
 } from 'react-router'
+import { Footer } from './components/footer'
 import { Providers } from './lib/providers'
 import './app.css'
 import '@rainbow-me/rainbowkit/styles.css'
@@ -66,7 +67,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Providers>
-      <Outlet />
+      <div className="min-h-screen bg-gray-900 flex flex-col">
+        <div className="flex-1">
+          <Outlet />
+        </div>
+        <Footer />
+      </div>
     </Providers>
   )
 }

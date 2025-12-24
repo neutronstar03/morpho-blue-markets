@@ -39,7 +39,7 @@ export default function MarketPage() {
   } = useMarketQuery(uniqueKey, Number(chainId))
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <>
       {/* Header */}
       <Header>
         <Link
@@ -78,6 +78,6 @@ export default function MarketPage() {
               )
             )}
       </Main>
-    </div>
+    </>
   )
 }

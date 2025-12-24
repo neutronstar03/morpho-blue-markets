@@ -4,7 +4,10 @@
   "version": "1.0.1",
   "private": true,
   "description": "An alternative frontend for the Morpho Blue DEFI protocol.",
-  "author": "neutronstar03",
+  "author": {
+    "name": "neutronstar03",
+    "url": "https://github.com/neutronstar03"
+  },
   "license": "The Unlicense",
   "repository": {
     "type": "git",
@@ -14,7 +17,13 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "version:patch": "bun pm version patch",
+    "version:minor": "bun pm version minor",
+    "version:major": "bun pm version major",
+    "release:patch": "bun pm version patch && git push --follow-tags",
+    "release:minor": "bun pm version minor && git push --follow-tags",
+    "release:major": "bun pm version major && git push --follow-tags"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

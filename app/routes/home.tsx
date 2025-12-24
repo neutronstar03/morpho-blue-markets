@@ -21,7 +21,7 @@ export default function HomePage() {
   }, [setRequiredChainId])
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <>
       {/* Header */}
       <Header>
         <h1 className="text-xl font-semibold text-white">
@@ -38,6 +38,6 @@ export default function HomePage() {
           </div>
         </div>
       </Main>
-    </div>
+    </>
   )
 }

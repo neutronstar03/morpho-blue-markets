@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __GIT_SHA__: string | null
+
 declare module '*.svg?react' {
   import type { FunctionComponent, SVGProps } from 'react'
 
