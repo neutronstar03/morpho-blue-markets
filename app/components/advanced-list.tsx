@@ -217,6 +217,15 @@ function MarketFilters({
   )
 }
 
+function morphoAppChainUrl(chainName: string, marketId: string) {
+  const exceptions: Record<string, string> = {
+    hyperliquid: 'hyperevm',
+  }
+
+  const safeChainName = exceptions[chainName.toLowerCase()] ?? chainName.toLowerCase()
+  return `https://app.morpho.org/${safeChainName}/market/${marketId}`
+}
+
 interface MarketTableProps {
   markets: MarketData[]
   isLoading: boolean
@@ -277,7 +286,7 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
                     {market.market}
                   </Link>
                   <a
-                    href={`https://app.morpho.org/${market.chainName.toLowerCase()}/market/${market.id}`}
+                    href={morphoAppChainUrl(market.chainName, market.id)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-white hover:text-blue-400 transition-colors relative z-10 flex items-center"

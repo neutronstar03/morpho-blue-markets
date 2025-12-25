@@ -1,4 +1,4 @@
-export type SupportedChain = 'Ethereum' | 'Base' | 'Arbitrum' | 'Polygon' | 'Hyperliquid' | 'Unichain' | 'Katana' | 'Optimism'
+export type SupportedChain = 'Ethereum' | 'Base' | 'Arbitrum' | 'Polygon' | 'Hyperliquid' | 'Unichain' | 'Katana' | 'Optimism' | 'Monad' | 'Stable'
 
 export const morphoAddressOnChain = {
   Ethereum: '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb',
@@ -9,9 +9,11 @@ export const morphoAddressOnChain = {
   Unichain: '0x8f5ae9cddb9f68de460c77730b018ae7e04a140a',
   Katana: '0xD50F2DffFd62f94Ee4AEd9ca05C61d0753268aBc',
   Optimism: '0xce95AfbB8EA029495c66020883F87aaE8864AF92',
+  Monad: '0xD5D960E8C380B724a48AC59E2DfF1b2CB4a1eAee',
+  Stable: '0xa40103088A899514E3fe474cD3cc5bf811b1102e',
 } as const satisfies Record<SupportedChain, `0x${string}`>
 
-export type SupportedChainId = 1 | 8453 | 42161 | 137 | 130 | 999 | 747474 | 10
+export type SupportedChainId = 1 | 8453 | 42161 | 137 | 130 | 999 | 747474 | 10 | 143 | 988
 export type UnknownChainName = `Chain ${number}`
 
 export const supportedChainMap = new Map<number, SupportedChain>([
@@ -23,6 +25,8 @@ export const supportedChainMap = new Map<number, SupportedChain>([
   [999, 'Hyperliquid'],
   [747474, 'Katana'],
   [10, 'Optimism'],
+  [143, 'Monad'],
+  [988, 'Stable'],
 ])
 
 // Reverse map: chainName -> chainId
