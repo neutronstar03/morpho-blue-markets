@@ -3,6 +3,7 @@ import type { MorphoMarket, MarketFilters as TypeMarketFilters } from '~/lib/hoo
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
+import { Card } from '~/components/ui/card'
 import { getSupportedChainName, supportedChainIdMap } from '~/lib/addresses'
 import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
 import {
@@ -12,7 +13,6 @@ import {
 } from '~/lib/hooks/graphql/use-list-markets'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
-import { Card } from './ui/card'
 
 const CONFIG = {
   minSupplyApy: 0.09, // 9% apr

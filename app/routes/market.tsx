@@ -5,7 +5,7 @@ import { Header } from '~/components/header'
 import { Card } from '~/components/ui/card'
 import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
-import { MarketDisplay } from '../components/market-display'
+import { MarketDisplay } from '~/pages/market/market-display'
 import {
   useMarketQuery,
 } from '../lib/hooks/graphql/use-market'

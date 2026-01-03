@@ -1,10 +1,10 @@
 import type { Route } from './+types/home'
 import { useEffect } from 'react'
-import { AdvancedList } from '~/components/advanced-list'
 import { Header } from '~/components/header'
 import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
-import { Position } from '../components/position'
+import { AdvancedList } from '~/pages/home/advanced-list'
+import { Position } from '~/pages/home/position'
 
 export function meta(_: Route.MetaArgs) {
   return [

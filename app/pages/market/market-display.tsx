@@ -1,8 +1,8 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
-import { MarketActions } from './market/market-actions'
-import { MarketDetails } from './market/market-details'
-import { MarketHeader } from './market/market-header'
-import { Card } from './ui/card'
+import { Card } from '~/components/ui/card'
+import { MarketActions } from './components/market-actions'
+import { MarketDetails } from './components/market-details'
+import { MarketHeader } from './components/market-header'
 
 interface MarketDisplayProps {
   market: SingleMorphoMarket

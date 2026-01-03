@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
+import { Button } from '~/components/ui/button'
+import { PercentageControl } from '~/components/ui/percentage-control'
 import { formatBigintShort, formatDecimalStringShort } from '~/lib/formatters'
-import { useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '../lib/hooks/rpc/use-morpho'
-import { useIsClient } from '../lib/hooks/use-is-client'
-import { Button } from './ui/button'
-import { PercentageControl } from './ui/percentage-control'
+import { useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '~/lib/hooks/rpc/use-morpho'
+import { useIsClient } from '~/lib/hooks/use-is-client'
 
 interface DepositFormProps {
   market: SingleMorphoMarket

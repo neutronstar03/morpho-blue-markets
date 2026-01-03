@@ -1,9 +1,9 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { useState } from 'react'
+import { Card } from '~/components/ui/card'
 import { formatLltv, formatPercent, formatUsd } from '~/lib/formatters'
 import { useTokenLiquidity } from '~/lib/hooks/use-token-liquidity'
-import { Card } from '../ui/card'
 
 interface MarketDetailsProps {
   market: SingleMorphoMarket
@@ -213,23 +213,6 @@ export function MarketDetails({ market }: MarketDetailsProps) {
         value={formatPercent(market.state.avgNetSupplyApy)}
       />
 
-      <SectionTitle title="Borrow APY" />
-      <DetailRow
-        label="Current"
-        value={formatPercent(market.state.netBorrowApy)}
-      />
-      <DetailRow
-        label="Daily"
-        value={formatPercent(market.state.dailyNetBorrowApy)}
-      />
-      <DetailRow
-        label="Weekly"
-        value={formatPercent(market.state.weeklyNetBorrowApy)}
-      />
-      <DetailRow
-        label="Average"
-        value={formatPercent(market.state.avgNetBorrowApy)}
-      />
     </Card>
   )
 }

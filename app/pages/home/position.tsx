@@ -4,6 +4,7 @@ import type {
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
+import { Card } from '~/components/ui/card'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useMarketQuery } from '~/lib/hooks/graphql/use-market'
 import {
@@ -12,7 +13,6 @@ import {
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { useTokenLiquidity } from '~/lib/hooks/use-token-liquidity'
-import { Card } from './ui/card'
 
 // This component is the general position in the homepage
 

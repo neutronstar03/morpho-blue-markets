@@ -3,11 +3,11 @@ import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/s
 import { useEffect, useMemo, useState } from 'react'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
+import { Button } from '~/components/ui/button'
+import { PercentageControl } from '~/components/ui/percentage-control'
 import { formatDecimalStringShort, formatTokenAmountShort } from '~/lib/formatters'
-import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '../lib/hooks/rpc/use-morpho'
-import { useIsClient } from '../lib/hooks/use-is-client'
-import { Button } from './ui/button'
-import { PercentageControl } from './ui/percentage-control'
+import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
+import { useIsClient } from '~/lib/hooks/use-is-client'
 
 interface WithdrawFormProps {
   market: SingleMorphoMarket

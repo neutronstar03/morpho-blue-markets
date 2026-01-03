@@ -1,9 +1,9 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
-import { DepositForm } from '../deposit-form'
-import { WithdrawForm } from '../withdraw-form'
+import { DepositForm } from './deposit-form'
 import { MarketPosition } from './market-position'
+import { WithdrawForm } from './withdraw-form'
 
 interface MarketActionsProps {
   market: SingleMorphoMarket
