@@ -1,13 +1,17 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { useEffect, useMemo, useState } from 'react'
+import { useDebounce } from 'use-debounce'
 import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { PercentageControl } from '~/components/ui/percentage-control'
-import { formatDecimalStringShort, formatTokenAmountShort } from '~/lib/formatters'
+import { formatDecimalStringShort, formatPercent, formatTokenAmountShort } from '~/lib/formatters'
+import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
+
+const WAD = 1_000_000_000_000_000_000n
 
 interface WithdrawFormProps {
   market: SingleMorphoMarket
@@ -24,6 +28,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
 
   const { data: position } = useUserPosition(market.uniqueKey, address)
   const { data: marketData } = useMarket(market.uniqueKey)
+  const marketState = marketData
 
   const maxWithdrawableShares = useMemo(() => {
     if (!position || !position[0])
@@ -50,13 +55,53 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
     return position && position[0] ? position[0] : 0n
   }, [position])
 
+  const maxWithdrawSharesWei = useMemo(() => {
+    // Compute MAX in terms of shares (tx input), capped by available market liquidity.
+    if (!marketData || totalSharesWei <= 0n)
+      return 0n
+    const [totalSupplyAssets, totalSupplyShares, totalBorrowAssets] = marketData
+    if (totalSupplyAssets <= 0n || totalSupplyShares <= 0n)
+      return 0n
+    const availableAssets = totalSupplyAssets - totalBorrowAssets
+    if (availableAssets <= 0n)
+      return 0n
+
+    // Convert available assets to shares at the current exchange rate, rounded DOWN.
+    const liquidityShares = (availableAssets * totalSupplyShares) / totalSupplyAssets
+    return liquidityShares < totalSharesWei ? liquidityShares : totalSharesWei
+  }, [marketData, totalSharesWei])
+
+  const maxWithdrawPercentString = useMemo(() => {
+    // Set Max as a percentage of the user's own position, but derive it from shares (not assets)
+    // and round DOWN to avoid simulate/tx reverts due to tiny rounding errors.
+    if (totalSharesWei <= 0n)
+      return '0'
+
+    // percentHundredths: 0..10000, where 1234 => 12.34%
+    let percentHundredths = (maxWithdrawSharesWei * 10_000n) / totalSharesWei
+    if (percentHundredths > 10_000n)
+      percentHundredths = 10_000n
+
+    // Safety margin: if we're not at 0% or 100%, back off by 0.01%.
+    // This prevents edge-case rounding in share/asset conversions from crossing the revert threshold.
+    if (percentHundredths > 0n && percentHundredths < 10_000n)
+      percentHundredths -= 1n
+
+    const integer = percentHundredths / 100n
+    const frac = percentHundredths % 100n
+    if (frac === 0n)
+      return integer.toString()
+    return `${integer.toString()}.${frac.toString().padStart(2, '0')}`
+  }, [maxWithdrawSharesWei, totalSharesWei])
+
   const sharesToWithdrawWei = useMemo(() => {
     const pct = Number.parseFloat(percentage)
     if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
       return 0n
     // Use fixed-point math to avoid float precision when scaling percentage
     const SCALE = 10000 // supports 0.01% precision
-    const pctScaled = BigInt(Math.round(pct * SCALE))
+    // Always round DOWN to avoid producing slightly-more-than-intended shares.
+    const pctScaled = BigInt(Math.floor(pct * SCALE))
     return (totalSharesWei * pctScaled) / (BigInt(100) * BigInt(SCALE))
   }, [percentage, totalSharesWei])
 
@@ -64,13 +109,59 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
     return formatUnits(sharesToWithdrawWei, 18)
   }, [sharesToWithdrawWei])
 
+  // Debounce the expensive RPC-driven hooks (simulate + IRM preview) while keeping
+  // the UI responsive (slider/amount updates immediately).
+  // Note: IRM preview is now computed locally; this debounce is mainly to avoid
+  // spamming withdraw simulation RPC calls while dragging.
+  const [debouncedSharesToWithdraw] = useDebounce(sharesToWithdraw, 500)
+  const isSharesDebounced = sharesToWithdraw === debouncedSharesToWithdraw
+
+  const withdrawAssetsWei = useMemo(() => {
+    if (!marketData || sharesToWithdrawWei <= 0n)
+      return 0n
+    const [totalSupplyAssets, totalSupplyShares] = marketData
+    if (!totalSupplyShares || totalSupplyShares === 0n)
+      return 0n
+    return (sharesToWithdrawWei * totalSupplyAssets) / totalSupplyShares
+  }, [marketData, sharesToWithdrawWei])
+
+  const utilizationAfterWad = useMemo(() => {
+    if (!marketData || withdrawAssetsWei <= 0n)
+      return undefined
+    const [totalSupplyAssets, , totalBorrowAssets] = marketData
+    const supplyAfter = totalSupplyAssets - withdrawAssetsWei
+    if (supplyAfter <= 0n)
+      return undefined
+    return (totalBorrowAssets * WAD) / supplyAfter
+  }, [marketData, withdrawAssetsWei])
+
+  const isUtilizationAfterAbove100 = useMemo(() => {
+    if (utilizationAfterWad == null)
+      return false
+    return utilizationAfterWad > WAD
+  }, [utilizationAfterWad])
+
+  const sharesToWithdrawForTx = useMemo(() => {
+    // If utilization would exceed 100%, onchain withdraw will revert (insufficient liquidity).
+    // Avoid spamming simulate/reverts: disable simulation by passing empty amount.
+    if (isUtilizationAfterAbove100)
+      return ''
+    return debouncedSharesToWithdraw
+  }, [isUtilizationAfterAbove100, debouncedSharesToWithdraw])
+
+  const preview = useMarketPreview({
+    market,
+    marketStateRaw: marketState,
+    deltaSupplyAssets: -withdrawAssetsWei,
+  })
+
   const {
     withdraw,
     hash: withdrawHash,
     isPending: isWithdrawing,
     error: withdrawError,
     isSimulating: isSimulatingWithdraw,
-  } = useWithdraw(market, sharesToWithdraw)
+  } = useWithdraw(market, sharesToWithdrawForTx)
   const { isSuccess: isWithdrawSuccess, isLoading: isWithdrawLoading } = useTransactionStatus(withdrawHash)
 
   useEffect(() => {
@@ -96,7 +187,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   // Input handling is encapsulated in PercentageControl
 
   const handleMaxClick = () => {
-    setPercentage('100')
+    setPercentage(maxWithdrawPercentString)
   }
 
   const isLoading = isWithdrawing || isWithdrawLoading || isSimulatingWithdraw
@@ -108,6 +199,15 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
     const maxAssets = Number.parseFloat(maxWithdrawableAssets) || 0
     return (percentNumber / 100) * maxAssets
   }, [percentNumber, maxWithdrawableAssets])
+
+  const showPreview = !!address && !isPercentInvalid && withdrawAssetsWei > 0n && preview.utilizationAfter != null
+  const beforeUtil = preview.utilizationBefore ?? market.state.utilization
+  const afterUtil = utilizationAfterWad != null
+    ? Number.parseFloat(formatUnits(utilizationAfterWad, 18))
+    : preview.utilizationAfter
+  const beforeApy = preview.supplyApyBefore ?? market.state.netSupplyApy
+  const afterApy = preview.supplyApyAfter ?? preview.estimatedSupplyApyAfter
+  const isApyEstimated = preview.supplyApyAfter == null && afterApy != null
 
   if (isSuccess && showSuccess) {
     return (
@@ -174,7 +274,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
         desktopCta={(
           <Button
             type="submit"
-            disabled={isPercentInvalid || isLoading || !address}
+            disabled={isPercentInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100}
             className="w-full"
           >
             {isLoading
@@ -191,6 +291,40 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
         )}
       />
 
+      {showPreview && (
+        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-400">Utilization</span>
+            <span className="text-gray-200">
+              {formatPercent(beforeUtil)}
+              {' '}
+              →
+              {' '}
+              {afterUtil != null ? formatPercent(afterUtil) : '—'}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center justify-between text-xs">
+            <span className="text-gray-400">Supply APY</span>
+            <span className="text-gray-200">
+              {formatPercent(beforeApy)}
+              {' '}
+              →
+              {' '}
+              {afterApy != null ? formatPercent(afterApy) : (preview.isBorrowRateLoading ? 'Loading…' : '—')}
+              {isApyEstimated && <span className="ml-1 text-gray-500">(est.)</span>}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {isUtilizationAfterAbove100 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <p className="text-sm text-yellow-800">
+            This withdrawal would push market utilization above 100% (not enough available liquidity). Reduce the amount.
+          </p>
+        </div>
+      )}
+
       {hasError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
           <p className="text-sm text-red-800">
@@ -203,7 +337,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
       <div className="md:hidden">
         <Button
           type="submit"
-          disabled={isPercentInvalid || isLoading || !address}
+          disabled={isPercentInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100}
           className="w-full"
           variant="outline"
         >

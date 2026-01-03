@@ -1,6 +1,7 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
+import { formatPercent } from '~/lib/formatters'
 import { DepositForm } from './deposit-form'
 import { MarketPosition } from './market-position'
 import { WithdrawForm } from './withdraw-form'
@@ -19,6 +20,17 @@ export function MarketActions({ market }: MarketActionsProps) {
         <MarketPosition market={market} />
       </div>
       <div className="pt-6 border-t border-gray-700">
+        <div className="mb-4 flex flex-wrap gap-2 text-xs">
+          <div className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1">
+            <span className="text-gray-400">Utilization</span>
+            <span className="text-gray-200">{formatPercent(market.state.utilization)}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1">
+            <span className="text-gray-400">Supply APY</span>
+            <span className="text-gray-200">{formatPercent(market.state.netSupplyApy)}</span>
+          </div>
+        </div>
+
         <div className="flex gap-3 mb-6">
           <button
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${

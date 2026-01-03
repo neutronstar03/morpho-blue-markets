@@ -2,12 +2,13 @@ import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { useEffect, useMemo, useState } from 'react'
 import { useDebounce } from 'use-debounce'
-import { formatUnits } from 'viem'
+import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { PercentageControl } from '~/components/ui/percentage-control'
-import { formatBigintShort, formatDecimalStringShort } from '~/lib/formatters'
-import { useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '~/lib/hooks/rpc/use-morpho'
+import { formatBigintShort, formatDecimalStringShort, formatPercent } from '~/lib/formatters'
+import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
+import { useMarket, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 
 interface DepositFormProps {
@@ -21,6 +22,8 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
   const [percentage, setPercentage] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const { address } = useAccount()
+
+  const { data: marketStateRaw } = useMarket(market.uniqueKey)
 
   // Wallet balance
   const { data: tokenBalance } = useTokenBalance(market.loanAsset.address, address)
@@ -51,6 +54,17 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
 
   const [debouncedAmount] = useDebounce(amount, 500)
   const isAmountDebounced = amount === debouncedAmount
+
+  const debouncedAmountWei = useMemo(() => {
+    if (!debouncedAmount)
+      return 0n
+    try {
+      return parseUnits(debouncedAmount, market.loanAsset.decimals!)
+    }
+    catch {
+      return 0n
+    }
+  }, [debouncedAmount, market.loanAsset.decimals])
 
   const {
     needsApproval,
@@ -118,6 +132,19 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
   const effectiveSupplyError = (!isAllowanceReady || needsApproval) ? undefined : supplyError
   const hasError = effectiveSupplyError || approveError
   const isSuccess = isSupplySuccess
+
+  const preview = useMarketPreview({
+    market,
+    marketStateRaw,
+    deltaSupplyAssets: debouncedAmountWei,
+  })
+
+  const showPreview = !!address && debouncedAmountWei > 0n && preview.utilizationAfter != null
+  const beforeUtil = preview.utilizationBefore ?? market.state.utilization
+  const afterUtil = preview.utilizationAfter
+  const beforeApy = preview.supplyApyBefore ?? market.state.netSupplyApy
+  const afterApy = preview.supplyApyAfter ?? preview.estimatedSupplyApyAfter
+  const isApyEstimated = preview.supplyApyAfter == null && afterApy != null
 
   if (isSuccess && showSuccess) {
     return (
@@ -208,6 +235,32 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
           </Button>
         )}
       />
+
+      {showPreview && (
+        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-400">Utilization</span>
+            <span className="text-gray-200">
+              {formatPercent(beforeUtil)}
+              {' '}
+              →
+              {' '}
+              {formatPercent(afterUtil!)}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center justify-between text-xs">
+            <span className="text-gray-400">Supply APY</span>
+            <span className="text-gray-200">
+              {formatPercent(beforeApy)}
+              {' '}
+              →
+              {' '}
+              {afterApy != null ? formatPercent(afterApy) : (preview.isBorrowRateLoading ? 'Loading…' : '—')}
+              {isApyEstimated && <span className="ml-1 text-gray-500">(est.)</span>}
+            </span>
+          </div>
+        </div>
+      )}
 
       {isApproveSuccess && !needsApproval && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
