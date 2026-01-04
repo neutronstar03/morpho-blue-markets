@@ -71,6 +71,10 @@ function fmtToken(amount: bigint, decimals: number, digits = 4): string {
 interface LoanAssetOption { address: string, symbol: string, decimals: number }
 
 export function SupplyApyOptimizer() {
+  // If the blended APY improvement is <= this threshold, show a "no-op" plan.
+  // 0.1% = 0.001 in WAD terms (1e18 = 100%).
+  const NO_BENEFIT_DELTA_APY_WAD = 1_000_000_000_000_000n
+
   const ctx = useSupplyApyOptimizer()
   const { address: userAddress, chain } = useAccount()
   const minMoveSize = ctx.inputs.minMoveSize
@@ -345,6 +349,24 @@ export function SupplyApyOptimizer() {
   }
 
   const result = ctx.result
+  const displayResult = useMemo(() => {
+    if (!result)
+      return undefined
+    const apyGainWad = result.optimized.blendedApyWad - result.current.blendedApyWad
+    const noBenefit = apyGainWad <= NO_BENEFIT_DELTA_APY_WAD
+    if (!noBenefit)
+      return result
+
+    return {
+      ...result,
+      optimized: { ...result.current },
+      positions: result.positions.map(p => ({
+        ...p,
+        amountAssets: p.currentUserAssets,
+        deltaAssets: 0n,
+      })),
+    }
+  }, [NO_BENEFIT_DELTA_APY_WAD, result])
   const symbol = selectedOption?.symbol ?? ctx.selection.loanAssetSymbol ?? ''
   const chainIdForLinks = ctx.selection.chainId ?? chain?.id
   const chainNameForLinks = chainIdForLinks ? getSupportedChainName(chainIdForLinks) : undefined
@@ -470,20 +492,20 @@ export function SupplyApyOptimizer() {
               </div>
             )}
 
-            {result && selectedOption && (
+            {displayResult && selectedOption && (
               <div className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="bg-white/5 border border-white/10 rounded-md p-3">
                     <div className="text-xs text-gray-400">Current blended APY</div>
-                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(result.current.blendedApyWad)}</div>
+                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.current.blendedApyWad)}</div>
                   </div>
                   <div className="bg-white/5 border border-white/10 rounded-md p-3">
                     <div className="text-xs text-gray-400">Optimized blended APY</div>
-                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(result.optimized.blendedApyWad)}</div>
+                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.optimized.blendedApyWad)}</div>
                   </div>
                   <div className="bg-white/5 border border-white/10 rounded-md p-3">
                     <div className="text-xs text-gray-400">Iterations</div>
-                    <div className="text-lg font-semibold text-white tabular-nums">{result.iterations}</div>
+                    <div className="text-lg font-semibold text-white tabular-nums">{displayResult.iterations}</div>
                   </div>
                 </div>
 
@@ -499,7 +521,7 @@ export function SupplyApyOptimizer() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10 bg-black/10">
-                      {result.positions.map((p) => {
+                      {displayResult.positions.map((p) => {
                         const deltaSign = p.deltaAssets >= 0n ? '+' : ''
                         const meta = marketMetaById.get(p.marketId.toLowerCase())
                         const marketLabel = meta?.collateralSymbol ? `${meta.collateralSymbol} / ${symbol}` : `${p.marketId.slice(0, 10)}…${p.marketId.slice(-6)}`
