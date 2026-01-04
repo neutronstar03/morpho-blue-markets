@@ -6,6 +6,7 @@ import { graphqlClient } from '../../graphql/client'
 // for the supply-side of the `useLiveMarketPositions` hook.
 export interface SupplyMarketData {
   uniqueKey: string
+  irmAddress: string
   loanAsset: {
     address: string
     symbol: string
@@ -55,6 +56,7 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
     ) {
       items {
         uniqueKey
+        irmAddress
         loanAsset {
           address
           symbol
@@ -78,40 +80,31 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
   }
 `
 
-export function useMarketsByChain(chainId?: number) {
+export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
   return useQuery<SupplyMarketData[]>({
-    queryKey: ['markets-by-chain', chainId],
+    queryKey: ['markets-by-chain', chainId, loanAssetAddress],
     queryFn: async () => {
       if (!chainId)
         return []
 
-      let markets: SupplyMarketData[] = []
-      let skip = 0
-      const first = 1000
-      let hasMore = true
+      const first = 200
+      const skip = 0
 
-      while (hasMore) {
-        const result = await graphqlClient.request<QueryMarketsByChainResult>(
-          QUERY_MARKETS_BY_CHAIN,
-          {
-            where: { chainId_in: [chainId] } as MarketFiltersWithChain,
-            orderBy: MarketOrderBy.NetSupplyApy,
-            orderDirection: OrderDirection.Desc,
-            first,
-            skip,
-          },
-        )
-        const newMarkets = result.markets.items || []
-        markets = markets.concat(newMarkets)
+      const where: MarketFiltersWithChain & { loanAssetAddress_in?: string[] } = { chainId_in: [chainId] }
+      if (loanAssetAddress)
+        where.loanAssetAddress_in = [loanAssetAddress]
 
-        if (newMarkets.length < first) {
-          hasMore = false
-        }
-        else {
-          skip += first
-        }
-      }
-      return markets
+      const result = await graphqlClient.request<QueryMarketsByChainResult>(
+        QUERY_MARKETS_BY_CHAIN,
+        {
+          where,
+          orderBy: MarketOrderBy.NetSupplyApy,
+          orderDirection: OrderDirection.Desc,
+          first,
+          skip,
+        },
+      )
+      return result.markets.items || []
     },
     enabled: !!chainId,
     staleTime: 10 * 60 * 1000, // 10 minutes

@@ -10,6 +10,7 @@ import { SIMPLIFIED_MORPHO_BLUE_ABI } from './simplified.abi'
 export interface LiveMarketPosition {
   market: {
     uniqueKey: string
+    irmAddress: string
     loanAsset: {
       symbol: string
       decimals: number | null
@@ -109,6 +110,7 @@ export function useLiveMarketPositions() {
       return graphPositions.map((gp): LiveMarketPosition => ({
         market: {
           uniqueKey: gp.market.uniqueKey,
+          irmAddress: gp.market.irmAddress,
           loanAsset: gp.market.loanAsset,
           collateralAsset: gp.market.collateralAsset,
           state: {
@@ -157,6 +159,7 @@ export function useLiveMarketPositions() {
         return {
           market: {
             uniqueKey: gp.market.uniqueKey,
+            irmAddress: gp.market.irmAddress,
             loanAsset: gp.market.loanAsset,
             collateralAsset: gp.market.collateralAsset,
             state: {

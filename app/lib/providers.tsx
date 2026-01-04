@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { NetworkProvider } from './contexts/network'
+import { SupplyApyOptimizerProvider } from './contexts/supply-apy-optimizer'
 import { config } from './wagmi'
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -25,7 +26,9 @@ export function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <NetworkProvider>
-          <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
+          <SupplyApyOptimizerProvider>
+            <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
+          </SupplyApyOptimizerProvider>
         </NetworkProvider>
       </QueryClientProvider>
     </WagmiProvider>
