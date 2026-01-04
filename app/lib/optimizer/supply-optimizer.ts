@@ -20,6 +20,13 @@ export interface SupplyOptimizerMarketSnapshot {
   rateAtTarget: bigint
 }
 
+export interface UserSupplyPosition {
+  /** Morpho market id (bytes32 as 0x-hex). */
+  marketId: `0x${string}`
+  /** User supplied assets in this market (raw loan token units). */
+  suppliedAssets: bigint
+}
+
 export interface SupplyOptimizerConstraints {
   /** Maximum number of markets allowed to have a non-zero allocation. */
   maxMarketsUsed?: number
@@ -74,6 +81,90 @@ export interface OptimizeSupplyAllocationResult {
   iterations: number
   /** If allocation stopped early, this indicates the remaining amount. */
   unallocatedAssets: bigint
+}
+
+export interface OptimizeSupplyWithPositionsArgs {
+  markets: SupplyOptimizerMarketSnapshot[]
+  /** Current user supplied assets per market (raw loan token units). Can be empty. */
+  positions: UserSupplyPosition[]
+  /** New deposit amount to add on top of existing positions (raw loan token units, can be 0 or negative). */
+  newDepositAssets: bigint
+  /** Step size (raw loan token units). */
+  stepAssets: bigint
+  /** Timestamp (seconds) used for AdaptiveCurve math. */
+  timestamp: bigint
+  constraints?: SupplyOptimizerConstraints
+  /** If false, disallow withdrawing from existing positions (only add newDeposit). Default: true. */
+  allowRebalance?: boolean
+  /** Hard cap on greedy iterations. */
+  maxIterations?: number
+}
+
+export interface OptimizedPositionDelta extends OptimizedMarketAllocation {
+  /** Current user supplied assets (raw). */
+  currentUserAssets: bigint
+  /** Delta to reach the optimized final amount (raw). Positive = supply, negative = withdraw. */
+  deltaAssets: bigint
+  /** Maximum withdrawable right now due to market liquidity (raw). */
+  maxWithdrawAssets: bigint
+  /** Minimum final allocation enforced by liquidity/policy (raw). */
+  minFinalAssets: bigint
+}
+
+export interface OptimizeSupplyWithPositionsResult {
+  /** Current (pre-deposit, pre-rebalance) blended APR/APY for the user’s existing position. */
+  current: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint }
+  /**
+   * Current allocation evaluated at the target total, by adding `newDepositAssets` pro‑rata
+   * across existing positions (i.e. "keep weights, just scale up").
+   *
+   * This is useful for an apples-to-apples comparison against `baselineNoRebalance` / `optimized`,
+   * because it uses the same totalAssets as those scenarios.
+   */
+  currentAtTargetProRata?: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint }
+  /**
+   * Baseline after applying `newDepositAssets` without withdrawing/rebalancing existing positions.
+   * (This is the “do nothing / just add deposit” reference.)
+   */
+  baselineNoRebalance?: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint }
+  /** Optimized blended APR/APY for the final portfolio (existing + new deposit). */
+  optimized: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint }
+  /** Final per-market targets plus deltas. Includes markets with non-zero current or final. */
+  positions: OptimizedPositionDelta[]
+  /** Greedy iterations used. */
+  iterations: number
+  /** If not all of `newDepositAssets` could be allocated (constraints), leftover amount (raw). */
+  unallocatedNewDepositAssets: bigint
+  /**
+   * If the requested target total is infeasible because you cannot withdraw enough liquidity,
+   * this is the excess amount that cannot be withdrawn (i.e. minFinalSum - targetTotal).
+   */
+  infeasibleWithdrawAssets: bigint
+}
+
+/**
+ * Rebalance-only surface API (no "new deposit" scenario).
+ *
+ * This matches the current frontend needs: optimize how to redistribute the *existing* position
+ * subject to withdrawal-liquidity constraints.
+ */
+export interface OptimizeSupplyRebalanceOnlyArgs {
+  markets: SupplyOptimizerMarketSnapshot[]
+  positions: UserSupplyPosition[]
+  stepAssets: bigint
+  timestamp: bigint
+  constraints?: SupplyOptimizerConstraints
+  /** Default: true. */
+  allowRebalance?: boolean
+  maxIterations?: number
+}
+
+export interface OptimizeSupplyRebalanceOnlyResult {
+  current: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint }
+  optimized: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint }
+  positions: OptimizedPositionDelta[]
+  iterations: number
+  infeasibleWithdrawAssets: bigint
 }
 
 function clamp0ToWad(x: bigint): bigint {
@@ -172,11 +263,200 @@ function minBigint(a: bigint, b: bigint): bigint {
   return a <= b ? a : b
 }
 
+function max0(x: bigint): bigint {
+  return x > 0n ? x : 0n
+}
+
+function normalizeId(id: `0x${string}`): string {
+  return id.toLowerCase()
+}
+
+function sumBigints(values: readonly bigint[]): bigint {
+  let s = 0n
+  for (const v of values)
+    s += v
+  return s
+}
+
+function addDepositProRata(currentUser: readonly bigint[], newDepositAssets: bigint): bigint[] {
+  const deposit = newDepositAssets > 0n ? newDepositAssets : 0n
+  if (deposit === 0n)
+    return [...currentUser]
+
+  const total = sumBigints(currentUser)
+  if (total <= 0n)
+    return [...currentUser]
+
+  // Distribute floor(proportion) first, then allocate remaining 1-wei units by largest remainder.
+  const extra: bigint[] = Array.from({ length: currentUser.length }, () => 0n)
+  const remainders: Array<{ idx: number, rem: bigint }> = []
+  let distributed = 0n
+
+  for (let i = 0; i < currentUser.length; i++) {
+    const u = currentUser[i]
+    if (u <= 0n) {
+      remainders.push({ idx: i, rem: 0n })
+      continue
+    }
+    const numer = deposit * u
+    const q = numer / total
+    const r = numer % total
+    extra[i] = q
+    distributed += q
+    remainders.push({ idx: i, rem: r })
+  }
+
+  let leftover = deposit - distributed
+  if (leftover > 0n) {
+    remainders.sort((a, b) => (a.rem === b.rem ? 0 : (a.rem > b.rem ? -1 : 1)))
+    for (let k = 0; k < remainders.length && leftover > 0n; k++) {
+      extra[remainders[k].idx] += 1n
+      leftover -= 1n
+    }
+  }
+
+  const out: bigint[] = Array.from({ length: currentUser.length }, (_, i) => currentUser[i] + extra[i])
+  return out
+}
+
 function getPerMarketCap(m: SupplyOptimizerMarketSnapshot, c?: SupplyOptimizerConstraints): bigint | undefined {
   const byMarket = c?.perMarketCapAssetsByMarket?.(m)
   if (byMarket != null)
     return byMarket
   return c?.perMarketCapAssets
+}
+
+function blendedRatesFromFinalAllocations(args: {
+  markets: SupplyOptimizerMarketSnapshot[]
+  finalUserAllocations: readonly bigint[]
+  exUserSupplyAssets: readonly bigint[]
+  timestamp: bigint
+}): { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint } {
+  const { markets, finalUserAllocations, exUserSupplyAssets, timestamp } = args
+  let total = 0n
+  let wApr = 0n
+  let wApy = 0n
+  for (let i = 0; i < markets.length; i++) {
+    const amt = finalUserAllocations[i]
+    if (amt <= 0n)
+      continue
+    const modeledMarket: SupplyOptimizerMarketSnapshot = {
+      ...markets[i],
+      totalSupplyAssets: exUserSupplyAssets[i] + amt,
+    }
+    const { supplyAprWad, supplyApyWad } = computeSupplyAfterDeltaWad({
+      market: modeledMarket,
+      deltaSupplyAssets: 0n,
+      timestamp,
+    })
+    total += amt
+    wApr += amt * supplyAprWad
+    wApy += amt * supplyApyWad
+  }
+  return {
+    totalAssets: total,
+    blendedAprWad: total > 0n ? (wApr / total) : 0n,
+    blendedApyWad: total > 0n ? (wApy / total) : 0n,
+  }
+}
+
+function greedyAllocateUpwards(args: {
+  markets: SupplyOptimizerMarketSnapshot[]
+  exUserSupplyAssets: readonly bigint[]
+  allocations: bigint[]
+  remaining: bigint
+  stepAssets: bigint
+  maxFinal: readonly bigint[]
+  timestamp: bigint
+  constraints?: SupplyOptimizerConstraints
+  used: Set<number>
+  maxIterations: number
+}): { remaining: bigint, iterations: number } {
+  const {
+    markets,
+    exUserSupplyAssets,
+    allocations,
+    remaining: remainingIn,
+    stepAssets,
+    maxFinal,
+    timestamp,
+    constraints,
+    used,
+    maxIterations,
+  } = args
+
+  if (stepAssets <= 0n)
+    throw new Error('stepAssets must be > 0')
+
+  let remaining = remainingIn
+  const minApyWad = constraints?.minSupplyApyWad
+  const maxMarketsUsed = constraints?.maxMarketsUsed
+
+  let iterations = 0
+  while (remaining > 0n && iterations < maxIterations) {
+    let bestIdx = -1
+    let bestStep = 0n
+    let bestScore = -1n
+
+    for (let i = 0; i < markets.length; i++) {
+      if (maxMarketsUsed != null && maxMarketsUsed > 0 && allocations[i] === 0n && used.size >= maxMarketsUsed)
+        continue
+
+      const capRemaining = maxFinal[i] - allocations[i]
+      if (capRemaining <= 0n)
+        continue
+
+      let step = minBigint(stepAssets, remaining)
+      step = minBigint(step, capRemaining)
+      if (step <= 0n)
+        continue
+
+      const currentFinal = allocations[i]
+      const candidateFinal = allocations[i] + step
+
+      const currentMarket: SupplyOptimizerMarketSnapshot = {
+        ...markets[i],
+        totalSupplyAssets: exUserSupplyAssets[i] + currentFinal,
+      }
+      const modeledMarket: SupplyOptimizerMarketSnapshot = {
+        ...markets[i],
+        totalSupplyAssets: exUserSupplyAssets[i] + candidateFinal,
+      }
+
+      const { supplyApyWad: supplyApyCurrentWad } = computeSupplyAfterDeltaWad({
+        market: currentMarket,
+        deltaSupplyAssets: 0n,
+        timestamp,
+      })
+      const { supplyApyWad } = computeSupplyAfterDeltaWad({
+        market: modeledMarket,
+        deltaSupplyAssets: 0n,
+        timestamp,
+      })
+      if (minApyWad != null && supplyApyWad < minApyWad)
+        continue
+
+      // Score by *delta* expected 1y yield (assets * WAD), accounting for the APY shift on existing
+      // allocated assets when utilization changes. This reduces step-size sensitivity vs step*APY.
+      const score = (candidateFinal * supplyApyWad) - (currentFinal * supplyApyCurrentWad)
+      if (score > bestScore) {
+        bestScore = score
+        bestIdx = i
+        bestStep = step
+      }
+    }
+
+    if (bestIdx < 0 || bestStep <= 0n)
+      break
+
+    allocations[bestIdx] += bestStep
+    if (allocations[bestIdx] > 0n)
+      used.add(bestIdx)
+    remaining -= bestStep
+    iterations++
+  }
+
+  return { remaining, iterations }
 }
 
 export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): OptimizeSupplyAllocationResult {
@@ -225,14 +505,16 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
       if (step <= 0n)
         continue
 
-      const deltaAfter = allocated[i] + step
-      const { supplyApyWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: deltaAfter, timestamp })
+      const currentAmt = allocated[i]
+      const candidateAmt = allocated[i] + step
+
+      const { supplyApyWad: supplyApyCurrentWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: currentAmt, timestamp })
+      const { supplyApyWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: candidateAmt, timestamp })
       if (minApyWad != null && supplyApyWad < minApyWad)
         continue
 
-      // Score is proportional to expected 1y revenue for this step, up to a constant scale.
-      // revenue ~ stepAssets * APY
-      const score = step * supplyApyWad // (assets * WAD)
+      // Score by *delta* expected 1y yield (assets * WAD), accounting for APY shift on already-allocated assets.
+      const score = (candidateAmt * supplyApyWad) - (currentAmt * supplyApyCurrentWad)
       if (score > bestScore) {
         bestScore = score
         bestIdx = i
@@ -287,5 +569,326 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
     blendedApyWad,
     iterations,
     unallocatedAssets: remaining,
+  }
+}
+
+/**
+ * Position-aware optimizer that rebalances (optionally) and respects withdrawal liquidity constraints.
+ *
+ * Optimizes over the user's *final* per-market supplied assets `x_i`, subject to:
+ * - sum(x_i) = sum(currentUserAssets) + newDepositAssets
+ * - liquidity-limited withdrawals: x_i >= currentUserAssets - marketLiquidity
+ *
+ * Where marketLiquidity ~= max(0, totalSupplyAssets - totalBorrowAssets) at the pinned block.
+ *
+ * To avoid double-counting the user inside `market.totalSupplyAssets`, utilization is modeled using:
+ *   totalSupplyAssets_modeled = max(0, totalSupplyAssets - currentUserAssets) + x_i
+ */
+export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPositionsArgs): OptimizeSupplyWithPositionsResult {
+  const {
+    markets,
+    positions,
+    newDepositAssets,
+    stepAssets,
+    timestamp,
+    constraints,
+    allowRebalance = true,
+    maxIterations = 500,
+  } = args
+
+  if (stepAssets <= 0n)
+    throw new Error('stepAssets must be > 0')
+
+  const n = markets.length
+  if (n === 0) {
+    return {
+      current: { totalAssets: 0n, blendedAprWad: 0n, blendedApyWad: 0n },
+      baselineNoRebalance: undefined,
+      optimized: { totalAssets: newDepositAssets > 0n ? newDepositAssets : 0n, blendedAprWad: 0n, blendedApyWad: 0n },
+      positions: [],
+      iterations: 0,
+      unallocatedNewDepositAssets: newDepositAssets > 0n ? newDepositAssets : 0n,
+      infeasibleWithdrawAssets: 0n,
+    }
+  }
+
+  // Map current user assets per market id.
+  const userById = new Map<string, bigint>()
+  for (const p of positions) {
+    const key = normalizeId(p.marketId)
+    const prev = userById.get(key) ?? 0n
+    const amt = p.suppliedAssets > 0n ? p.suppliedAssets : 0n
+    userById.set(key, prev + amt)
+  }
+
+  // Ensure market snapshots include any market the user is positioned in.
+  const snapshotIds = new Set(markets.map(m => normalizeId(m.marketId)))
+  for (const id of userById.keys()) {
+    if (!snapshotIds.has(id))
+      throw new Error(`Missing market snapshot for user position: ${id}`)
+  }
+
+  const currentUser: bigint[] = Array.from({ length: n }, () => 0n)
+  const exUserSupply: bigint[] = Array.from({ length: n }, () => 0n)
+  const maxWithdraw: bigint[] = Array.from({ length: n }, () => 0n)
+  const minFinal: bigint[] = Array.from({ length: n }, () => 0n)
+  const maxFinal: bigint[] = Array.from({ length: n }, () => 0n)
+
+  for (let i = 0; i < n; i++) {
+    const m = markets[i]
+    const u = userById.get(normalizeId(m.marketId)) ?? 0n
+    currentUser[i] = u
+
+    // Liquidity available for withdrawals at this snapshot: supply - borrow (floored at 0).
+    const liquidity = m.totalSupplyAssets > m.totalBorrowAssets ? (m.totalSupplyAssets - m.totalBorrowAssets) : 0n
+    maxWithdraw[i] = minBigint(u, liquidity)
+
+    // Minimum final allocation enforced by liquidity and (optional) no-rebalance policy.
+    const minByLiquidity = u - maxWithdraw[i] // cannot withdraw more than maxWithdraw
+    const minByPolicy = allowRebalance ? 0n : u
+    minFinal[i] = minByLiquidity > minByPolicy ? minByLiquidity : minByPolicy
+
+    // Ex-user supply baseline (avoid double-counting the user in totalSupplyAssets).
+    exUserSupply[i] = max0(m.totalSupplyAssets - u)
+
+    const cap = getPerMarketCap(m, constraints)
+    maxFinal[i] = cap != null ? cap : (2n ** 255n) // large sentinel
+
+    if (minFinal[i] > maxFinal[i])
+      throw new Error(`Infeasible: minFinal > maxFinal for market ${m.marketId}`)
+  }
+
+  const currentTotal = sumBigints(currentUser)
+  const targetTotal = currentTotal + newDepositAssets
+
+  // Seed with minimums and allocate remaining.
+  const finalAlloc = [...minFinal]
+  const minSum = sumBigints(minFinal)
+
+  let infeasibleWithdrawAssets = 0n
+  let remaining = targetTotal - minSum
+  if (remaining < 0n) {
+    // Cannot reach targetTotal because we cannot withdraw enough liquidity.
+    infeasibleWithdrawAssets = -remaining
+    remaining = 0n
+  }
+
+  const used = new Set<number>()
+  for (let i = 0; i < n; i++) {
+    if (finalAlloc[i] > 0n)
+      used.add(i)
+  }
+
+  const minApyWad = constraints?.minSupplyApyWad
+  const maxMarketsUsed = constraints?.maxMarketsUsed
+
+  let iterations = 0
+  while (remaining > 0n && iterations < maxIterations) {
+    let bestIdx = -1
+    let bestStep = 0n
+    let bestScore = -1n
+
+    for (let i = 0; i < n; i++) {
+      if (maxMarketsUsed != null && maxMarketsUsed > 0 && finalAlloc[i] === 0n && used.size >= maxMarketsUsed)
+        continue
+
+      const capRemaining = maxFinal[i] - finalAlloc[i]
+      if (capRemaining <= 0n)
+        continue
+
+      let step = minBigint(stepAssets, remaining)
+      step = minBigint(step, capRemaining)
+      if (step <= 0n)
+        continue
+
+      const currentFinal = finalAlloc[i]
+      const candidateFinal = finalAlloc[i] + step
+
+      const currentMarket: SupplyOptimizerMarketSnapshot = {
+        ...markets[i],
+        totalSupplyAssets: exUserSupply[i] + currentFinal,
+      }
+      const modeledMarket: SupplyOptimizerMarketSnapshot = {
+        ...markets[i],
+        totalSupplyAssets: exUserSupply[i] + candidateFinal,
+      }
+
+      const { supplyApyWad: supplyApyCurrentWad } = computeSupplyAfterDeltaWad({
+        market: currentMarket,
+        deltaSupplyAssets: 0n,
+        timestamp,
+      })
+      const { supplyApyWad } = computeSupplyAfterDeltaWad({
+        market: modeledMarket,
+        deltaSupplyAssets: 0n,
+        timestamp,
+      })
+      if (minApyWad != null && supplyApyWad < minApyWad)
+        continue
+
+      // Score by *delta* expected 1y yield (assets * WAD), accounting for the APY shift on existing
+      // allocated assets when utilization changes.
+      const score = (candidateFinal * supplyApyWad) - (currentFinal * supplyApyCurrentWad)
+      if (score > bestScore) {
+        bestScore = score
+        bestIdx = i
+        bestStep = step
+      }
+    }
+
+    if (bestIdx < 0 || bestStep <= 0n)
+      break
+
+    finalAlloc[bestIdx] += bestStep
+    if (finalAlloc[bestIdx] > 0n)
+      used.add(bestIdx)
+    remaining -= bestStep
+    iterations++
+  }
+
+  const currentRates = blendedRatesFromFinalAllocations({
+    markets,
+    finalUserAllocations: currentUser,
+    exUserSupplyAssets: exUserSupply,
+    timestamp,
+  })
+
+  const currentAtTargetProRata = (newDepositAssets > 0n && currentTotal > 0n)
+    ? blendedRatesFromFinalAllocations({
+        markets,
+        finalUserAllocations: addDepositProRata(currentUser, newDepositAssets),
+        exUserSupplyAssets: exUserSupply,
+        timestamp,
+      })
+    : undefined
+
+  // Baseline: keep existing allocations, only add new deposit (no withdraw).
+  let baselineNoRebalance: OptimizeSupplyWithPositionsResult['baselineNoRebalance']
+  let baselineAllocForFallback: bigint[] | undefined
+  let baselineRatesForFallback: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint } | undefined
+  if (newDepositAssets > 0n) {
+    const baselineAlloc = [...currentUser]
+    const usedBaseline = new Set<number>()
+    for (let i = 0; i < n; i++) {
+      if (baselineAlloc[i] > 0n)
+        usedBaseline.add(i)
+    }
+    // For baseline, the minFinal is currentUser; allocate deposit upwards.
+    const { remaining: baselineRemaining } = greedyAllocateUpwards({
+      markets,
+      exUserSupplyAssets: exUserSupply,
+      allocations: baselineAlloc,
+      remaining: newDepositAssets,
+      stepAssets,
+      maxFinal,
+      timestamp,
+      constraints,
+      used: usedBaseline,
+      maxIterations,
+    })
+    const baselineRates = blendedRatesFromFinalAllocations({
+      markets,
+      finalUserAllocations: baselineAlloc,
+      exUserSupplyAssets: exUserSupply,
+      timestamp,
+    })
+    baselineAllocForFallback = baselineAlloc
+    baselineRatesForFallback = baselineRates
+    baselineNoRebalance = {
+      totalAssets: currentTotal + (newDepositAssets - baselineRemaining),
+      blendedAprWad: baselineRates.blendedAprWad,
+      blendedApyWad: baselineRates.blendedApyWad,
+    }
+  }
+
+  // Prefer not to rebalance into a strictly worse outcome when no new capital is added.
+  // (Current allocation is always feasible under the liquidity constraint model.)
+  let optimizedFinalAlloc = finalAlloc
+  let optimizedRates = blendedRatesFromFinalAllocations({
+    markets,
+    finalUserAllocations: optimizedFinalAlloc,
+    exUserSupplyAssets: exUserSupply,
+    timestamp,
+  })
+  if (newDepositAssets === 0n && optimizedRates.blendedApyWad < currentRates.blendedApyWad) {
+    optimizedFinalAlloc = currentUser
+    optimizedRates = currentRates
+  }
+  // Also, if a "no-rebalance" baseline exists, never return something strictly worse than it.
+  if (baselineAllocForFallback && baselineRatesForFallback && optimizedRates.blendedApyWad < baselineRatesForFallback.blendedApyWad) {
+    optimizedFinalAlloc = baselineAllocForFallback
+    optimizedRates = baselineRatesForFallback
+  }
+
+  const positionsOut: OptimizedPositionDelta[] = []
+  for (let i = 0; i < n; i++) {
+    const cur = currentUser[i]
+    const fin = optimizedFinalAlloc[i]
+    if (cur === 0n && fin === 0n)
+      continue
+
+    const modeledMarket: SupplyOptimizerMarketSnapshot = {
+      ...markets[i],
+      totalSupplyAssets: exUserSupply[i] + fin,
+    }
+
+    const { utilizationAfterWad, supplyAprWad, supplyApyWad } = computeSupplyAfterDeltaWad({
+      market: modeledMarket,
+      deltaSupplyAssets: 0n,
+      timestamp,
+    })
+
+    positionsOut.push({
+      marketId: markets[i].marketId,
+      uniqueKey: markets[i].uniqueKey,
+      currentUserAssets: cur,
+      amountAssets: fin,
+      deltaAssets: fin - cur,
+      maxWithdrawAssets: maxWithdraw[i],
+      minFinalAssets: minFinal[i],
+      utilizationAfterWad,
+      supplyAprAfterWad: supplyAprWad,
+      supplyApyAfterWad: supplyApyWad,
+    })
+  }
+
+  positionsOut.sort((a, b) => (a.amountAssets === b.amountAssets ? 0 : (a.amountAssets > b.amountAssets ? -1 : 1)))
+
+  // Remaining is leftover TARGET allocation; if newDepositAssets < 0, this isn't "leftover deposit".
+  // For the common "newDeposit >= 0" case, this is the unallocated portion of the new deposit.
+  const unallocatedNewDepositAssets = newDepositAssets > 0n ? remaining : 0n
+
+  return {
+    current: currentRates,
+    currentAtTargetProRata: currentAtTargetProRata
+      ? { totalAssets: targetTotal, blendedAprWad: currentAtTargetProRata.blendedAprWad, blendedApyWad: currentAtTargetProRata.blendedApyWad }
+      : undefined,
+    baselineNoRebalance,
+    optimized: { totalAssets: targetTotal, blendedAprWad: optimizedRates.blendedAprWad, blendedApyWad: optimizedRates.blendedApyWad },
+    positions: positionsOut,
+    iterations,
+    unallocatedNewDepositAssets,
+    infeasibleWithdrawAssets,
+  }
+}
+
+export function optimizeSupplyRebalanceOnly(args: OptimizeSupplyRebalanceOnlyArgs): OptimizeSupplyRebalanceOnlyResult {
+  const res = optimizeSupplyAllocationWithPositions({
+    markets: args.markets,
+    positions: args.positions,
+    newDepositAssets: 0n,
+    stepAssets: args.stepAssets,
+    timestamp: args.timestamp,
+    constraints: args.constraints,
+    allowRebalance: args.allowRebalance,
+    maxIterations: args.maxIterations,
+  })
+
+  return {
+    current: res.current,
+    optimized: res.optimized,
+    positions: res.positions,
+    iterations: res.iterations,
+    infeasibleWithdrawAssets: res.infeasibleWithdrawAssets,
   }
 }

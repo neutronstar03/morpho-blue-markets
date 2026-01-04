@@ -3,7 +3,7 @@ import { gql } from 'graphql-request'
 import { createPublicClient, formatUnits } from 'viem'
 import { mainnet } from 'viem/chains'
 import { graphqlClient } from '../../app/lib/graphql/client'
-import { optimizeSupplyAllocation } from '../../app/lib/optimizer/supply-optimizer'
+import { optimizeSupplyAllocationWithPositions } from '../../app/lib/optimizer/supply-optimizer'
 import { ADAPTIVE_CURVE_IRM_ABI, MORPHO_BLUE_ABI, MORPHO_BLUE_MAINNET } from '../irm/abi'
 import { makeMainnetTransport } from '../irm/rpc'
 
@@ -84,16 +84,31 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 async function fetchAllMainnetMarkets(): Promise<GqlMarket[]> {
+  return fetchMarkets(mainnet, { loanAssetAddresses: [USDS_MAINNET] })
+}
+
+async function fetchMarkets(
+  network: { id: number },
+  assets: { loanAssetAddresses?: string[], collateralAssetAddresses?: string[] },
+): Promise<GqlMarket[]> {
   let all: GqlMarket[] = []
   let skip = 0
   let hasMore = true
+
+  const where: Record<string, unknown> = { chainId_in: [network.id] }
+  if (assets.loanAssetAddresses?.length)
+    where.loanAssetAddress_in = assets.loanAssetAddresses
+  if (assets.collateralAssetAddresses?.length)
+    where.collateralAssetAddress_in = assets.collateralAssetAddresses
+
   while (hasMore) {
     const res = await graphqlClient.request<{ markets: { items: GqlMarket[] } }>(
       QUERY_MARKETS_FOR_OPTIMIZER,
       {
         first: PAGE_SIZE,
         skip,
-        where: { chainId_in: [1] },
+        // Filter server-side (case insensitive per schema) to avoid paging through all markets.
+        where,
         orderBy: 'NetSupplyApy',
         orderDirection: 'Desc',
       },
@@ -141,14 +156,9 @@ describe('Optimizer (live mainnet) — USDS 100k greedy allocation', () => {
     const block = await client.getBlock({ blockNumber })
     const timestamp = block.timestamp
 
-    const allMarkets = await fetchAllMainnetMarkets()
-    const usdsMarkets = allMarkets.filter((m) => {
-      return m.loanAsset?.address?.toLowerCase() === USDS_MAINNET.toLowerCase()
-        && m.morphoBlue?.chain?.id === 1
-    })
+    const usdsMarkets = await fetchAllMainnetMarkets()
 
     console.warn(`Pinned block: ${blockNumber} (timestamp=${timestamp})`)
-    console.warn(`Mainnet markets (GraphQL): ${allMarkets.length}`)
     console.warn(`USDS candidate markets:     ${usdsMarkets.length}`)
     console.warn(`USDS total to allocate:     ${fmtToken(TOTAL_AMOUNT_ASSETS)} USDS`)
 
@@ -233,7 +243,7 @@ describe('Optimizer (live mainnet) — USDS 100k greedy allocation', () => {
     const stepAssets = TOTAL_AMOUNT_ASSETS / 100n // 100 steps default
     console.warn(`Greedy step size:           ${fmtToken(stepAssets)} USDS`)
 
-    const res = optimizeSupplyAllocation({
+    const res = optimizeSupplyAllocationWithPositions({
       markets: snapshot.map(s => ({
         marketId: s.marketId,
         uniqueKey: s.uniqueKey,
@@ -243,7 +253,8 @@ describe('Optimizer (live mainnet) — USDS 100k greedy allocation', () => {
         feeWad: s.feeWad,
         rateAtTarget: s.rateAtTarget,
       })),
-      totalAmountAssets: TOTAL_AMOUNT_ASSETS,
+      positions: [],
+      newDepositAssets: TOTAL_AMOUNT_ASSETS,
       stepAssets,
       timestamp,
       maxIterations: 500,
@@ -252,18 +263,18 @@ describe('Optimizer (live mainnet) — USDS 100k greedy allocation', () => {
     // Verbose report for plausibility checks.
     console.warn('')
     console.warn('=== Optimizer result (estimated next-block instantaneous supply APY) ===')
-    console.warn(`Optimal positions:          ${res.allocations.length}`)
+    console.warn(`Optimal positions:          ${res.positions.length}`)
     console.warn(`Iterations:                 ${res.iterations}`)
-    console.warn(`Allocated:                  ${fmtToken(res.totalAllocatedAssets)} / ${fmtToken(TOTAL_AMOUNT_ASSETS)} USDS`)
-    if (res.unallocatedAssets > 0n)
-      console.warn(`Unallocated:                ${fmtToken(res.unallocatedAssets)} USDS`)
-    console.warn(`Blended APY:                ${pctFromWad(res.blendedApyWad, 2)}`)
-    console.warn(`Blended APR (simple):       ${pctFromWad(res.blendedAprWad, 2)}`)
+    console.warn(`Allocated:                  ${fmtToken(res.optimized.totalAssets)} / ${fmtToken(TOTAL_AMOUNT_ASSETS)} USDS`)
+    if (res.unallocatedNewDepositAssets > 0n)
+      console.warn(`Unallocated:                ${fmtToken(res.unallocatedNewDepositAssets)} USDS`)
+    console.warn(`Blended APY:                ${pctFromWad(res.optimized.blendedApyWad, 2)}`)
+    console.warn(`Blended APR (simple):       ${pctFromWad(res.optimized.blendedAprWad, 2)}`)
     console.warn('')
 
     const byId = new Map(snapshot.map(s => [s.marketId.toLowerCase(), s]))
 
-    for (const a of res.allocations) {
+    for (const a of res.positions) {
       const meta = byId.get(a.marketId.toLowerCase())?.meta
       const collateral = meta?.collateralSymbol ?? 'COLL'
       const lltvPct = meta?.lltv
@@ -286,9 +297,9 @@ describe('Optimizer (live mainnet) — USDS 100k greedy allocation', () => {
     console.warn('')
 
     // Light assertions: this is intended to be inspected by a human.
-    expect(res.allocations.length).toBeGreaterThan(0)
-    expect(res.totalAllocatedAssets).toBe(TOTAL_AMOUNT_ASSETS)
-    expect(res.unallocatedAssets).toBe(0n)
-    expect(res.blendedApyWad).toBeGreaterThanOrEqual(0n)
+    expect(res.positions.length).toBeGreaterThan(0)
+    expect(res.optimized.totalAssets).toBe(TOTAL_AMOUNT_ASSETS)
+    expect(res.unallocatedNewDepositAssets).toBe(0n)
+    expect(res.optimized.blendedApyWad).toBeGreaterThanOrEqual(0n)
   }, { timeout: 120_000 })
 })
