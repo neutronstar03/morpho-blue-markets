@@ -27,6 +27,20 @@ function aprWadFromRatePerSecondWad(ratePerSecondWad: bigint) {
   return ratePerSecondWad * SECONDS_PER_YEAR
 }
 
+function apyFromRatePerSecondWad(ratePerSecondWad: bigint) {
+  // Continuous-compounding style APY (matches `useMarketPreview` convention).
+  const r = Number.parseFloat(formatUnits(ratePerSecondWad, 18))
+  if (!Number.isFinite(r) || r <= 0)
+    return 0
+  return Math.expm1(r * Number(SECONDS_PER_YEAR))
+}
+
+function utilizationWad(totalBorrowAssets: bigint, totalSupplyAssets: bigint) {
+  if (totalSupplyAssets <= 0n)
+    return 0n
+  return (totalBorrowAssets * WAD) / totalSupplyAssets
+}
+
 const ERC20_META_ABI = [
   { type: 'function', name: 'decimals', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
   { type: 'function', name: 'symbol', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
@@ -312,5 +326,99 @@ describe('IRM explanation (poor-man APR estimator)', () => {
 
     // The point of this test is explanatory logging; keep one light assertion so it still “tests” something.
     expect(absDiff(localAfter, onchainAfter)).toBe(0n)
+  }, { timeout: 60_000 })
+
+  test('PEPE/USDS spot check: print borrow/supply APR vs APY at optimizer-sized deposit', async () => {
+    const client = createPublicClient({
+      chain: mainnet,
+      transport: makeMainnetTransport(),
+    })
+
+    // Market from optimizer output.
+    const id = '0x5ffdf15c5a4d7c6affb3f12634eeda1a20e60b92c0eb547f61754f656b55841e' as const
+    // Optimizer allocation from the earlier run (raw USDS units, 18 decimals).
+    const depositDelta = 77_000n * 10n ** 18n
+
+    const startBlockNumber = await client.getBlockNumber()
+    const block = await client.getBlock({ blockNumber: startBlockNumber })
+    const timestamp = block.timestamp
+
+    const marketParams = normalizeMarketParams(await client.readContract({
+      address: MORPHO_BLUE_MAINNET,
+      abi: MORPHO_BLUE_ABI,
+      functionName: 'idToMarketParams',
+      args: [id],
+      blockNumber: startBlockNumber,
+    }))
+
+    const market = normalizeMarket(await client.readContract({
+      address: MORPHO_BLUE_MAINNET,
+      abi: MORPHO_BLUE_ABI,
+      functionName: 'market',
+      args: [id],
+      blockNumber: startBlockNumber,
+    }))
+
+    const marketAfterDeposit = { ...market, totalSupplyAssets: market.totalSupplyAssets + depositDelta } as const
+
+    const onchainBorrowRatePerSecondWad = await client.readContract({
+      address: marketParams.irm,
+      abi: ADAPTIVE_CURVE_IRM_ABI,
+      functionName: 'borrowRateView',
+      args: [marketParams, marketAfterDeposit],
+      blockNumber: startBlockNumber,
+    })
+
+    const rateAtTarget = await client.readContract({
+      address: marketParams.irm,
+      abi: ADAPTIVE_CURVE_IRM_ABI,
+      functionName: 'rateAtTarget',
+      args: [id],
+      blockNumber: startBlockNumber,
+    })
+
+    const localBorrowRatePerSecondWad = adaptiveCurveBorrowRateView({
+      marketId: id,
+      rateAtTarget,
+      market: {
+        totalSupplyAssets: marketAfterDeposit.totalSupplyAssets,
+        totalBorrowAssets: marketAfterDeposit.totalBorrowAssets,
+        lastUpdate: marketAfterDeposit.lastUpdate,
+      },
+      timestamp,
+    })
+
+    // Assert our local model matches onchain borrowRateView for this input.
+    expect(absDiff(localBorrowRatePerSecondWad, onchainBorrowRatePerSecondWad)).toBe(0n)
+
+    const utilAfterWad = utilizationWad(marketAfterDeposit.totalBorrowAssets, marketAfterDeposit.totalSupplyAssets)
+    const utilAfter = Number.parseFloat(formatUnits(utilAfterWad, 18))
+
+    const fee = Number.parseFloat(formatUnits(marketAfterDeposit.fee, 18))
+
+    const borrowApr = Number.parseFloat(formatUnits(aprWadFromRatePerSecondWad(onchainBorrowRatePerSecondWad), 18))
+    const borrowApy = apyFromRatePerSecondWad(onchainBorrowRatePerSecondWad)
+
+    const supplyAprGross = borrowApr * utilAfter
+    const supplyAprNet = supplyAprGross * (1 - fee)
+
+    const supplyApyGross = borrowApy * utilAfter
+    const supplyApyNet = supplyApyGross * (1 - fee)
+
+    console.warn('')
+    console.warn('=== PEPE/USDS spot check (borrowRateView @ pinned block, after deposit) ===')
+    console.warn(`Market id:        ${id}`)
+    console.warn(`Pinned block:     ${startBlockNumber} (timestamp=${timestamp})`)
+    console.warn(`Deposit delta:    ${formatUnits(depositDelta, 18)} USDS`)
+    console.warn(`Utilization(after): ${(utilAfter * 100).toFixed(2)}%`)
+    console.warn(`Fee:               ${(fee * 100).toFixed(2)}%`)
+    console.warn(`Borrow APR(simple): ${(borrowApr * 100).toFixed(2)}%`)
+    console.warn(`Borrow APY(comp):  ${(borrowApy * 100).toFixed(2)}%`)
+    console.warn(`Supply APR gross:  ${(supplyAprGross * 100).toFixed(2)}%`)
+    console.warn(`Supply APR net:    ${(supplyAprNet * 100).toFixed(2)}%`)
+    console.warn(`Supply APY gross:  ${(supplyApyGross * 100).toFixed(2)}%`)
+    console.warn(`Supply APY net:    ${(supplyApyNet * 100).toFixed(2)}%`)
+    console.warn('======================================================================')
+    console.warn('')
   }, { timeout: 60_000 })
 })
