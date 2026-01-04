@@ -6,7 +6,7 @@ import { formatUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { PercentageControl } from '~/components/ui/percentage-control'
-import { formatDecimalStringShort, formatPercent, formatTokenAmountShort } from '~/lib/formatters'
+import { formatPercent, formatTokenAmountShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
@@ -29,12 +29,6 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   const { data: position } = useUserPosition(market.uniqueKey, address)
   const { data: marketData } = useMarket(market.uniqueKey)
   const marketState = marketData
-
-  const maxWithdrawableShares = useMemo(() => {
-    if (!position || !position[0])
-      return '0'
-    return formatUnits(position[0], 18)
-  }, [position])
 
   const maxWithdrawableAssets = useMemo(() => {
     if (!position || !position[0] || !marketData)
@@ -105,9 +99,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
     return (totalSharesWei * pctScaled) / (BigInt(100) * BigInt(SCALE))
   }, [percentage, totalSharesWei])
 
-  const sharesToWithdraw = useMemo(() => {
-    return formatUnits(sharesToWithdrawWei, 18)
-  }, [sharesToWithdrawWei])
+  const sharesToWithdraw = useMemo(() => formatUnits(sharesToWithdrawWei, 18), [sharesToWithdrawWei])
 
   // Debounce the expensive RPC-driven hooks (simulate + IRM preview) while keeping
   // the UI responsive (slider/amount updates immediately).
@@ -247,30 +239,6 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
         percentage={percentage}
         onChange={setPercentage}
         onMax={handleMaxClick}
-        leftHelper={(
-          <>
-            Max available:
-            {' '}
-            <span className="text-gray-200">{formatDecimalStringShort(maxWithdrawableShares)}</span>
-            {' '}
-            shares
-          </>
-        )}
-        rightHelper={(
-          <>
-            ≈
-            {' '}
-            {formatTokenAmountShort(assetsAtPercent)}
-            {' '}
-            {loanTokenSymbol}
-            {' '}
-            ·
-            {' '}
-            {formatDecimalStringShort(sharesToWithdraw)}
-            {' '}
-            shares
-          </>
-        )}
         desktopCta={(
           <Button
             type="submit"
