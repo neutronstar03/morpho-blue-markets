@@ -2,14 +2,15 @@ import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { useEffect, useMemo, useState } from 'react'
 import { useDebounce } from 'use-debounce'
-import { formatUnits } from 'viem'
+import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
+import { AmountControl } from '~/components/ui/amount-control'
 import { Button } from '~/components/ui/button'
-import { PercentageControl } from '~/components/ui/percentage-control'
 import { formatPercent, formatTokenAmountShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 
 const WAD = 1_000_000_000_000_000_000n
 
@@ -21,28 +22,17 @@ interface WithdrawFormProps {
 
 export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFormProps) {
   const isClient = useIsClient()
+  const [mode, setMode] = useLocalStorage<'percent' | 'asset'>('market:withdraw:unit', 'percent')
   // percentage string (0 - 100)
   const [percentage, setPercentage] = useState('')
+  // asset amount string (token decimals)
+  const [assetAmount, setAssetAmount] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const { address } = useAccount()
 
   const { data: position } = useUserPosition(market.uniqueKey, address)
   const { data: marketData } = useMarket(market.uniqueKey)
   const marketState = marketData
-
-  const maxWithdrawableAssets = useMemo(() => {
-    if (!position || !position[0] || !marketData)
-      return '0'
-    const [supplyShares] = position
-    const [totalSupplyAssets, totalSupplyShares] = marketData
-    if (totalSupplyShares === 0n)
-      return '0'
-
-    const assets = (supplyShares * totalSupplyAssets) / totalSupplyShares
-    return formatUnits(assets, market.loanAsset.decimals!)
-  }, [position, marketData, market.loanAsset.decimals])
-
-  // Derived assets preview handled directly from percentage and max assets
 
   // Convert percentage into shares string (18 decimals) for the withdraw hook
   const totalSharesWei = useMemo(() => {
@@ -89,15 +79,37 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   }, [maxWithdrawSharesWei, totalSharesWei])
 
   const sharesToWithdrawWei = useMemo(() => {
-    const pct = Number.parseFloat(percentage)
-    if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
+    if (mode === 'percent') {
+      const pct = Number.parseFloat(percentage)
+      if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
+        return 0n
+      // Use fixed-point math to avoid float precision when scaling percentage
+      const SCALE = 10000 // supports 0.01% precision
+      // Always round DOWN to avoid producing slightly-more-than-intended shares.
+      const pctScaled = BigInt(Math.floor(pct * SCALE))
+      return (totalSharesWei * pctScaled) / (BigInt(100) * BigInt(SCALE))
+    }
+
+    // Asset amount mode: parse token amount -> convert to shares (round down) -> cap to liquidity-capped max.
+    if (!assetAmount || !marketData)
       return 0n
-    // Use fixed-point math to avoid float precision when scaling percentage
-    const SCALE = 10000 // supports 0.01% precision
-    // Always round DOWN to avoid producing slightly-more-than-intended shares.
-    const pctScaled = BigInt(Math.floor(pct * SCALE))
-    return (totalSharesWei * pctScaled) / (BigInt(100) * BigInt(SCALE))
-  }, [percentage, totalSharesWei])
+    const [totalSupplyAssets, totalSupplyShares] = marketData
+    if (totalSupplyAssets <= 0n || totalSupplyShares <= 0n)
+      return 0n
+
+    let assetsWei = 0n
+    try {
+      assetsWei = parseUnits(assetAmount, market.loanAsset.decimals!)
+    }
+    catch {
+      return 0n
+    }
+    if (assetsWei <= 0n)
+      return 0n
+
+    const sharesFromAssets = (assetsWei * totalSupplyShares) / totalSupplyAssets
+    return sharesFromAssets < maxWithdrawSharesWei ? sharesFromAssets : maxWithdrawSharesWei
+  }, [mode, percentage, assetAmount, marketData, market.loanAsset.decimals, totalSharesWei, maxWithdrawSharesWei])
 
   const sharesToWithdraw = useMemo(() => formatUnits(sharesToWithdrawWei, 18), [sharesToWithdrawWei])
 
@@ -116,6 +128,40 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
       return 0n
     return (sharesToWithdrawWei * totalSupplyAssets) / totalSupplyShares
   }, [marketData, sharesToWithdrawWei])
+
+  const withdrawAssets = useMemo(() => {
+    if (!withdrawAssetsWei)
+      return '0'
+    return formatUnits(withdrawAssetsWei, market.loanAsset.decimals!)
+  }, [withdrawAssetsWei, market.loanAsset.decimals])
+
+  const withdrawAssetsShort = useMemo(() => {
+    return formatTokenAmountShort(Number.parseFloat(withdrawAssets) || 0)
+  }, [withdrawAssets])
+
+  const percentOfPositionString = useMemo(() => {
+    if (totalSharesWei <= 0n || sharesToWithdrawWei <= 0n)
+      return '0'
+    // 0..10000 hundredths
+    let percentHundredths = (sharesToWithdrawWei * 10_000n) / totalSharesWei
+    if (percentHundredths > 10_000n)
+      percentHundredths = 10_000n
+    const integer = percentHundredths / 100n
+    const frac = percentHundredths % 100n
+    if (frac === 0n)
+      return integer.toString()
+    return `${integer.toString()}.${frac.toString().padStart(2, '0')}`
+  }, [sharesToWithdrawWei, totalSharesWei])
+
+  const switchToPercent = () => {
+    setMode('percent')
+    setPercentage(percentOfPositionString)
+  }
+
+  const switchToAsset = () => {
+    setMode('asset')
+    setAssetAmount(withdrawAssets === '0' ? '' : withdrawAssets)
+  }
 
   const utilizationAfterWad = useMemo(() => {
     if (!marketData || withdrawAssetsWei <= 0n)
@@ -165,7 +211,8 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!percentage || !address || !isClient)
+    const inputValue = mode === 'percent' ? percentage : assetAmount
+    if (!inputValue || !address || !isClient)
       return
 
     try {
@@ -176,23 +223,38 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
     }
   }
 
-  // Input handling is encapsulated in PercentageControl
+  // Input handling is encapsulated in AmountControl
 
   const handleMaxClick = () => {
-    setPercentage(maxWithdrawPercentString)
+    if (mode === 'percent') {
+      setPercentage(maxWithdrawPercentString)
+      return
+    }
+
+    if (!marketData) {
+      setAssetAmount('')
+      return
+    }
+    const [totalSupplyAssets, totalSupplyShares] = marketData
+    if (totalSupplyAssets <= 0n || totalSupplyShares <= 0n) {
+      setAssetAmount('')
+      return
+    }
+    const maxAssetsWei = (maxWithdrawSharesWei * totalSupplyAssets) / totalSupplyShares
+    const maxAssets = formatUnits(maxAssetsWei, market.loanAsset.decimals!)
+    setAssetAmount(maxAssets === '0' ? '' : maxAssets)
   }
 
   const isLoading = isWithdrawing || isWithdrawLoading || isSimulatingWithdraw
   const hasError = withdrawError
   const isSuccess = isWithdrawSuccess
   const percentNumber = Number.parseFloat(percentage) || 0
+  const assetNumber = Number.parseFloat(assetAmount) || 0
   const isPercentInvalid = !percentage || percentNumber <= 0 || percentNumber > 100
-  const assetsAtPercent = useMemo(() => {
-    const maxAssets = Number.parseFloat(maxWithdrawableAssets) || 0
-    return (percentNumber / 100) * maxAssets
-  }, [percentNumber, maxWithdrawableAssets])
+  const isAssetInvalid = !assetAmount || assetNumber <= 0
+  const isInputInvalid = mode === 'percent' ? isPercentInvalid : isAssetInvalid
 
-  const showPreview = !!address && !isPercentInvalid && withdrawAssetsWei > 0n && preview.utilizationAfter != null
+  const showPreview = !!address && !isInputInvalid && withdrawAssetsWei > 0n && preview.utilizationAfter != null
   const beforeUtil = preview.utilizationBefore ?? market.state.utilization
   const afterUtil = utilizationAfterWad != null
     ? Number.parseFloat(formatUnits(utilizationAfterWad, 18))
@@ -234,15 +296,36 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <PercentageControl
-        label="Percentage to Withdraw"
-        percentage={percentage}
-        onChange={setPercentage}
+      <AmountControl
+        label={mode === 'percent' ? 'Percentage to Withdraw' : `Amount to Withdraw (${loanTokenSymbol})`}
+        percentage={mode === 'percent' ? percentage : assetAmount}
+        onChange={mode === 'percent' ? setPercentage : setAssetAmount}
         onMax={handleMaxClick}
+        showSlider={mode === 'percent'}
+        suffix={(
+          <span className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={switchToPercent}
+              className={`px-1.5 py-0.5 rounded border border-white/10 text-xs ${mode === 'percent' ? 'bg-white/10 text-gray-100' : 'text-gray-300 hover:bg-white/10'}`}
+              aria-label="Switch to percentage"
+            >
+              %
+            </button>
+            <button
+              type="button"
+              onClick={switchToAsset}
+              className={`px-1.5 py-0.5 rounded border border-white/10 text-xs ${mode === 'asset' ? 'bg-white/10 text-gray-100' : 'text-gray-300 hover:bg-white/10'}`}
+              aria-label={`Switch to ${loanTokenSymbol} amount`}
+            >
+              {loanTokenSymbol}
+            </button>
+          </span>
+        )}
         desktopCta={(
           <Button
             type="submit"
-            disabled={isPercentInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100}
+            disabled={isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100}
             className="w-full"
           >
             {isLoading
@@ -253,7 +336,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
                   </>
                 )
               : (
-                  `Withdraw ${formatTokenAmountShort(assetsAtPercent)} ${loanTokenSymbol}`
+                  `Withdraw ${withdrawAssetsShort} ${loanTokenSymbol}`
                 )}
           </Button>
         )}
@@ -305,7 +388,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
       <div className="md:hidden">
         <Button
           type="submit"
-          disabled={isPercentInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100}
+          disabled={isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100}
           className="w-full"
           variant="outline"
         >
@@ -317,7 +400,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
                 </>
               )
             : (
-                `Withdraw ${formatTokenAmountShort(assetsAtPercent)} ${loanTokenSymbol}`
+                `Withdraw ${withdrawAssetsShort} ${loanTokenSymbol}`
               )}
         </Button>
       </div>
@@ -328,7 +411,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
         </p>
       )}
 
-      {percentNumber > 100 && (
+      {mode === 'percent' && percentNumber > 100 && (
         <p className="text-sm text-red-600 text-center">
           Percentage exceeds 100%
         </p>

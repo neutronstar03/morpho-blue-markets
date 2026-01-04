@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-interface PercentageControlProps {
+interface AmountControlProps {
   label?: string
   percentage: string
   onChange: (value: string) => void
@@ -8,9 +8,11 @@ interface PercentageControlProps {
   leftHelper?: React.ReactNode
   rightHelper?: React.ReactNode
   desktopCta?: React.ReactNode
+  suffix?: React.ReactNode
+  showSlider?: boolean
 }
 
-export function PercentageControl({
+export function AmountControl({
   label = 'Percentage',
   percentage,
   onChange,
@@ -18,7 +20,9 @@ export function PercentageControl({
   leftHelper,
   rightHelper,
   desktopCta,
-}: PercentageControlProps) {
+  suffix,
+  showSlider = true,
+}: AmountControlProps) {
   const percentNumber = Number.parseFloat(percentage) || 0
 
   const handlePercentInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,7 +37,7 @@ export function PercentageControl({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <label htmlFor="percentage-control" className="block text-sm font-medium text-gray-200">
+        <label htmlFor="amount-control" className="block text-sm font-medium text-gray-200">
           {label}
         </label>
 
@@ -43,13 +47,15 @@ export function PercentageControl({
               <input
                 type="text"
                 inputMode="decimal"
-                id="percentage-control"
+                id="amount-control"
                 value={percentage}
                 onChange={handlePercentInputChange}
                 placeholder="0.0"
-                className="w-full px-3 py-2 pr-7 border border-white/10 bg-white/5 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 pr-16 border border-white/10 bg-white/5 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
-              <span className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-400">%</span>
+              <span className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-400 cursor-pointer">
+                {suffix ?? '%'}
+              </span>
             </div>
 
             <button
@@ -70,32 +76,34 @@ export function PercentageControl({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={0.01}
-          value={Number.isFinite(percentNumber) ? percentNumber : 0}
-          onChange={e => onChange(e.target.value)}
-          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-600"
-          style={{ ['--fill' as any]: `${percentNumber}%` }}
-          aria-label="Percentage slider"
-        />
-        <div className="flex justify-between text-xs text-gray-400">
-          {[0, 25, 50, 75, 100].map(p => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => onChange(String(p))}
-              className="cursor-pointer px-1 py-0.5 rounded hover:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-            >
-              {p}
-              %
-            </button>
-          ))}
+      {showSlider && (
+        <div className="space-y-2">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={0.01}
+            value={Number.isFinite(percentNumber) ? percentNumber : 0}
+            onChange={e => onChange(e.target.value)}
+            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            style={{ ['--fill' as any]: `${percentNumber}%` }}
+            aria-label="Percentage slider"
+          />
+          <div className="flex justify-between text-xs text-gray-400">
+            {[0, 25, 50, 75, 100].map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => onChange(String(p))}
+                className="cursor-pointer px-1 py-0.5 rounded hover:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+              >
+                {p}
+                %
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {(leftHelper || rightHelper) && (
         <div className="flex items-center justify-between text-xs text-gray-400">

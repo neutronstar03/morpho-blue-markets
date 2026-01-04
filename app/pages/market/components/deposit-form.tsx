@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
+import { AmountControl } from '~/components/ui/amount-control'
 import { Button } from '~/components/ui/button'
-import { PercentageControl } from '~/components/ui/percentage-control'
 import { formatBigintShort, formatDecimalStringShort, formatPercent } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 
 interface DepositFormProps {
   market: SingleMorphoMarket
@@ -19,7 +20,9 @@ interface DepositFormProps {
 
 export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormProps) {
   const isClient = useIsClient()
+  const [mode, setMode] = useLocalStorage<'percent' | 'asset'>('market:deposit:unit', 'percent')
   const [percentage, setPercentage] = useState('')
+  const [assetAmount, setAssetAmount] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const { address } = useAccount()
 
@@ -30,19 +33,61 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
 
   // Derive amount from percentage of wallet balance
   const amountWei = useMemo(() => {
-    const pct = Number.parseFloat(percentage)
-    if (!Number.isFinite(pct) || pct <= 0 || pct > 100 || !tokenBalance)
+    if (!tokenBalance)
       return 0n
-    const SCALE = 10000
-    const pctScaled = BigInt(Math.round(pct * SCALE))
-    return (tokenBalance * pctScaled) / (BigInt(100) * BigInt(SCALE))
-  }, [percentage, tokenBalance])
+
+    if (mode === 'percent') {
+      const pct = Number.parseFloat(percentage)
+      if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
+        return 0n
+      const SCALE = 10000
+      const pctScaled = BigInt(Math.round(pct * SCALE))
+      return (tokenBalance * pctScaled) / (BigInt(100) * BigInt(SCALE))
+    }
+
+    if (!assetAmount)
+      return 0n
+
+    let assetsWei = 0n
+    try {
+      assetsWei = parseUnits(assetAmount, market.loanAsset.decimals!)
+    }
+    catch {
+      return 0n
+    }
+    if (assetsWei <= 0n)
+      return 0n
+    return assetsWei < tokenBalance ? assetsWei : tokenBalance
+  }, [mode, percentage, assetAmount, tokenBalance, market.loanAsset.decimals])
 
   const amount = useMemo(() => {
     if (!amountWei)
       return ''
     return formatUnits(amountWei, market.loanAsset.decimals!)
   }, [amountWei, market.loanAsset.decimals])
+
+  const percentOfBalanceString = useMemo(() => {
+    if (!tokenBalance || tokenBalance <= 0n || amountWei <= 0n)
+      return '0'
+    let percentHundredths = (amountWei * 10_000n) / tokenBalance
+    if (percentHundredths > 10_000n)
+      percentHundredths = 10_000n
+    const integer = percentHundredths / 100n
+    const frac = percentHundredths % 100n
+    if (frac === 0n)
+      return integer.toString()
+    return `${integer.toString()}.${frac.toString().padStart(2, '0')}`
+  }, [amountWei, tokenBalance])
+
+  const switchToPercent = () => {
+    setMode('percent')
+    setPercentage(percentOfBalanceString)
+  }
+
+  const switchToAsset = () => {
+    setMode('asset')
+    setAssetAmount(amount || '')
+  }
 
   const displayAmountShort = useMemo(() => {
     return amount ? formatDecimalStringShort(amount) : '0'
@@ -104,7 +149,16 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
   }, [isSupplySuccess])
 
   const handleMaxClick = () => {
-    setPercentage('100')
+    if (mode === 'percent') {
+      setPercentage('100')
+      return
+    }
+    if (!tokenBalance) {
+      setAssetAmount('')
+      return
+    }
+    const max = formatUnits(tokenBalance, market.loanAsset.decimals!)
+    setAssetAmount(max === '0' ? '' : max)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -126,7 +180,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
     }
   }
 
-  // Input handled by PercentageControl
+  // Input handled by AmountControl
 
   const isLoading = isSupplying || isApprovingToken || isSupplyLoading || isApproveLoading || isSimulatingSupply || isSimulatingApproval || (!needsApproval && !isAllowanceReady && !!amount)
   const effectiveSupplyError = (!isAllowanceReady || needsApproval) ? undefined : supplyError
@@ -179,11 +233,32 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <PercentageControl
-        label="Percentage to Deposit"
-        percentage={percentage}
-        onChange={setPercentage}
+      <AmountControl
+        label={mode === 'percent' ? 'Percentage to Deposit' : `Amount to Deposit (${loanTokenSymbol})`}
+        percentage={mode === 'percent' ? percentage : assetAmount}
+        onChange={mode === 'percent' ? setPercentage : setAssetAmount}
         onMax={handleMaxClick}
+        showSlider={mode === 'percent'}
+        suffix={(
+          <span className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={switchToPercent}
+              className={`px-1.5 py-0.5 rounded border border-white/10 text-xs ${mode === 'percent' ? 'bg-white/10 text-gray-100' : 'text-gray-300 hover:bg-white/10'}`}
+              aria-label="Switch to percentage"
+            >
+              %
+            </button>
+            <button
+              type="button"
+              onClick={switchToAsset}
+              className={`px-1.5 py-0.5 rounded border border-white/10 text-xs ${mode === 'asset' ? 'bg-white/10 text-gray-100' : 'text-gray-300 hover:bg-white/10'}`}
+              aria-label={`Switch to ${loanTokenSymbol} amount`}
+            >
+              {loanTokenSymbol}
+            </button>
+          </span>
+        )}
         leftHelper={address
           ? (
               <>
@@ -195,15 +270,17 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
               </>
             )
           : undefined}
-        rightHelper={(
-          <>
-            ≈
-            {' '}
-            {displayAmountShort}
-            {' '}
-            {loanTokenSymbol}
-          </>
-        )}
+        rightHelper={mode === 'percent'
+          ? (
+              <>
+                ≈
+                {' '}
+                {displayAmountShort}
+                {' '}
+                {loanTokenSymbol}
+              </>
+            )
+          : undefined}
         desktopCta={(
           <Button
             type="submit"
