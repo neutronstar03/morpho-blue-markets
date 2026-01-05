@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { OptimizeSupplyRebalanceOnlyResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
+import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 
 export interface SupplyApyOptimizerSelection {
@@ -12,6 +12,8 @@ export interface SupplyApyOptimizerSelection {
 export interface SupplyApyOptimizerInputs {
   /** Human input in token units (e.g. "123.45"). Parsed later using decimals. */
   minMoveSize?: string
+  /** Optional: additional amount to supply (new deposit), in token units (e.g. "123.45"). */
+  newDepositAmount?: string
 }
 
 export interface SupplyApyOptimizerDerived {
@@ -34,17 +36,18 @@ export interface SupplyApyOptimizerState {
   inputs: SupplyApyOptimizerInputs
   derived: SupplyApyOptimizerDerived
   run: SupplyApyOptimizerRunState
-  result?: OptimizeSupplyRebalanceOnlyResult
+  result?: OptimizeSupplyWithPositionsResult
 }
 
 interface SupplyApyOptimizerContextValue extends SupplyApyOptimizerState {
   start: () => void
   clear: () => void
   setSelection: (next: SupplyApyOptimizerSelection) => void
-  setMinMoveSize: (v: string) => void
+  setMinMoveSize: (v: string | undefined) => void
+  setNewDepositAmount: (v: string | undefined) => void
   setDerived: (next: SupplyApyOptimizerDerived) => void
   beginRun: (meta?: { timestamp?: bigint }) => number
-  finishRun: (runId: number, res?: OptimizeSupplyRebalanceOnlyResult, err?: string) => void
+  finishRun: (runId: number, res?: OptimizeSupplyWithPositionsResult, err?: string) => void
 }
 
 const SupplyApyOptimizerContext = createContext<SupplyApyOptimizerContextValue | null>(null)
@@ -55,7 +58,7 @@ export function SupplyApyOptimizerProvider({ children }: { children: ReactNode }
   const [inputs, setInputs] = useState<SupplyApyOptimizerInputs>({})
   const [derived, setDerivedState] = useState<SupplyApyOptimizerDerived>({})
   const [run, setRun] = useState<SupplyApyOptimizerRunState>({ isRunning: false, runId: 0 })
-  const [result, setResult] = useState<OptimizeSupplyRebalanceOnlyResult | undefined>(undefined)
+  const [result, setResult] = useState<OptimizeSupplyWithPositionsResult | undefined>(undefined)
   const runIdRef = useRef<number>(0)
 
   const start = useCallback(() => setStarted(true), [])
@@ -81,8 +84,12 @@ export function SupplyApyOptimizerProvider({ children }: { children: ReactNode }
     setRun(prev => ({ ...prev, error: undefined }))
   }, [])
 
-  const setMinMoveSize = useCallback((v: string) => {
+  const setMinMoveSize = useCallback((v: string | undefined) => {
     setInputs(prev => ({ ...prev, minMoveSize: v }))
+  }, [])
+
+  const setNewDepositAmount = useCallback((v: string | undefined) => {
+    setInputs(prev => ({ ...prev, newDepositAmount: v }))
   }, [])
 
   const setDerived = useCallback((next: SupplyApyOptimizerDerived) => {
@@ -98,7 +105,7 @@ export function SupplyApyOptimizerProvider({ children }: { children: ReactNode }
     return nextRunId
   }, [])
 
-  const finishRun = useCallback((runId: number, res?: OptimizeSupplyRebalanceOnlyResult, err?: string) => {
+  const finishRun = useCallback((runId: number, res?: OptimizeSupplyWithPositionsResult, err?: string) => {
     if (runIdRef.current !== runId)
       return // stale (cleared or new run started)
     setRun((prev) => {
@@ -123,11 +130,12 @@ export function SupplyApyOptimizerProvider({ children }: { children: ReactNode }
       clear,
       setSelection,
       setMinMoveSize,
+      setNewDepositAmount,
       setDerived,
       beginRun,
       finishRun,
     }
-  }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMinMoveSize, setDerived, beginRun, finishRun])
+  }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMinMoveSize, setNewDepositAmount, setDerived, beginRun, finishRun])
 
   return (
     <SupplyApyOptimizerContext.Provider value={value}>

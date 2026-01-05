@@ -11,8 +11,8 @@ import { useSupplyApyOptimizer } from '~/lib/contexts/supply-apy-optimizer'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/hooks/rpc/simplified.abi'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
-import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
-import { optimizeSupplyRebalanceOnly } from '~/lib/optimizer/supply-optimizer'
+import { getMorphoBlueAddress, parseTokenAmount, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
+import { optimizeSupplyAllocationWithPositions } from '~/lib/optimizer/supply-optimizer'
 
 const IRM_RATE_AT_TARGET_ABI = [
   {
@@ -78,8 +78,10 @@ export function SupplyApyOptimizer() {
   const ctx = useSupplyApyOptimizer()
   const { address: userAddress, chain } = useAccount()
   const minMoveSize = ctx.inputs.minMoveSize
+  const newDepositAmount = ctx.inputs.newDepositAmount
   const setDerived = ctx.setDerived
   const setMinMoveSize = ctx.setMinMoveSize
+  const setNewDepositAmount = ctx.setNewDepositAmount
   const beginRun = ctx.beginRun
   const finishRun = ctx.finishRun
 
@@ -122,6 +124,12 @@ export function SupplyApyOptimizer() {
 
   // Fetch top candidate markets (max 200) for the selected loan asset on this chain.
   const { data: topMarkets } = useMarketsByChain(selectedLoanAddr ? chain?.id : undefined, selectedLoanAddr)
+
+  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+  const { data: walletBalanceRaw } = useTokenBalance(
+    selectedOption?.address ?? ZERO_ADDRESS,
+    selectedOption ? userAddress : undefined,
+  )
 
   // Small onchain read for user markets to compute supplied assets and default step.
   const morphoAddress = useMemo(() => getMorphoBlueAddress(chain?.id), [chain?.id])
@@ -177,18 +185,35 @@ export function SupplyApyOptimizer() {
 
     setDerived({ totalSuppliedAssets: total, positions })
 
-    // Set default only if user hasn't typed anything yet.
-    if (!minMoveSize) {
+    // Set default only if the user hasn't typed anything yet.
+    // Important: don't treat empty string ("") as "unset" because users often clear the input
+    // before typing a new number; resetting to the default mid-typing feels broken.
+    if (minMoveSize == null) {
       const rawStep = total / 100n
       const stepAssets = rawStep > 0n ? rawStep : 1n
       setMinMoveSize(formatUnits(stepAssets, selectedOption.decimals))
     }
   }, [minMoveSize, selectedOption, selectedUserMarkets, setDerived, setMinMoveSize, userMarketStates])
 
+  // Default "additional amount to supply" to the user's wallet balance for the selected token.
+  // Only set a default if the user hasn't typed anything yet.
+  useEffect(() => {
+    if (!selectedOption)
+      return
+    if (newDepositAmount != null)
+      return
+    const bal = walletBalanceRaw ?? 0n
+    if (bal <= 0n)
+      return
+    // Prefill with a parseable string (no locale commas).
+    setNewDepositAmount(formatUnits(bal, selectedOption.decimals))
+  }, [newDepositAmount, selectedOption, setNewDepositAmount, walletBalanceRaw])
+
   const [optimizeRequest, setOptimizeRequest] = useState<null | {
     runId: number
     timestamp: bigint
     stepAssets: bigint
+    newDepositAssets: bigint
     positions: UserSupplyPosition[]
     markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>
   }>(null)
@@ -271,9 +296,10 @@ export function SupplyApyOptimizer() {
     }
 
     try {
-      const res = optimizeSupplyRebalanceOnly({
+      const res = optimizeSupplyAllocationWithPositions({
         markets: snapshots,
         positions: optimizeRequest.positions,
+        newDepositAssets: optimizeRequest.newDepositAssets,
         stepAssets: optimizeRequest.stepAssets,
         timestamp: optimizeRequest.timestamp,
         maxIterations: 800,
@@ -301,7 +327,9 @@ export function SupplyApyOptimizer() {
       loanAssetSymbol: opt?.symbol,
       loanAssetDecimals: opt?.decimals,
     })
-    ctx.setMinMoveSize('')
+    // Mark as "unset" so the default can be computed/preset for the new selection.
+    ctx.setMinMoveSize(undefined)
+    ctx.setNewDepositAmount(undefined)
   }
 
   const canOptimize = !!selectedOption
@@ -324,6 +352,8 @@ export function SupplyApyOptimizer() {
       return
     }
 
+    const newDepositAssets = parseTokenAmount(ctx.inputs.newDepositAmount ?? '', selectedOption.decimals)
+
     // Universe = top markets (<= 200) ∪ user's markets (for safety).
     const universe = new Map<string, { uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>()
 
@@ -343,15 +373,24 @@ export function SupplyApyOptimizer() {
       runId,
       timestamp,
       stepAssets,
+      newDepositAssets,
       positions,
       markets: [...universe.values()],
     })
   }
 
   const result = ctx.result
+  const parsedNewDepositAssets = useMemo(() => {
+    if (!selectedOption)
+      return 0n
+    return parseTokenAmount(ctx.inputs.newDepositAmount ?? '', selectedOption.decimals)
+  }, [selectedOption, ctx.inputs.newDepositAmount])
   const displayResult = useMemo(() => {
     if (!result)
       return undefined
+    // The "no-op plan" is only meaningful for rebalance-only runs.
+    if (parsedNewDepositAssets > 0n)
+      return result
     const apyGainWad = result.optimized.blendedApyWad - result.current.blendedApyWad
     const noBenefit = apyGainWad <= NO_BENEFIT_DELTA_APY_WAD
     if (!noBenefit)
@@ -366,7 +405,13 @@ export function SupplyApyOptimizer() {
         deltaAssets: 0n,
       })),
     }
-  }, [NO_BENEFIT_DELTA_APY_WAD, result])
+  }, [NO_BENEFIT_DELTA_APY_WAD, parsedNewDepositAssets, result])
+
+  const totalAllocatedAssets = useMemo(() => {
+    if (!displayResult)
+      return 0n
+    return displayResult.positions.reduce((sum, p) => sum + p.amountAssets, 0n)
+  }, [displayResult])
   const symbol = selectedOption?.symbol ?? ctx.selection.loanAssetSymbol ?? ''
   const chainIdForLinks = ctx.selection.chainId ?? chain?.id
   const chainNameForLinks = chainIdForLinks ? getSupportedChainName(chainIdForLinks) : undefined
@@ -424,7 +469,7 @@ export function SupplyApyOptimizer() {
             )}
 
             {canPick && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-200">
                     Asset to optimize
@@ -472,6 +517,34 @@ export function SupplyApyOptimizer() {
                   <div className="text-xs text-gray-500">
                     Default is 1% of your supplied amount.
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-200">
+                    Additional amount to supply
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={ctx.inputs.newDepositAmount ?? ''}
+                      onChange={e => ctx.setNewDepositAmount(e.target.value)}
+                      placeholder="0.0"
+                      className="w-full px-3 py-2 pr-16 border border-white/10 bg-white/5 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
+                      {symbol}
+                    </span>
+                  </div>
+                  {selectedOption && (
+                    <div className="text-xs text-gray-500">
+                      Wallet balance:
+                      {' '}
+                      {fmtToken(walletBalanceRaw ?? 0n, selectedOption.decimals)}
+                      {' '}
+                      {selectedOption.symbol}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center">
@@ -578,6 +651,25 @@ export function SupplyApyOptimizer() {
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                <div className="text-sm text-gray-300 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <div className="font-medium text-white">
+                    Total allocated:
+                    {' '}
+                    <span className="tabular-nums">{fmtToken(totalAllocatedAssets, selectedOption.decimals)}</span>
+                    {' '}
+                    {symbol}
+                  </div>
+                  {displayResult.unallocatedNewDepositAssets > 0n && (
+                    <div className="text-xs text-gray-400">
+                      Unallocated deposit:
+                      {' '}
+                      <span className="tabular-nums">{fmtToken(displayResult.unallocatedNewDepositAssets, selectedOption.decimals)}</span>
+                      {' '}
+                      {symbol}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -142,31 +142,6 @@ export interface OptimizeSupplyWithPositionsResult {
   infeasibleWithdrawAssets: bigint
 }
 
-/**
- * Rebalance-only surface API (no "new deposit" scenario).
- *
- * This matches the current frontend needs: optimize how to redistribute the *existing* position
- * subject to withdrawal-liquidity constraints.
- */
-export interface OptimizeSupplyRebalanceOnlyArgs {
-  markets: SupplyOptimizerMarketSnapshot[]
-  positions: UserSupplyPosition[]
-  stepAssets: bigint
-  timestamp: bigint
-  constraints?: SupplyOptimizerConstraints
-  /** Default: true. */
-  allowRebalance?: boolean
-  maxIterations?: number
-}
-
-export interface OptimizeSupplyRebalanceOnlyResult {
-  current: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint }
-  optimized: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint }
-  positions: OptimizedPositionDelta[]
-  iterations: number
-  infeasibleWithdrawAssets: bigint
-}
-
 function clamp0ToWad(x: bigint): bigint {
   if (x < 0n)
     return 0n
@@ -869,26 +844,5 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
     iterations,
     unallocatedNewDepositAssets,
     infeasibleWithdrawAssets,
-  }
-}
-
-export function optimizeSupplyRebalanceOnly(args: OptimizeSupplyRebalanceOnlyArgs): OptimizeSupplyRebalanceOnlyResult {
-  const res = optimizeSupplyAllocationWithPositions({
-    markets: args.markets,
-    positions: args.positions,
-    newDepositAssets: 0n,
-    stepAssets: args.stepAssets,
-    timestamp: args.timestamp,
-    constraints: args.constraints,
-    allowRebalance: args.allowRebalance,
-    maxIterations: args.maxIterations,
-  })
-
-  return {
-    current: res.current,
-    optimized: res.optimized,
-    positions: res.positions,
-    iterations: res.iterations,
-    infeasibleWithdrawAssets: res.infeasibleWithdrawAssets,
   }
 }

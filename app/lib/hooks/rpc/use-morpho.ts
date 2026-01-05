@@ -20,8 +20,11 @@ export function formatTokenAmount(amount: bigint, decimals: number): string {
 export function parseTokenAmount(amount: string, decimals: number): bigint {
   if (!amount)
     return 0n
+  // Accept common UX formatting like "11,003.25" or "11 003.25".
+  // (viem's parseUnits rejects these, so we sanitize.)
+  const normalized = amount.trim().replaceAll(',', '').replaceAll(' ', '').replaceAll('_', '')
   try {
-    return parseUnits(amount, decimals)
+    return parseUnits(normalized, decimals)
   }
   catch {
     // handle invalid amount string e.g. "" or "."
