@@ -220,6 +220,13 @@ export function useMarketPreview(args: {
 
   const canUseLocalIrm = enabled && before != null && after != null && rateAtTarget != null
 
+  const rateAtTargetApy = useMemo(() => {
+    if (rateAtTarget == null)
+      return undefined
+    // rateAtTarget is per-second WAD (int256 onchain). Negative rates are treated as 0 for display.
+    return apyFromRatePerSecondWad(rateAtTarget > 0n ? rateAtTarget : 0n)
+  }, [rateAtTarget])
+
   const nowTimestamp = useMemo(() => {
     // For UX we don't need exact block timestamp here. Using wall clock removes an extra RPC call.
     return BigInt(Math.floor(Date.now() / 1000))
@@ -313,20 +320,21 @@ export function useMarketPreview(args: {
     return Number.parseFloat(formatUnits(utilizationAfterWad, 18))
   }, [utilizationAfterWad])
 
-  const canEstimateApy = utilizationBefore != null && utilizationAfter != null && market.state.netSupplyApy != null
+  const canEstimateApy = utilizationBefore != null && utilizationAfter != null && market.state.supplyApy != null
   const estimatedSupplyApyAfter = useMemo(() => {
     if (!canEstimateApy)
       return undefined
     if (utilizationBefore <= 0)
-      return market.state.netSupplyApy
+      return market.state.supplyApy
     // Simple “utilization-only” estimate: assumes borrow rate unchanged.
-    return market.state.netSupplyApy * (utilizationAfter / utilizationBefore)
-  }, [canEstimateApy, utilizationBefore, utilizationAfter, market.state.netSupplyApy])
+    return market.state.supplyApy * (utilizationAfter / utilizationBefore)
+  }, [canEstimateApy, utilizationBefore, utilizationAfter, market.state.supplyApy])
 
   return {
     enabled,
     isBorrowRateLoading,
     borrowRateError,
+    rateAtTargetApy,
     utilizationBefore,
     utilizationAfter,
     supplyApyBefore,

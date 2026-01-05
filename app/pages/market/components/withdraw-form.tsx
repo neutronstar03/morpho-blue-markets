@@ -168,8 +168,10 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
       return undefined
     const [totalSupplyAssets, , totalBorrowAssets] = marketData
     const supplyAfter = totalSupplyAssets - withdrawAssetsWei
+    // If supplyAfter is 0 (or negative due to rounding/edge cases), utilization is effectively > 100%
+    // as long as there is any outstanding borrow.
     if (supplyAfter <= 0n)
-      return undefined
+      return totalBorrowAssets > 0n ? (WAD + 1n) : 0n
     return (totalBorrowAssets * WAD) / supplyAfter
   }, [marketData, withdrawAssetsWei])
 
@@ -179,13 +181,22 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
     return utilizationAfterWad > WAD
   }, [utilizationAfterWad])
 
+  const isAboveMaxWithdrawShares = useMemo(() => {
+    // This can happen in percent mode if the user types 100% manually while the market has less liquidity than their full position.
+    if (sharesToWithdrawWei <= 0n)
+      return false
+    if (maxWithdrawSharesWei <= 0n)
+      return sharesToWithdrawWei > 0n
+    return sharesToWithdrawWei > maxWithdrawSharesWei
+  }, [sharesToWithdrawWei, maxWithdrawSharesWei])
+
   const sharesToWithdrawForTx = useMemo(() => {
     // If utilization would exceed 100%, onchain withdraw will revert (insufficient liquidity).
     // Avoid spamming simulate/reverts: disable simulation by passing empty amount.
-    if (isUtilizationAfterAbove100)
+    if (isUtilizationAfterAbove100 || isAboveMaxWithdrawShares)
       return ''
     return debouncedSharesToWithdraw
-  }, [isUtilizationAfterAbove100, debouncedSharesToWithdraw])
+  }, [isUtilizationAfterAbove100, isAboveMaxWithdrawShares, debouncedSharesToWithdraw])
 
   const preview = useMarketPreview({
     market,
@@ -259,7 +270,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   const afterUtil = utilizationAfterWad != null
     ? Number.parseFloat(formatUnits(utilizationAfterWad, 18))
     : preview.utilizationAfter
-  const beforeApy = preview.supplyApyBefore ?? market.state.netSupplyApy
+  const beforeApy = preview.supplyApyBefore ?? market.state.supplyApy ?? market.state.netSupplyApy
   const afterApy = preview.supplyApyAfter ?? preview.estimatedSupplyApyAfter
   const isApyEstimated = preview.supplyApyAfter == null && afterApy != null
 
@@ -325,7 +336,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
         desktopCta={(
           <Button
             type="submit"
-            disabled={isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100}
+            disabled={isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100 || isAboveMaxWithdrawShares}
             className="w-full"
           >
             {isLoading
@@ -376,6 +387,14 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
         </div>
       )}
 
+      {isAboveMaxWithdrawShares && !isUtilizationAfterAbove100 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <p className="text-sm text-yellow-800">
+            This amount exceeds the maximum withdrawable given your position and current market liquidity. Use Max or reduce the amount.
+          </p>
+        </div>
+      )}
+
       {hasError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
           <p className="text-sm text-red-800">
@@ -388,7 +407,7 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
       <div className="md:hidden">
         <Button
           type="submit"
-          disabled={isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100}
+          disabled={isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100 || isAboveMaxWithdrawShares}
           className="w-full"
           variant="outline"
         >

@@ -33,10 +33,9 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
 
   // Derive amount from percentage of wallet balance
   const amountWei = useMemo(() => {
-    if (!tokenBalance)
-      return 0n
-
     if (mode === 'percent') {
+      if (!tokenBalance)
+        return 0n
       const pct = Number.parseFloat(percentage)
       if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
         return 0n
@@ -57,7 +56,8 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
     }
     if (assetsWei <= 0n)
       return 0n
-    return assetsWei < tokenBalance ? assetsWei : tokenBalance
+    // NOTE: do not cap to wallet balance — we still want to preview impact for arbitrary amounts.
+    return assetsWei
   }, [mode, percentage, assetAmount, tokenBalance, market.loanAsset.decimals])
 
   const amount = useMemo(() => {
@@ -122,8 +122,17 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
     isAllowanceReady,
   } = useTokenApproval(market.loanAsset.address, debouncedAmount, address, market.loanAsset.decimals)
 
+  const hasSufficientBalance = useMemo(() => {
+    if (!tokenBalance)
+      return false
+    if (debouncedAmountWei <= 0n)
+      return false
+    return debouncedAmountWei <= tokenBalance
+  }, [debouncedAmountWei, tokenBalance])
+
   // Gate supply simulation until allowance is known and sufficient
-  const guardedAmount = isAllowanceReady && !needsApproval ? debouncedAmount : ''
+  // Also gate on wallet balance: preview should work for arbitrary amounts, but tx simulation will revert if balance is insufficient.
+  const guardedAmount = (isAllowanceReady && !needsApproval && hasSufficientBalance) ? debouncedAmount : ''
 
   const {
     supply,
@@ -171,7 +180,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
       if (needsApproval) {
         approve()
       }
-      else {
+      else if (hasSufficientBalance) {
         supply()
       }
     }
@@ -193,10 +202,10 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
     deltaSupplyAssets: debouncedAmountWei,
   })
 
-  const showPreview = !!address && debouncedAmountWei > 0n && preview.utilizationAfter != null
+  const showPreview = debouncedAmountWei > 0n && preview.utilizationAfter != null
   const beforeUtil = preview.utilizationBefore ?? market.state.utilization
   const afterUtil = preview.utilizationAfter
-  const beforeApy = preview.supplyApyBefore ?? market.state.netSupplyApy
+  const beforeApy = preview.supplyApyBefore ?? market.state.supplyApy ?? market.state.netSupplyApy
   const afterApy = preview.supplyApyAfter ?? preview.estimatedSupplyApyAfter
   const isApyEstimated = preview.supplyApyAfter == null && afterApy != null
 
@@ -284,7 +293,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
         desktopCta={(
           <Button
             type="submit"
-            disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount)}
+            disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount) || (!needsApproval && !hasSufficientBalance)}
             className="w-full"
           >
             {isLoading
@@ -361,6 +370,14 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
         </div>
       )}
 
+      {!!amount && !!address && tokenBalance !== undefined && !needsApproval && !hasSufficientBalance && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <p className="text-sm text-yellow-800">
+            Insufficient wallet balance for this deposit amount. Preview is shown, but deposit is disabled.
+          </p>
+        </div>
+      )}
+
       {hasError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
           <p className="text-sm text-red-800">
@@ -373,7 +390,7 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
       <div className="md:hidden">
         <Button
           type="submit"
-          disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount)}
+          disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount) || (!needsApproval && !hasSufficientBalance)}
           className="w-full"
         >
           {isLoading

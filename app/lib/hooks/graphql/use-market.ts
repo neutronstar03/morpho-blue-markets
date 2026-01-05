@@ -25,17 +25,28 @@ const GetMarketDocument = gql`
         # this value is awesome, it's the variation of the collateral price over the last 24 hours
         dailyPriceVariation
 
+        # Base (ex-rewards) instantaneous + aggregates
+        supplyApy
+        avgSupplyApy
+        dailySupplyApy
+        weeklySupplyApy
+
+        # Net (incl rewards) instantaneous + aggregates
         netSupplyApy
         avgNetSupplyApy
         dailyNetSupplyApy
         weeklyNetSupplyApy
 
+        # IRM state / curve anchor
+        apyAtTarget
+        rateAtTarget
+
+        # Borrow side (kept for completeness)
+        borrowApy
         netBorrowApy
         avgNetBorrowApy
         dailyNetBorrowApy
         weeklyNetBorrowApy
-        netSupplyApy
-        netBorrowApy
       }
     }
   }
@@ -74,10 +85,17 @@ export interface SingleMorphoMarket {
     borrowAssetsUsd: number
     utilization: number
     dailyPriceVariation: number
+    supplyApy: number
+    avgSupplyApy: number
+    dailySupplyApy: number
+    weeklySupplyApy: number
     netSupplyApy: number
     avgNetSupplyApy: number
     dailyNetSupplyApy: number
     weeklyNetSupplyApy: number
+    apyAtTarget: number
+    rateAtTarget: string | number
+    borrowApy: number
     netBorrowApy: number
     avgNetBorrowApy: number
     dailyNetBorrowApy: number

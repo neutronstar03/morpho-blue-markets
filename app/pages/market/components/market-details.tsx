@@ -3,6 +3,8 @@ import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { useState } from 'react'
 import { Card } from '~/components/ui/card'
 import { formatLltv, formatPercent, formatUsd } from '~/lib/formatters'
+import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
+import { useMarket } from '~/lib/hooks/rpc/use-morpho'
 import { useTokenLiquidity } from '~/lib/hooks/use-token-liquidity'
 
 interface MarketDetailsProps {
@@ -38,6 +40,11 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 export function MarketDetails({ market }: MarketDetailsProps) {
+  const { data: marketStateRaw } = useMarket(market.uniqueKey)
+  const live = useMarketPreview({ market, marketStateRaw, deltaSupplyAssets: 0n })
+  const liveSupplyApy = live.supplyApyBefore
+  const liveRateAtTargetApy = live.rateAtTargetApy
+
   const { data: liquidityStr, isLoading: isLiqLoading } = useTokenLiquidity({
     chainId: market.morphoBlue.chain.id,
     tokenAddress: market.collateralAsset.address,
@@ -196,21 +203,25 @@ export function MarketDetails({ market }: MarketDetailsProps) {
 
       <SectionTitle title="Supply APY" />
       <DetailRow
-        label="Current"
-        value={formatPercent(market.state.netSupplyApy)}
+        label="Instantaneous"
+        value={formatPercent(liveSupplyApy ?? market.state.supplyApy ?? market.state.netSupplyApy)}
+      />
+      <DetailRow
+        label="Rate at Target"
+        value={formatPercent(liveRateAtTargetApy ?? market.state.apyAtTarget)}
       />
 
       <DetailRow
         label="Daily"
-        value={formatPercent(market.state.dailyNetSupplyApy)}
+        value={formatPercent(market.state.dailySupplyApy ?? market.state.dailyNetSupplyApy)}
       />
       <DetailRow
         label="Weekly"
-        value={formatPercent(market.state.weeklyNetSupplyApy)}
+        value={formatPercent(market.state.weeklySupplyApy ?? market.state.weeklyNetSupplyApy)}
       />
       <DetailRow
         label="Average"
-        value={formatPercent(market.state.avgNetSupplyApy)}
+        value={formatPercent(market.state.avgSupplyApy ?? market.state.avgNetSupplyApy)}
       />
 
     </Card>
