@@ -5,7 +5,6 @@ import { erc20Abi, formatUnits, parseUnits } from 'viem'
 import { useAccount, useReadContract, useSimulateContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { getSupportedChainName, morphoAddressOnChain } from '../../addresses'
-import { tokenAmountToWei } from '../../tokens'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from './simplified.abi'
 
 export function getMorphoBlueAddress(chainId?: number): `0x${string}` {
@@ -171,7 +170,7 @@ export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenD
         irm: market.irmAddress as `0x${string}`,
         lltv: BigInt(market.lltv),
       },
-      tokenAmountToWei(amount, loanTokenDecimals),
+      parseUnits(amount, loanTokenDecimals),
       BigInt(0), // shares (0 for max)
       userAddress as `0x${string}`, // onBehalf
       '0x', // data

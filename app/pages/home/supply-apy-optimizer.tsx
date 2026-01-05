@@ -8,6 +8,7 @@ import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useSupplyApyOptimizer } from '~/lib/contexts/supply-apy-optimizer'
+import { formatBigintShort } from '~/lib/formatters'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/hooks/rpc/simplified.abi'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
@@ -428,7 +429,7 @@ export function SupplyApyOptimizer() {
   }, [topMarkets, selectedUserMarkets])
 
   return (
-    <Card className="border border-gray-700 bg-gray-900/40">
+    <Card className="mb-8">
       <div className="p-4 border-b border-gray-700 flex items-center gap-3">
         <div className="flex flex-col">
           <h2 className="text-xl font-bold text-white">Supply APY optimizer</h2>
@@ -440,7 +441,7 @@ export function SupplyApyOptimizer() {
           <button
             type="button"
             onClick={() => ctx.clear()}
-            className="ml-auto px-2 py-1 rounded-md border border-white/10 text-gray-200 hover:bg-white/10"
+            className="ml-auto px-2 py-1 rounded-md border border-gray-700 text-gray-200 hover:bg-gray-800"
             title="Clear"
           >
             X
@@ -448,7 +449,7 @@ export function SupplyApyOptimizer() {
         )}
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-6 space-y-6">
         {!ctx.started && (
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm text-gray-300">
@@ -477,7 +478,7 @@ export function SupplyApyOptimizer() {
                   <select
                     value={ctx.selection.loanAssetAddress ?? ''}
                     onChange={e => onChangeLoanAsset(e.target.value)}
-                    className="w-full bg-gray-800 border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="" disabled>Select an asset</option>
                     {loanAssetOptions.map(o => (
@@ -508,7 +509,7 @@ export function SupplyApyOptimizer() {
                       value={ctx.inputs.minMoveSize ?? ''}
                       onChange={e => ctx.setMinMoveSize(e.target.value)}
                       placeholder="0.0"
-                      className="w-full px-3 py-2 pr-16 border border-white/10 bg-white/5 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 pr-16 border border-gray-700 bg-gray-900 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                     <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
                       {symbol}
@@ -530,7 +531,7 @@ export function SupplyApyOptimizer() {
                       value={ctx.inputs.newDepositAmount ?? ''}
                       onChange={e => ctx.setNewDepositAmount(e.target.value)}
                       placeholder="0.0"
-                      className="w-full px-3 py-2 pr-16 border border-white/10 bg-white/5 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 pr-16 border border-gray-700 bg-gray-900 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                     <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
                       {symbol}
@@ -568,23 +569,23 @@ export function SupplyApyOptimizer() {
             {displayResult && selectedOption && (
               <div className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="bg-white/5 border border-white/10 rounded-md p-3">
+                  <div className="bg-gray-900 border border-gray-700 rounded-md p-3">
                     <div className="text-xs text-gray-400">Current blended APY</div>
                     <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.current.blendedApyWad)}</div>
                   </div>
-                  <div className="bg-white/5 border border-white/10 rounded-md p-3">
+                  <div className="bg-gray-900 border border-gray-700 rounded-md p-3">
                     <div className="text-xs text-gray-400">Optimized blended APY</div>
                     <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.optimized.blendedApyWad)}</div>
                   </div>
-                  <div className="bg-white/5 border border-white/10 rounded-md p-3">
+                  <div className="bg-gray-900 border border-gray-700 rounded-md p-3">
                     <div className="text-xs text-gray-400">Iterations</div>
                     <div className="text-lg font-semibold text-white tabular-nums">{displayResult.iterations}</div>
                   </div>
                 </div>
 
-                <div className="overflow-x-auto border border-white/10 rounded-md">
-                  <table className="min-w-full divide-y divide-white/10">
-                    <thead className="bg-white/5">
+                <div className="overflow-x-auto border border-gray-700 rounded-md">
+                  <table className="min-w-full divide-y divide-gray-700">
+                    <thead className="bg-gray-800/40">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
                         <th className="px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Current</th>
@@ -593,7 +594,7 @@ export function SupplyApyOptimizer() {
                         <th className="px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">APY after</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/10 bg-black/10">
+                    <tbody className="divide-y divide-gray-700 bg-gray-900/20">
                       {displayResult.positions.map((p) => {
                         const deltaSign = p.deltaAssets >= 0n ? '+' : ''
                         const meta = marketMetaById.get(p.marketId.toLowerCase())
@@ -653,21 +654,35 @@ export function SupplyApyOptimizer() {
                   </table>
                 </div>
 
-                <div className="text-sm text-gray-300 flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <div className="font-medium text-white">
-                    Total allocated:
-                    {' '}
-                    <span className="tabular-nums">{fmtToken(totalAllocatedAssets, selectedOption.decimals)}</span>
-                    {' '}
-                    {symbol}
-                  </div>
-                  {displayResult.unallocatedNewDepositAssets > 0n && (
-                    <div className="text-xs text-gray-400">
-                      Unallocated deposit:
-                      {' '}
-                      <span className="tabular-nums">{fmtToken(displayResult.unallocatedNewDepositAssets, selectedOption.decimals)}</span>
+                <div className="pt-2">
+                  <div
+                    className="
+                      flex flex-row justify-center items-center mx-4
+                      sm:justify-end
+                      gap-1 sm:gap-2
+                    "
+                  >
+                    <p className="text-xs text-gray-400 whitespace-nowrap">Total allocated</p>
+                    <p className="text-sm text-white whitespace-nowrap">
+                      {formatBigintShort(totalAllocatedAssets, selectedOption.decimals)}
                       {' '}
                       {symbol}
+                    </p>
+                  </div>
+                  {displayResult.unallocatedNewDepositAssets > 0n && (
+                    <div
+                      className="
+                        flex flex-row justify-center items-center mx-4 mt-1
+                        sm:justify-end
+                        gap-1 sm:gap-2
+                      "
+                    >
+                      <p className="text-xs text-gray-400 whitespace-nowrap">Unallocated deposit</p>
+                      <p className="text-sm text-white whitespace-nowrap">
+                        {formatBigintShort(displayResult.unallocatedNewDepositAssets, selectedOption.decimals)}
+                        {' '}
+                        {symbol}
+                      </p>
                     </div>
                   )}
                 </div>
