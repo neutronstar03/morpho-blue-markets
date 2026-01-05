@@ -1,0 +1,405 @@
+{
+  "chainId": 1,
+  "blockNumber": "24164776",
+  "timestamp": "1767571655",
+  "morphoBlue": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+  "markets": [
+    {
+      "marketId": "0x0655e0c8686d94d9e0c0d2b78d7f99492676e52d712db5ac061b3c78da4b7587",
+      "totalSupplyAssets": "21372461990822760522338",
+      "totalSupplyShares": "20778479669856747092930799461",
+      "totalBorrowAssets": "21372461990822760522338",
+      "totalBorrowShares": "20744071847706845307215602361",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "8575101117"
+    },
+    {
+      "marketId": "0x0976b2b8e796994ef3e2fcc6c2f808c420917d531bb9cfaa4537773ca6860e1c",
+      "totalSupplyAssets": "2610969640034114667425",
+      "totalSupplyShares": "2916977627160221206777802086",
+      "totalBorrowAssets": "44434870909176373372",
+      "totalBorrowShares": "38703019221388587173000772",
+      "lastUpdate": "1767339575",
+      "feeWad": "0",
+      "rateAtTarget": "31709791"
+    },
+    {
+      "marketId": "0x1a01594467db83fefd93ad9028e3c13ca7f8499f7086afefb667966f6a2b3b11",
+      "totalSupplyAssets": "1000000000000000000",
+      "totalSupplyShares": "1000000000000000000000000",
+      "totalBorrowAssets": "100000000000000000",
+      "totalBorrowShares": "100000000000000000000000",
+      "lastUpdate": "1760063471",
+      "feeWad": "0",
+      "rateAtTarget": "1262589136"
+    },
+    {
+      "marketId": "0x2910f6b4ff92dacd6987a6bf74a4c6d15ed1f3acbde6d04fc8cf41c43bb5dbbf",
+      "totalSupplyAssets": "342014369846379018120347",
+      "totalSupplyShares": "341304908987644157556628947129",
+      "totalBorrowAssets": "342014369846379018120347",
+      "totalBorrowShares": "341165298672916061580285730417",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "375552363"
+    },
+    {
+      "marketId": "0x29200655ad6ee4b86a0f4132e86736844479b4f4ff55d0a40fb31e8264fb811c",
+      "totalSupplyAssets": "48659027492336018590552",
+      "totalSupplyShares": "48107563312841676555067296298",
+      "totalBorrowAssets": "48659027492336018590552",
+      "totalBorrowShares": "48073982306157137377546061950",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "3225328959"
+    },
+    {
+      "marketId": "0x347aa5f94a12dd46d3e17e542ca1c4033bd6952bde4b22af3caa33c82e52451a",
+      "totalSupplyAssets": "11827748280145286251226",
+      "totalSupplyShares": "10777250488687243125228906347",
+      "totalBorrowAssets": "8404704308567694893989",
+      "totalBorrowShares": "7607134971214685070221796298",
+      "lastUpdate": "1767513263",
+      "feeWad": "0",
+      "rateAtTarget": "22285406814"
+    },
+    {
+      "marketId": "0x366bc0aa9aa70a1f075096e825e9b1c7221878a90edd52081d2af5cfca3beb89",
+      "totalSupplyAssets": "95760440699159741971",
+      "totalSupplyShares": "93415983749270124410663031",
+      "totalBorrowAssets": "1286863408339183576",
+      "totalBorrowShares": "1252194141779247223669703",
+      "lastUpdate": "1765314143",
+      "feeWad": "0",
+      "rateAtTarget": "3002879724"
+    },
+    {
+      "marketId": "0x37997b3cf7cea3555abb101f94f39963e8256be71408165937d4fb7642039ac7",
+      "totalSupplyAssets": "956128104001669861594",
+      "totalSupplyShares": "951944711783849464170569467",
+      "totalBorrowAssets": "956128104001669861594",
+      "totalBorrowShares": "951489483614945697417926653",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "256104739"
+    },
+    {
+      "marketId": "0x38d28aa002b2961f734763f6afeeb78a36a9b947cb12b988c35a5bb4bde0d1c7",
+      "totalSupplyAssets": "9290374220062886781322",
+      "totalSupplyShares": "9276832429369751292209153396",
+      "totalBorrowAssets": "9290374220062886781322",
+      "totalBorrowShares": "9275330681029765266706224810",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "409779265"
+    },
+    {
+      "marketId": "0x3eb3899b02600e4c5c626a1dc3f9167c08d0675b7adbdd0daf78111574234f8b",
+      "totalSupplyAssets": "390277595929702809598305",
+      "totalSupplyShares": "386101809590033697611450546807",
+      "totalBorrowAssets": "390277595929702809598305",
+      "totalBorrowShares": "385478352183258596455903189763",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "1065223813"
+    },
+    {
+      "marketId": "0x3f1d5c88c72432b04f2074499fe217468af49ddaa98bcb6ec80b08f76a82c6ec",
+      "totalSupplyAssets": "20777860107879198274372",
+      "totalSupplyShares": "16930262931822472514071792092",
+      "totalBorrowAssets": "18258829323501445085605",
+      "totalBorrowShares": "13996468545294528376937986569",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "9648837943"
+    },
+    {
+      "marketId": "0x44f51e6b7356132597872e40c8d4a5bb2f1fc2c99e7292ee3b3953d9074086b6",
+      "totalSupplyAssets": "263420581956827934864334",
+      "totalSupplyShares": "257563006833848341426370589953",
+      "totalBorrowAssets": "263420581956827934864334",
+      "totalBorrowShares": "257117324994089419299396890088",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "5582171785"
+    },
+    {
+      "marketId": "0x4b64c12b086173a928162ca5f7a80584a3a87927784314da8734517e64e24485",
+      "totalSupplyAssets": "3000116706946596705",
+      "totalSupplyShares": "2999935116073430059077395",
+      "totalBorrowAssets": "900116706946596705",
+      "totalBorrowShares": "900000000000000000000000",
+      "lastUpdate": "1757604791",
+      "feeWad": "0",
+      "rateAtTarget": "1110578714"
+    },
+    {
+      "marketId": "0x57e8783f294473667d2c300d0752ed3bed3226f16076fb41209f32f64da7ed24",
+      "totalSupplyAssets": "1000127865030707824",
+      "totalSupplyShares": "1000000000000000000000000",
+      "totalBorrowAssets": "900126067425053201",
+      "totalBorrowShares": "900001271492980463163440",
+      "lastUpdate": "1753774583",
+      "feeWad": "0",
+      "rateAtTarget": "1279064724"
+    },
+    {
+      "marketId": "0x5fbb467c8f4f3a64ec8c3a58d04febbcce3eaec510f4dfaec5b1b57c8f189a14",
+      "totalSupplyAssets": "1000726552451486698",
+      "totalSupplyShares": "1000079540248053136302338",
+      "totalBorrowAssets": "1000726552451486698",
+      "totalBorrowShares": "1000000000000000000000000",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "39904743"
+    },
+    {
+      "marketId": "0x5ffdf15c5a4d7c6affb3f12634eeda1a20e60b92c0eb547f61754f656b55841e",
+      "totalSupplyAssets": "2188297285507511760106872",
+      "totalSupplyShares": "1928368327548908253451194215258",
+      "totalBorrowAssets": "1530355143207031779443153",
+      "totalBorrowShares": "1291406297042211759726907693130",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "17774284275"
+    },
+    {
+      "marketId": "0x604e98b52f2375c5d3c6e92766c14174eb45ffbb61d36091f21277ae8930e42c",
+      "totalSupplyAssets": "3220860765317869908",
+      "totalSupplyShares": "3219578143549160449879907",
+      "totalBorrowAssets": "3220860765317869908",
+      "totalBorrowShares": "3219206477504477678495259",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "39904743"
+    },
+    {
+      "marketId": "0x71d214ecf6c58413f943849752a7e727691a084be7dfe9cf7c2d7efc82c610c7",
+      "totalSupplyAssets": "0",
+      "totalSupplyShares": "0",
+      "totalBorrowAssets": "0",
+      "totalBorrowShares": "0",
+      "lastUpdate": "1736163083",
+      "feeWad": "0",
+      "rateAtTarget": "1268391679"
+    },
+    {
+      "marketId": "0x74812bbebc266a8054473a62722aeab79ed54fd9f7f23ddb88dfe6af35ef6eb5",
+      "totalSupplyAssets": "1000000000000000000",
+      "totalSupplyShares": "1000000000000000000000000",
+      "totalBorrowAssets": "0",
+      "totalBorrowShares": "0",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "31709791"
+    },
+    {
+      "marketId": "0x81b97c7305aca46c62f2ffce63a09c6a4d647163e25f31c44fadcbeab838b3f8",
+      "totalSupplyAssets": "88994311814804715454118",
+      "totalSupplyShares": "78161073554107175857848876677",
+      "totalBorrowAssets": "68022164821795479713406",
+      "totalBorrowShares": "58832577061233764704648161499",
+      "lastUpdate": "1767513263",
+      "feeWad": "0",
+      "rateAtTarget": "16108532882"
+    },
+    {
+      "marketId": "0x8cdb63a27a48ac27fadc0f158a732104bcc4e10bb61c9a5095ea7c127204e26c",
+      "totalSupplyAssets": "22252137557195221183373",
+      "totalSupplyShares": "21748590047959130535202959664",
+      "totalBorrowAssets": "922927636352445924",
+      "totalBorrowShares": "900000000000000000000000",
+      "lastUpdate": "1766501183",
+      "feeWad": "0",
+      "rateAtTarget": "4132956243"
+    },
+    {
+      "marketId": "0x973b23002efe233943715a2dfb98b66a0434d4b192b00bb4924230b3916433f7",
+      "totalSupplyAssets": "80877939064109483330694",
+      "totalSupplyShares": "79368942944980391213200989795",
+      "totalBorrowAssets": "80877939064109483330694",
+      "totalBorrowShares": "79283673626845729320710325989",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "5554927091"
+    },
+    {
+      "marketId": "0x9bdf55afe3832abff223c7d10b2af529b395ec2489e32d872156421c32ec7a5f",
+      "totalSupplyAssets": "195933172736251769128442",
+      "totalSupplyShares": "194741434205165877533646441548",
+      "totalBorrowAssets": "195933172736251769128442",
+      "totalBorrowShares": "194649007465446125114530499640",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "2094122554"
+    },
+    {
+      "marketId": "0xa5a49fa08443783f5a5cdc99b604033378f65148ec5cb6b2e718e801c4e7fe08",
+      "totalSupplyAssets": "12889325089533010674684",
+      "totalSupplyShares": "12843076527615029036270342388",
+      "totalBorrowAssets": "12889325089533010674684",
+      "totalBorrowShares": "12840146260569115501707130780",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "1131323643"
+    },
+    {
+      "marketId": "0xa79d8028dec527565028fd9fc075b02b498f2b69a1d519dff543ba99b812ff6b",
+      "totalSupplyAssets": "60159217598754135213618",
+      "totalSupplyShares": "59286803408774844938441454282",
+      "totalBorrowAssets": "123380484253786602244",
+      "totalBorrowShares": "121356667455981113994536248",
+      "lastUpdate": "1767422891",
+      "feeWad": "0",
+      "rateAtTarget": "44168554"
+    },
+    {
+      "marketId": "0xa7ed1d25d22232695244bf63fdee33688d6d3540e569dd3d88919a7982ed1d7a",
+      "totalSupplyAssets": "987316223185386949835",
+      "totalSupplyShares": "5538159059295971340158029506",
+      "totalBorrowAssets": "887582385433731257342",
+      "totalBorrowShares": "604893408866866589988757796",
+      "lastUpdate": "1767544439",
+      "feeWad": "0",
+      "rateAtTarget": "23810829332"
+    },
+    {
+      "marketId": "0xb1115c39bd889bbf0295e1482a50a3c3582bd08668fd73bedcbc26c3cb939225",
+      "totalSupplyAssets": "14189545160625485363892",
+      "totalSupplyShares": "14147752078431830683559100545",
+      "totalBorrowAssets": "14189545160625485363892",
+      "totalBorrowShares": "14145658130779297347795521632",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "1096388646"
+    },
+    {
+      "marketId": "0xbd5cff99f6a6988399f1f95835186a46e4642c615bf6364c33027504514791f8",
+      "totalSupplyAssets": "2000067528938653687",
+      "totalSupplyShares": "1999999999908497870784066",
+      "totalBorrowAssets": "1000115110479336995",
+      "totalBorrowShares": "1000000000000000000000000",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "31709791"
+    },
+    {
+      "marketId": "0xc0257b98c04fe09d162ded37d5966fd59c9f0e25ecff4a146483b61cd01d2979",
+      "totalSupplyAssets": "1000000000000000000",
+      "totalSupplyShares": "1000000000000000000000000",
+      "totalBorrowAssets": "800000000000000000",
+      "totalBorrowShares": "800000000000000000000000",
+      "lastUpdate": "1756193447",
+      "feeWad": "0",
+      "rateAtTarget": "1268319284"
+    },
+    {
+      "marketId": "0xc26fb49a683ba55846974fe8283d63ab40dff0788c5ef4e79990426f080b60ec",
+      "totalSupplyAssets": "1000000000000000000",
+      "totalSupplyShares": "1000000000000000000000000",
+      "totalBorrowAssets": "100000000000000000",
+      "totalBorrowShares": "100000000000000000000000",
+      "lastUpdate": "1760063867",
+      "feeWad": "0",
+      "rateAtTarget": "1259158729"
+    },
+    {
+      "marketId": "0xc7d717f4052ac4e5463dcc58cea0f6b05dd7d8c67e0aee68ebe30a8af09b259f",
+      "totalSupplyAssets": "648020885503790353014479",
+      "totalSupplyShares": "560704888069466232835177563237",
+      "totalBorrowAssets": "502621435944826055736933",
+      "totalBorrowShares": "422727466676499023940125036243",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "14318072586"
+    },
+    {
+      "marketId": "0xcbc21405c11c8eb13f1741bfba2a72dfbdab3cb525b79dc5b61148b1183b79a0",
+      "totalSupplyAssets": "26156984211641580193129",
+      "totalSupplyShares": "26052223241721544375984072953",
+      "totalBorrowAssets": "26156984211641580193129",
+      "totalBorrowShares": "26047178663939604991800490348",
+      "lastUpdate": "1767571655",
+      "feeWad": "0",
+      "rateAtTarget": "1420852475"
+    },
+    {
+      "marketId": "0xcde91686d5a37d199bef64c2b9487d5be745c5a617ba4a76712d87cc2a92fcc1",
+      "totalSupplyAssets": "1000000000000000000",
+      "totalSupplyShares": "1000000000000000000000000",
+      "totalBorrowAssets": "500000000000000000",
+      "totalBorrowShares": "500000000000000000000000",
+      "lastUpdate": "1754865839",
+      "feeWad": "0",
+      "rateAtTarget": "1264367992"
+    },
+    {
+      "marketId": "0xce3a5f1bd26a980be6db1b7acc1a082413bb948d9b19fb4a92cfe5108ff2f275",
+      "totalSupplyAssets": "10008364786017667458",
+      "totalSupplyShares": "10000000000000000000000000",
+      "totalBorrowAssets": "390724067976089765",
+      "totalBorrowShares": "390263372781030772900248",
+      "lastUpdate": "1767463391",
+      "feeWad": "0",
+      "rateAtTarget": "31709791"
+    },
+    {
+      "marketId": "0xd27961160558fb1118b8aebcf581fad52d97542866317002c934e979dd1b5608",
+      "totalSupplyAssets": "51198585629667352446",
+      "totalSupplyShares": "34197275330955448791417479",
+      "totalBorrowAssets": "51198585629667352446",
+      "totalBorrowShares": "34085676638261304292664759",
+      "lastUpdate": "1767463391",
+      "feeWad": "0",
+      "rateAtTarget": "63419583967"
+    },
+    {
+      "marketId": "0xdb52908f9c18d8e3c490aaf9b056809d3e2b42f195383efd90b8cb32301807fd",
+      "totalSupplyAssets": "1000000000000000000",
+      "totalSupplyShares": "1000000000000000000000000",
+      "totalBorrowAssets": "800000000000000000",
+      "totalBorrowShares": "800000000000000000000000",
+      "lastUpdate": "1756194095",
+      "feeWad": "0",
+      "rateAtTarget": "1268271023"
+    },
+    {
+      "marketId": "0xe5cb041381b10f2fefde5d81e87e4dff207052d1fa2defd268c4fcc608de3a8f",
+      "totalSupplyAssets": "0",
+      "totalSupplyShares": "0",
+      "totalBorrowAssets": "0",
+      "totalBorrowShares": "0",
+      "lastUpdate": "1760932979",
+      "feeWad": "0",
+      "rateAtTarget": "1268391679"
+    },
+    {
+      "marketId": "0xef9f1e3e71483c9c9b61d2e27452e26507e52b547775ca899277b35585ef7b01",
+      "totalSupplyAssets": "6063912763515759894845",
+      "totalSupplyShares": "4818736225815647579491384630",
+      "totalBorrowAssets": "5234941889626356860545",
+      "totalBorrowShares": "3889446346058857386350251649",
+      "lastUpdate": "1767549455",
+      "feeWad": "0",
+      "rateAtTarget": "5689178491"
+    },
+    {
+      "marketId": "0xf41d787430cad2ab9eefedba1d591223916de841664a87417158127649996661",
+      "totalSupplyAssets": "1000000000000000000",
+      "totalSupplyShares": "1000000000000000000000000",
+      "totalBorrowAssets": "900000000000000000",
+      "totalBorrowShares": "900000000000000000000000",
+      "lastUpdate": "1757665883",
+      "feeWad": "0",
+      "rateAtTarget": "1268343415"
+    }
+  ],
+  "meta": {
+    "generatedAt": "2026-01-05T00:26:17.157Z",
+    "env": {
+      "MAINNET_RPC_URL": "unset",
+      "RPC_URL": "unset"
+    }
+  }
+}
