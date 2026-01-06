@@ -147,6 +147,8 @@ export interface MarketFilters {
   borrowApy_gte?: number
   borrowApy_lte?: number
   chainId_in?: number[]
+  collateralAssetAddress_in?: string[]
+  loanAssetAddress_in?: string[]
 }
 
 interface UseMarketsProps {
