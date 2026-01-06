@@ -1,8 +1,5 @@
-import { formatUnits } from 'viem'
 import { adaptiveCurveBorrowRateView } from '../irm/adaptive-curve-irm'
-
-const WAD = 1_000_000_000_000_000_000n
-const SECONDS_PER_YEAR = 365n * 24n * 60n * 60n
+import { aprWadFromRatePerSecondWad, apyWadFromRatePerSecondWad, supplyRatePerSecondWad, utilizationWad, WAD } from '../irm/apy-math'
 
 export interface SupplyOptimizerMarketSnapshot {
   /** Morpho market id (bytes32 as 0x-hex). On Morpho GraphQL this is `uniqueKey`. */
@@ -142,51 +139,7 @@ export interface OptimizeSupplyWithPositionsResult {
   infeasibleWithdrawAssets: bigint
 }
 
-function clamp0ToWad(x: bigint): bigint {
-  if (x < 0n)
-    return 0n
-  if (x > WAD)
-    return WAD
-  return x
-}
-
-export function utilizationWad(totalBorrowAssets: bigint, totalSupplyAssets: bigint): bigint {
-  if (totalSupplyAssets <= 0n)
-    return 0n
-  if (totalBorrowAssets <= 0n)
-    return 0n
-  // WAD * borrow / supply, rounded down.
-  return (totalBorrowAssets * WAD) / totalSupplyAssets
-}
-
-export function supplyRatePerSecondWad(args: {
-  borrowRatePerSecondWad: bigint
-  utilizationWad: bigint
-  feeWad: bigint
-}): bigint {
-  const feeWad = clamp0ToWad(args.feeWad)
-  const utilWad = clamp0ToWad(args.utilizationWad)
-  // supplyRate = borrowRate * utilization * (1 - fee)
-  const afterUtil = (args.borrowRatePerSecondWad * utilWad) / WAD
-  return (afterUtil * (WAD - feeWad)) / WAD
-}
-
-export function aprWadFromRatePerSecondWad(ratePerSecondWad: bigint): bigint {
-  // APR ~= ratePerSecond * secondsPerYear (no compounding).
-  return ratePerSecondWad * SECONDS_PER_YEAR
-}
-
-export function apyWadFromRatePerSecondWad(ratePerSecondWad: bigint): bigint {
-  // Convert WAD to float per-second.
-  const r = Number.parseFloat(formatUnits(ratePerSecondWad, 18))
-  if (!Number.isFinite(r) || r <= 0)
-    return 0n
-  const apy = Math.expm1(r * Number(SECONDS_PER_YEAR))
-  if (!Number.isFinite(apy) || apy <= 0)
-    return 0n
-  // Convert to WAD (floor to stay conservative).
-  return BigInt(Math.floor(apy * 1e18))
-}
+// NOTE: utilization/supplyRate/apr/apy helpers are shared in `../irm/apy-math`.
 
 export function computeSupplyAfterDeltaWad(args: {
   market: SupplyOptimizerMarketSnapshot

@@ -7,6 +7,7 @@ import { useAccount } from 'wagmi'
 import { Card } from '~/components/ui/card'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useMarketQuery } from '~/lib/hooks/graphql/use-market'
+import { useLiveMarketApy } from '~/lib/hooks/rpc/use-live-market-apy'
 import {
   useLiveMarketPositions,
 } from '~/lib/hooks/rpc/use-live-market-positions'
@@ -27,9 +28,11 @@ interface Portfolio {
 function PositionListItem({
   position,
   chainId,
+  liveApy,
 }: {
   position: LiveMarketPosition
   chainId: number
+  liveApy?: number
 }) {
   const marketSupplyAssets = BigInt(position.market.state.supplyAssets)
   const marketSupplyShares = BigInt(position.market.state.supplyShares)
@@ -42,7 +45,7 @@ function PositionListItem({
     return (userSupplyShares * marketSupplyAssets) / marketSupplyShares
   }, [userSupplyShares, marketSupplyAssets, marketSupplyShares])
 
-  const netSupplyApy = position.market.state.netSupplyApy * 100 // Convert to percentage
+  const apy = (liveApy ?? position.market.state.netSupplyApy) * 100 // Convert to percentage
 
   // Liquidity for collateral token on this chain (aggregated), approximated 50% usable
   const { data: liquidityStr } = useTokenLiquidity({
@@ -93,7 +96,7 @@ function PositionListItem({
             <p className="text-sm text-green-400">
               APY:
               {' '}
-              {netSupplyApy.toFixed(2)}
+              {apy.toFixed(2)}
               %
             </p>
             <p className={`text-sm ${safunessColor(safuness)}`}>
@@ -126,6 +129,8 @@ function PositionClient() {
     refetch,
     dataUpdatedAt,
   } = useLiveMarketPositions()
+
+  const { apyByMarketKey } = useLiveMarketApy(positions)
 
   const [timeAgo, setTimeAgo] = useState('')
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
@@ -177,12 +182,13 @@ function PositionClient() {
         continue
 
       const userPrincipalUsd = marketSupplyUsd * shareRatio
-      const dailyRate = (p.market.state.netSupplyApy || 0) / 365
+      const marketApy = apyByMarketKey[p.market.uniqueKey]?.apy ?? p.market.state.netSupplyApy ?? 0
+      const dailyRate = marketApy / 365
       const dailyUsd = userPrincipalUsd * dailyRate
 
       totalPrincipalUsd += userPrincipalUsd
       totalDailyUsd += dailyUsd
-      totalAprWeighted += userPrincipalUsd * (p.market.state.netSupplyApy || 0)
+      totalAprWeighted += userPrincipalUsd * marketApy
 
       // Calculate total assets if all positions have the same asset
       if (allSameAsset && totalAssets !== undefined) {
@@ -202,7 +208,7 @@ function PositionClient() {
       totalAssetsSymbol,
       totalAssetsDecimals,
     }
-  }, [positions])
+  }, [positions, apyByMarketKey])
 
   if (!isConnected) {
     return (
@@ -246,7 +252,7 @@ function PositionClient() {
         </div>
         <div className="ml-auto flex items-center space-x-6">
           <div className="text-right">
-            <p className="text-xs text-gray-400">Weighted APR</p>
+            <p className="text-xs text-gray-400">Weighted APY</p>
             <p className="text-sm text-white">{portfolio.weightedAprPct != null ? `${portfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
           </div>
           <div className="text-right">
@@ -280,6 +286,7 @@ function PositionClient() {
                         key={position.market.uniqueKey}
                         position={position}
                         chainId={chain.id}
+                        liveApy={apyByMarketKey[position.market.uniqueKey]?.apy}
                       />
                     ))}
                 </ul>

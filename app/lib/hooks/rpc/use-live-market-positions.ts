@@ -1,16 +1,18 @@
-import type { SupportedChain } from '../../addresses'
+import type { SupportedChain } from '~/lib/addresses'
 
 import { useMemo } from 'react'
 import { useAccount, useReadContracts } from 'wagmi'
-import { getSupportedChainName, morphoAddressOnChain } from '../../addresses'
-import { useUserPositions } from '../graphql/use-user-positions'
-import { SIMPLIFIED_MORPHO_BLUE_ABI } from './simplified.abi'
+import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
+import { getSupportedChainName, morphoAddressOnChain } from '~/lib/addresses'
+import { useUserPositions } from '~/lib/hooks/graphql/use-user-positions'
 
 // This interface maps the GraphQL position data to what position.tsx expects
 export interface LiveMarketPosition {
   market: {
     uniqueKey: string
     irmAddress: string
+    oracleAddress?: string
+    lltv?: string
     loanAsset: {
       symbol: string
       decimals: number | null
@@ -111,6 +113,8 @@ export function useLiveMarketPositions() {
         market: {
           uniqueKey: gp.market.uniqueKey,
           irmAddress: gp.market.irmAddress,
+          oracleAddress: gp.market.oracle?.address ?? undefined,
+          lltv: gp.market.lltv ?? undefined,
           loanAsset: gp.market.loanAsset,
           collateralAsset: gp.market.collateralAsset,
           state: {
@@ -160,6 +164,8 @@ export function useLiveMarketPositions() {
           market: {
             uniqueKey: gp.market.uniqueKey,
             irmAddress: gp.market.irmAddress,
+            oracleAddress: gp.market.oracle?.address ?? undefined,
+            lltv: gp.market.lltv ?? undefined,
             loanAsset: gp.market.loanAsset,
             collateralAsset: gp.market.collateralAsset,
             state: {

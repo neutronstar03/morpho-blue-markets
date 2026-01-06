@@ -6,24 +6,16 @@ import { useAccount, useReadContracts } from 'wagmi'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
+import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useSupplyApyOptimizer } from '~/lib/contexts/supply-apy-optimizer'
 import { formatBigintShort } from '~/lib/formatters'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
-import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/hooks/rpc/simplified.abi'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
+import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
+import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { optimizeSupplyAllocationWithPositions } from '~/lib/optimizer/supply-optimizer'
-
-const IRM_RATE_AT_TARGET_ABI = [
-  {
-    type: 'function',
-    name: 'rateAtTarget',
-    stateMutability: 'view',
-    inputs: [{ name: 'id', type: 'bytes32' }],
-    outputs: [{ name: '', type: 'int256' }],
-  },
-] as const
 
 function morphoAppChainUrl(chainName: string, marketId: string) {
   const exceptions: Record<string, string> = {
@@ -32,27 +24,6 @@ function morphoAppChainUrl(chainName: string, marketId: string) {
 
   const safeChainName = exceptions[chainName.toLowerCase()] ?? chainName.toLowerCase()
   return `https://app.morpho.org/${safeChainName}/market/${marketId}`
-}
-
-function normalizeMarketTuple(x: any) {
-  if (Array.isArray(x) && x.length >= 6) {
-    return {
-      totalSupplyAssets: x[0] as bigint,
-      totalSupplyShares: x[1] as bigint,
-      totalBorrowAssets: x[2] as bigint,
-      totalBorrowShares: x[3] as bigint,
-      lastUpdate: x[4] as bigint,
-      fee: x[5] as bigint,
-    }
-  }
-  return x as {
-    totalSupplyAssets: bigint
-    totalSupplyShares: bigint
-    totalBorrowAssets: bigint
-    totalBorrowShares: bigint
-    lastUpdate: bigint
-    fee: bigint
-  }
 }
 
 function pctFromWad(wad: bigint, digits = 2): string {
@@ -139,7 +110,6 @@ export function SupplyApyOptimizer() {
   // Fetch top candidate markets (max 200) for the selected loan asset on this chain.
   const { data: topMarkets } = useMarketsByChain(selectedLoanAddr ? chain?.id : undefined, selectedLoanAddr)
 
-  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
   const { data: walletBalanceRaw } = useTokenBalance(
     selectedOption?.address ?? ZERO_ADDRESS,
     selectedOption ? userAddress : undefined,
@@ -181,9 +151,11 @@ export function SupplyApyOptimizer() {
       const res = userMarketStates[i]
       if (res?.status !== 'success' || !res.result)
         continue
-      const tuple = normalizeMarketTuple(res.result)
-      const totalSupplyAssets = tuple.totalSupplyAssets
-      const totalSupplyShares = tuple.totalSupplyShares
+      const st = normalizeMorphoMarketState(res.result)
+      if (!st)
+        continue
+      const totalSupplyAssets = st.totalSupplyAssets
+      const totalSupplyShares = st.totalSupplyShares
       const supplyShares = selectedUserMarkets[i].userState.supplyShares
       if (totalSupplyShares <= 0n || totalSupplyAssets <= 0n || supplyShares <= 0n)
         continue
@@ -282,7 +254,12 @@ export function SupplyApyOptimizer() {
         continue
       }
 
-      const tuple = normalizeMarketTuple(marketRes.result)
+      const tuple = normalizeMorphoMarketState(marketRes.result)
+      if (!tuple) {
+        if (required)
+          missingRequired.push(id)
+        continue
+      }
       const rateAtTarget = rateRes.result as bigint
 
       // Basic sanity: skip if timestamp < lastUpdate.

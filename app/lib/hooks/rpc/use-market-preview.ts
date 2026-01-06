@@ -1,12 +1,13 @@
-import type { SingleMorphoMarket } from '../graphql/use-market'
+import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useMemo } from 'react'
-import { encodeAbiParameters, formatUnits, keccak256 } from 'viem'
+import { formatUnits } from 'viem'
 import { useAccount, useReadContracts } from 'wagmi'
+import { IRM_RATE_AT_TARGET_ABI } from '~/lib/abis/simplified'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { adaptiveCurveBorrowRateView } from '~/lib/irm/adaptive-curve-irm'
-
-const WAD = 1_000_000_000_000_000_000n
-const SECONDS_PER_YEAR = 365n * 24n * 60n * 60n
+import { apyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
+import { computeMorphoMarketId } from '~/lib/morpho/market-id'
+import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 
 // Minimal ABI for AdaptiveCurveIRM-style borrowRateView(marketParams, market) -> ratePerSecondWad
 const IRM_BORROW_RATE_VIEW_ABI = [
@@ -43,77 +44,7 @@ const IRM_BORROW_RATE_VIEW_ABI = [
   },
 ] as const
 
-// Minimal ABI for AdaptiveCurveIRM-style rateAtTarget(bytes32 id) -> int256
-const IRM_RATE_AT_TARGET_ABI = [
-  {
-    type: 'function',
-    name: 'rateAtTarget',
-    stateMutability: 'view',
-    inputs: [{ name: 'id', type: 'bytes32' }],
-    outputs: [{ name: '', type: 'int256' }],
-  },
-] as const
-
-export interface MorphoMarketStateTuple {
-  totalSupplyAssets: bigint
-  totalSupplyShares: bigint
-  totalBorrowAssets: bigint
-  totalBorrowShares: bigint
-  lastUpdate: bigint
-  fee: bigint
-}
-
-function normalizeMarketStateTuple(x: any): MorphoMarketStateTuple | undefined {
-  if (!x)
-    return undefined
-  if (Array.isArray(x) && x.length >= 6) {
-    return {
-      totalSupplyAssets: x[0] as bigint,
-      totalSupplyShares: x[1] as bigint,
-      totalBorrowAssets: x[2] as bigint,
-      totalBorrowShares: x[3] as bigint,
-      lastUpdate: x[4] as bigint,
-      fee: x[5] as bigint,
-    }
-  }
-  // wagmi/viem may return named props
-  return x as MorphoMarketStateTuple
-}
-
-function wadDivDown(n: bigint, d: bigint): bigint {
-  if (d === 0n)
-    return 0n
-  return (n * WAD) / d
-}
-
-function clamp0ToWad(x: bigint): bigint {
-  if (x < 0n)
-    return 0n
-  if (x > WAD)
-    return WAD
-  return x
-}
-
-function apyFromRatePerSecondWad(ratePerSecondWad: bigint): number {
-  // Convert WAD to float per-second.
-  const r = Number.parseFloat(formatUnits(ratePerSecondWad, 18))
-  if (!Number.isFinite(r) || r <= 0)
-    return 0
-  // Continuous-compounding style APY (stable for small r via expm1).
-  return Math.expm1(r * Number(SECONDS_PER_YEAR))
-}
-
-function supplyRatePerSecondWad(args: {
-  borrowRatePerSecondWad: bigint
-  utilizationWad: bigint
-  feeWad: bigint
-}): bigint {
-  const { borrowRatePerSecondWad, utilizationWad } = args
-  const feeWad = clamp0ToWad(args.feeWad)
-  // supplyRate = borrowRate * utilization * (1 - fee)
-  const afterUtil = (borrowRatePerSecondWad * utilizationWad) / WAD
-  return (afterUtil * (WAD - feeWad)) / WAD
-}
+export type MorphoMarketStateTuple = NonNullable<ReturnType<typeof normalizeMorphoMarketState>>
 
 export function useMarketPreview(args: {
   market: SingleMorphoMarket
@@ -125,7 +56,7 @@ export function useMarketPreview(args: {
   const { requiredChainId } = useNetworkContext()
   const isWrongNetwork = requiredChainId && chainId !== requiredChainId
 
-  const marketState = useMemo(() => normalizeMarketStateTuple(marketStateRaw), [marketStateRaw])
+  const marketState = useMemo(() => normalizeMorphoMarketState(marketStateRaw), [marketStateRaw])
 
   const marketParams = useMemo(() => {
     return {
@@ -137,26 +68,14 @@ export function useMarketPreview(args: {
     } as const
   }, [market])
 
-  // Morpho's market id = keccak256(abi.encode(marketParams)).
   const marketId = useMemo(() => {
-    return keccak256(
-      encodeAbiParameters(
-        [
-          { type: 'address' },
-          { type: 'address' },
-          { type: 'address' },
-          { type: 'address' },
-          { type: 'uint256' },
-        ],
-        [
-          marketParams.loanToken,
-          marketParams.collateralToken,
-          marketParams.oracle,
-          marketParams.irm,
-          marketParams.lltv,
-        ],
-      ),
-    ) as `0x${string}`
+    return computeMorphoMarketId({
+      loanToken: marketParams.loanToken,
+      collateralToken: marketParams.collateralToken,
+      oracle: marketParams.oracle,
+      irm: marketParams.irm,
+      lltv: marketParams.lltv,
+    })
   }, [marketParams])
 
   const before = useMemo(() => {
