@@ -26,7 +26,7 @@ export function Header({ children }: { children: ReactNode }) {
                   variant="outline"
                   size="sm"
                   onClick={() => switchChain({ chainId: requiredChainId })}
-                  className="border-purple-600 text-purple-500 hover:bg-purple-700 hover:text-white cursor-pointer"
+                  className="border-purple-600 text-purple-500 hover:bg-purple-700 hover:text-white"
                 >
                   <span className="hidden sm:inline">
                     Switch to

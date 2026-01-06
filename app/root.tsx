@@ -9,6 +9,7 @@ import {
   ScrollRestoration,
 } from 'react-router'
 import { Footer } from './components/footer'
+import { UpdateAvailableToast } from './components/update-available-toast'
 import { Providers } from './lib/providers'
 import './app.css'
 import '@rainbow-me/rainbowkit/styles.css'
@@ -71,6 +72,7 @@ export default function App() {
         <div className="flex-1">
           <Outlet />
         </div>
+        <UpdateAvailableToast />
         <Footer />
       </div>
     </Providers>
