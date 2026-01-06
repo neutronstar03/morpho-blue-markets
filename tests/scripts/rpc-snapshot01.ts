@@ -7,7 +7,12 @@ import { mainnet } from 'viem/chains'
 import { ADAPTIVE_CURVE_IRM_ABI, MORPHO_BLUE_ABI, MORPHO_BLUE_MAINNET } from '../irm/abi'
 import { makeMainnetTransport } from '../irm/rpc'
 
-const BLOCK_NUMBER = 24164776n
+const BLOCK_NUMBER_RAW = process.env.BLOCK_NUMBER
+if (BLOCK_NUMBER_RAW == null || BLOCK_NUMBER_RAW === '') {
+  console.error(`BLOCK_NUMBER environment variable is not set.`)
+  process.exit(1)
+}
+const BLOCK_NUMBER = BigInt(Number.parseInt(BLOCK_NUMBER_RAW))
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
