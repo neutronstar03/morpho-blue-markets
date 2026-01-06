@@ -1,5 +1,10 @@
 import type { Abi } from 'viem'
 
+/**
+ * Minimal ABI surface used by this app for Morpho Blue + AdaptiveCurve-style IRMs.
+ *
+ * Keeping these in one place prevents ABI drift across hooks/components.
+ */
 export const SIMPLIFIED_MORPHO_BLUE_ABI = [
   {
     inputs: [
@@ -84,3 +89,14 @@ export const SIMPLIFIED_MORPHO_BLUE_ABI = [
     type: 'function',
   },
 ] as const satisfies Abi
+
+// Minimal ABI for AdaptiveCurveIRM-style rateAtTarget(bytes32 id) -> int256
+export const IRM_RATE_AT_TARGET_ABI = [
+  {
+    type: 'function',
+    name: 'rateAtTarget',
+    stateMutability: 'view',
+    inputs: [{ name: 'id', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'int256' }],
+  },
+] as const
