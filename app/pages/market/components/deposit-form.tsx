@@ -1,6 +1,6 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
@@ -15,10 +15,11 @@ import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 interface DepositFormProps {
   market: SingleMorphoMarket
   loanTokenSymbol: string
+  prefill?: { mode: 'asset', amount: string, key: string }
   onSuccess?: () => void
 }
 
-export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormProps) {
+export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: DepositFormProps) {
   const isClient = useIsClient()
   const [mode, setMode] = useLocalStorage<'percent' | 'asset'>('market:deposit:unit', 'percent')
   const [percentage, setPercentage] = useState('')
@@ -27,6 +28,21 @@ export function DepositForm({ market, loanTokenSymbol, onSuccess }: DepositFormP
   const { address } = useAccount()
 
   const { data: marketStateRaw } = useMarket(market.uniqueKey)
+
+  const appliedPrefillKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!prefill)
+      return
+    if (appliedPrefillKeyRef.current === prefill.key)
+      return
+
+    appliedPrefillKeyRef.current = prefill.key
+    if (prefill.mode === 'asset') {
+      setMode('asset')
+      setAssetAmount(prefill.amount)
+      setPercentage('')
+    }
+  }, [prefill, setMode])
 
   // Wallet balance
   const { data: tokenBalance } = useTokenBalance(market.loanAsset.address, address)

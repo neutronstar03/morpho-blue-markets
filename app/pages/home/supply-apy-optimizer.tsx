@@ -1,6 +1,6 @@
 import type { SupplyOptimizerMarketSnapshot, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { createSearchParams, Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
 import { useAccount, useReadContracts } from 'wagmi'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
@@ -69,7 +69,20 @@ function fmtToken(amount: bigint, decimals: number, digits = 4): string {
   return asNum.toLocaleString(undefined, { maximumFractionDigits: digits })
 }
 
-interface LoanAssetOption { address: string, symbol: string, decimals: number }
+function trimTrailingZerosDecimalString(s: string): string {
+  // Ensure "3072.0000" -> "3072" and "12.3400" -> "12.34"
+  if (!s.includes('.'))
+    return s
+  const trimmed = s.replace(/0+$/, '').replace(/\.$/, '')
+  return trimmed
+}
+
+interface LoanAssetOption {
+  address: string
+  symbol: string
+  decimals: number
+  oraclePriceUsd?: number | null
+}
 
 export function SupplyApyOptimizer() {
   // If the blended APY improvement is <= this threshold, show a "no-op" plan.
@@ -599,6 +612,18 @@ export function SupplyApyOptimizer() {
                         const deltaSign = p.deltaAssets >= 0n ? '+' : ''
                         const meta = marketMetaById.get(p.marketId.toLowerCase())
                         const marketLabel = meta?.collateralSymbol ? `${meta.collateralSymbol} / ${symbol}` : `${p.marketId.slice(0, 10)}…${p.marketId.slice(-6)}`
+                        const absDeltaAssets = p.deltaAssets < 0n ? -p.deltaAssets : p.deltaAssets
+                        const deepLinkTab = p.deltaAssets < 0n ? 'withdraw' : 'deposit'
+                        const deepLinkAmount = selectedOption
+                          ? trimTrailingZerosDecimalString(formatUnits(absDeltaAssets, selectedOption.decimals))
+                          : ''
+                        const deepLinkSearch = absDeltaAssets > 0n && deepLinkAmount
+                          ? createSearchParams({
+                              tab: deepLinkTab,
+                              unit: 'asset',
+                              amount: deepLinkAmount,
+                            }).toString()
+                          : ''
                         return (
                           <tr key={p.marketId}>
                             <td className="px-4 py-2 text-sm text-white">
@@ -606,7 +631,10 @@ export function SupplyApyOptimizer() {
                                 {chainIdForLinks
                                   ? (
                                       <Link
-                                        to={`/market/${p.marketId}/${chainIdForLinks}`}
+                                        to={{
+                                          pathname: `/market/${p.marketId}/${chainIdForLinks}`,
+                                          search: deepLinkSearch ? `?${deepLinkSearch}` : '',
+                                        }}
                                         className="hover:text-blue-400 transition-colors"
                                       >
                                         {marketLabel}

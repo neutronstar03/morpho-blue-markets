@@ -1,5 +1,6 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { StatPill } from '~/components/ui/stat-pill'
 import { formatMarketSize, formatPercent } from '~/lib/formatters'
@@ -14,8 +15,55 @@ interface MarketActionsProps {
 }
 
 export function MarketActions({ market }: MarketActionsProps) {
-  const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit')
   const { address } = useAccount()
+  const [searchParams] = useSearchParams()
+
+  const deepLink = useMemo(() => {
+    const tab = searchParams.get('tab')
+    const unit = searchParams.get('unit')
+    const amount = searchParams.get('amount')
+
+    const normalizedTab = tab === 'withdraw' || tab === 'deposit' ? tab : undefined
+    const normalizedUnit = unit === 'asset' ? unit : undefined
+    const normalizedAmount = amount && /^\d+(?:\.\d+)?$/.test(amount) && amount !== '0' ? amount : undefined
+
+    if (!normalizedTab || !normalizedUnit || !normalizedAmount)
+      return undefined
+
+    return {
+      tab: normalizedTab,
+      unit: normalizedUnit,
+      amount: normalizedAmount,
+      key: `${market.uniqueKey}:${normalizedTab}:${normalizedUnit}:${normalizedAmount}`,
+    } as const
+  }, [market.uniqueKey, searchParams])
+
+  // Initialize from deep-link so we don't render the default tab and then flip a tick later.
+  const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>(() => deepLink?.tab ?? 'deposit')
+
+  const appliedDeepLinkKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!deepLink)
+      return
+    if (appliedDeepLinkKeyRef.current === deepLink.key)
+      return
+
+    appliedDeepLinkKeyRef.current = deepLink.key
+    if (activeTab !== deepLink.tab)
+      setActiveTab(deepLink.tab)
+  }, [activeTab, deepLink])
+
+  const depositPrefill = useMemo(() => {
+    if (!deepLink || deepLink.tab !== 'deposit')
+      return undefined
+    return { mode: 'asset' as const, amount: deepLink.amount, key: deepLink.key }
+  }, [deepLink])
+
+  const withdrawPrefill = useMemo(() => {
+    if (!deepLink || deepLink.tab !== 'withdraw')
+      return undefined
+    return { mode: 'asset' as const, amount: deepLink.amount, key: deepLink.key }
+  }, [deepLink])
 
   // Live market state (RPC) + IRM-derived live rates.
   const { data: marketStateRaw } = useMarket(market.uniqueKey)
@@ -93,12 +141,14 @@ export function MarketActions({ market }: MarketActionsProps) {
                 <DepositForm
                   market={market}
                   loanTokenSymbol={market.loanAsset.symbol}
+                  prefill={depositPrefill}
                 />
               )
             : (
                 <WithdrawForm
                   market={market}
                   loanTokenSymbol={market.loanAsset.symbol}
+                  prefill={withdrawPrefill}
                 />
               )}
         </div>

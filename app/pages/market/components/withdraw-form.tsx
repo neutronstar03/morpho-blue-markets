@@ -1,6 +1,6 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
@@ -17,10 +17,11 @@ const WAD = 1_000_000_000_000_000_000n
 interface WithdrawFormProps {
   market: SingleMorphoMarket
   loanTokenSymbol: string
+  prefill?: { mode: 'asset', amount: string, key: string }
   onSuccess?: () => void
 }
 
-export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFormProps) {
+export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: WithdrawFormProps) {
   const isClient = useIsClient()
   const [mode, setMode] = useLocalStorage<'percent' | 'asset'>('market:withdraw:unit', 'percent')
   // percentage string (0 - 100)
@@ -29,6 +30,21 @@ export function WithdrawForm({ market, loanTokenSymbol, onSuccess }: WithdrawFor
   const [assetAmount, setAssetAmount] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const { address } = useAccount()
+
+  const appliedPrefillKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!prefill)
+      return
+    if (appliedPrefillKeyRef.current === prefill.key)
+      return
+
+    appliedPrefillKeyRef.current = prefill.key
+    if (prefill.mode === 'asset') {
+      setMode('asset')
+      setAssetAmount(prefill.amount)
+      setPercentage('')
+    }
+  }, [prefill, setMode])
 
   const { data: position } = useUserPosition(market.uniqueKey, address)
   const { data: marketData } = useMarket(market.uniqueKey)
