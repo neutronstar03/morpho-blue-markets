@@ -9,7 +9,10 @@ type GeckoNetworkSlug
     | 'arbitrum'
     | 'polygon'
     | 'unichain'
+    // GeckoTerminal treats "Hyperliquid" (non-EVM) and "HyperEVM" (EVM chain) as distinct networks.
+    // Our Morpho deployment is on the EVM chain (chainId 999), which GeckoTerminal calls "hyperevm".
     | 'hyperliquid'
+    | 'hyperevm'
     | 'katana'
     | 'optimism'
 
@@ -23,7 +26,28 @@ interface GeckoPoolResource {
   }
 }
 
-interface GeckoPoolResponse {
+interface GeckoTokenResource {
+  id: string
+  type: 'token'
+  attributes?: {
+    // Total liquidity across pools tracked by GeckoTerminal for this token, in USD.
+    // This is the best single value to use when available (vs summing only top pools / first page).
+    total_reserve_in_usd?: string | null
+  }
+  relationships?: {
+    top_pools?: {
+      data?: Array<{ id: string, type: 'pool' }>
+    }
+  }
+}
+
+interface GeckoTokenResponse {
+  data: GeckoTokenResource
+  // When requesting `include=top_pools`, GeckoTerminal returns pool resources here.
+  included?: GeckoPoolResource[]
+}
+
+interface GeckoPoolsResponse {
   data: GeckoPoolResource[]
 }
 
@@ -46,7 +70,8 @@ function mapChainToGeckoNetwork(chainId?: number): GeckoNetworkSlug | undefined 
     case 'Unichain':
       return 'unichain'
     case 'Hyperliquid':
-      return 'hyperliquid'
+      // NOTE: our chain is named "Hyperliquid" in `addresses.ts`, but this is the HyperEVM network.
+      return 'hyperevm'
     case 'Katana':
       return 'katana'
     case 'Optimism':
@@ -99,7 +124,7 @@ function writeCachedValue(key: string, value: string): void {
   }
 }
 
-async function fetchTopPoolsByToken(network: GeckoNetworkSlug, tokenAddress: string): Promise<GeckoPoolResponse> {
+async function fetchTopPoolsByToken(network: GeckoNetworkSlug, tokenAddress: string): Promise<GeckoPoolsResponse> {
   const url = new URL(`${GECKOTERMINAL_BASE_URL}/networks/${network}/tokens/${tokenAddress}/pools`)
   // fixed first page, server sorts by default
   url.searchParams.set('page', '1')
@@ -109,15 +134,36 @@ async function fetchTopPoolsByToken(network: GeckoNetworkSlug, tokenAddress: str
   })
   if (!res.ok)
     throw new Error(`GeckoTerminal error ${res.status}`)
-  return res.json() as Promise<GeckoPoolResponse>
+  return res.json() as Promise<GeckoPoolsResponse>
 }
 
-function sumLiquidityUsd(resp: GeckoPoolResponse): string {
-  const total = (resp?.data || []).reduce((acc, p) => {
+async function fetchTokenWithTopPools(network: GeckoNetworkSlug, tokenAddress: string): Promise<GeckoTokenResponse> {
+  const url = new URL(`${GECKOTERMINAL_BASE_URL}/networks/${network}/tokens/${tokenAddress}`)
+  // Ensure we get pool resources in `included` so we can fall back to summing top pools if needed.
+  url.searchParams.set('include', 'top_pools')
+
+  const res = await fetch(url.toString(), {
+    headers: { accept: 'application/json' },
+  })
+  if (!res.ok)
+    throw new Error(`GeckoTerminal error ${res.status}`)
+  return res.json() as Promise<GeckoTokenResponse>
+}
+
+function parseUsdToRoundedString(value: string | null | undefined): string | undefined {
+  if (!value)
+    return undefined
+  const n = Number(value)
+  if (!Number.isFinite(n))
+    return undefined
+  return String(Math.round(n))
+}
+
+function sumPoolReservesUsd(pools: GeckoPoolResource[] | undefined): string {
+  const total = (pools || []).reduce((acc, p) => {
     const v = p.attributes?.reserve_in_usd ? Number(p.attributes.reserve_in_usd) : 0
     return acc + (Number.isFinite(v) ? v : 0)
   }, 0)
-  // return as string, rounded to nearest whole USD
   return String(Math.round(total))
 }
 
@@ -129,13 +175,39 @@ export function useTokenLiquidity({ chainId, tokenAddress }: UseTokenLiquidityAr
   return useQuery<string>({
     queryKey: ['token-liquidity', network, tokenAddress],
     queryFn: async () => {
-      const key = makeCacheKey(network as GeckoNetworkSlug, tokenAddress as string)
+      if (!network || !tokenAddress)
+        throw new Error('Missing network or tokenAddress')
+
+      const key = makeCacheKey(network, tokenAddress)
       const cached = readCachedValue(key, SIX_HOURS_MS)
       if (cached !== undefined)
         return cached
 
-      const raw = await fetchTopPoolsByToken(network as GeckoNetworkSlug, tokenAddress as string)
-      const total = sumLiquidityUsd(raw)
+      // Prefer the token endpoint's `total_reserve_in_usd`:
+      // - It's a single authoritative liquidity figure computed by GeckoTerminal.
+      // - It avoids undercounting (our old approach only summed the first page of pools).
+      //
+      // If unavailable, fall back to summing pool reserves from `included` (top pools),
+      // and finally to summing the first page of `/pools` as a last resort.
+      let total: string | undefined
+      try {
+        const tokenResp = await fetchTokenWithTopPools(network, tokenAddress)
+        total = parseUsdToRoundedString(tokenResp.data?.attributes?.total_reserve_in_usd)
+        if (!total)
+          total = sumPoolReservesUsd(tokenResp.included)
+      }
+      catch {
+        // ignore; we'll fall back to `/pools` below
+      }
+
+      if (!total) {
+        const poolsResp = await fetchTopPoolsByToken(network, tokenAddress)
+        total = sumPoolReservesUsd(poolsResp.data)
+      }
+
+      if (!total)
+        throw new Error('Failed to compute token liquidity')
+
       writeCachedValue(key, total)
       return total
     },
