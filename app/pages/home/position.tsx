@@ -53,7 +53,7 @@ function PositionListItem({
 
   return (
     <Link to={`/market/${position.market.uniqueKey}/${chainId}`}>
-      <li className="mb-4 p-4 bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors duration-200 cursor-pointer">
+      <li className="mb-4 p-3 sm:p-4 bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors duration-200 cursor-pointer">
         <div className="flex justify-between items-start mb-2">
           <div>
             <p className="text-lg font-semibold text-white">

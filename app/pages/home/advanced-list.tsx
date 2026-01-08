@@ -252,13 +252,13 @@ function MarketTable({
       <table className="min-w-full divide-y divide-gray-700">
         <thead className={colors.background}>
           <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Chain</th>
-            <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Size $</th>
-            <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">before 90%</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">usage %</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Recent APY</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Immediate APY</th>
+            <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
+            <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Chain</th>
+            <th scope="col" className="px-2 sm:px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Size $</th>
+            <th scope="col" className="px-2 sm:px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">before 90%</th>
+            <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">usage %</th>
+            <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Recent APY</th>
+            <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Immediate APY</th>
           </tr>
         </thead>
         <tbody className={`${colors.backgroundLight} divide-y divide-gray-700`}>
@@ -267,7 +267,7 @@ function MarketTable({
               key={market.id}
               className={`${colors.hover} transition-colors relative`}
             >
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                 <div className="flex items-center gap-2">
                   <Link
                     to={`/market/${market.id}/${market.chainId}`}
@@ -286,14 +286,14 @@ function MarketTable({
                   </a>
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{market.chainName}</td>
-              <td className="px-3 py-4 whitespace-nowrap text-right text-sm text-white">{formatMarketSize(market.marketSizeUsd ?? undefined)}</td>
-              <td className="px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.beforeTarget}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilizationPct}</td>
-              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
+              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-400">{market.chainName}</td>
+              <td className="px-2 sm:px-3 py-4 whitespace-nowrap text-right text-sm text-white">{formatMarketSize(market.marketSizeUsd ?? undefined)}</td>
+              <td className="px-2 sm:px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.beforeTarget}</td>
+              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilizationPct}</td>
+              <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
                 {`${((rateType === 'supply' ? market.netSupplyApy : market.netBorrowApy) * 100).toFixed(2)}%`}
               </td>
-              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
+              <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
                 {(() => {
                   const entry = immediateApyByMarketKey[market.id]
                   const immediate = rateType === 'supply' ? entry?.apy : entry?.borrowApy

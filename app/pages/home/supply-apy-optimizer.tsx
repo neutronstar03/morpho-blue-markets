@@ -467,7 +467,7 @@ export function SupplyApyOptimizer() {
         )}
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {!ctx.started && (
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm text-gray-300">
@@ -637,11 +637,11 @@ export function SupplyApyOptimizer() {
                   <table className="min-w-full divide-y divide-gray-700">
                     <thead className="bg-gray-800/40">
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Current</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Target</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Delta</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">APY after</th>
+                        <th className="px-3 sm:px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
+                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Current</th>
+                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Target</th>
+                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Delta</th>
+                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">APY after</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-700 bg-gray-900/20">
@@ -663,7 +663,7 @@ export function SupplyApyOptimizer() {
                           : ''
                         return (
                           <tr key={p.marketId}>
-                            <td className="px-4 py-2 text-sm text-white">
+                            <td className="px-3 sm:px-4 py-2 text-sm text-white">
                               <div className="flex items-center gap-2">
                                 {chainIdForLinks
                                   ? (
@@ -693,23 +693,23 @@ export function SupplyApyOptimizer() {
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
+                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
                               {fmtToken(p.currentUserAssets, selectedOption.decimals)}
                               {' '}
                               {symbol}
                             </td>
-                            <td className="px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
+                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
                               {fmtToken(p.amountAssets, selectedOption.decimals)}
                               {' '}
                               {symbol}
                             </td>
-                            <td className={`px-4 py-2 text-sm text-right tabular-nums ${p.deltaAssets >= 0n ? 'text-green-300' : 'text-orange-300'}`}>
+                            <td className={`px-3 sm:px-4 py-2 text-sm text-right tabular-nums ${p.deltaAssets >= 0n ? 'text-green-300' : 'text-orange-300'}`}>
                               {deltaSign}
                               {fmtToken(p.deltaAssets, selectedOption.decimals)}
                               {' '}
                               {symbol}
                             </td>
-                            <td className="px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
+                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
                               {pctFromWad(p.supplyApyAfterWad)}
                             </td>
                           </tr>
