@@ -15,16 +15,8 @@ import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-position
 import { getMorphoBlueAddress, parseTokenAmount, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
 import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
+import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 import { optimizeSupplyAllocationWithPositions } from '~/lib/optimizer/supply-optimizer'
-
-function morphoAppChainUrl(chainName: string, marketId: string) {
-  const exceptions: Record<string, string> = {
-    hyperliquid: 'hyperevm',
-  }
-
-  const safeChainName = exceptions[chainName.toLowerCase()] ?? chainName.toLowerCase()
-  return `https://app.morpho.org/${safeChainName}/market/${marketId}`
-}
 
 function pctFromWad(wad: bigint, digits = 2): string {
   const asNum = Number.parseFloat(formatUnits(wad, 18)) * 100
@@ -622,7 +614,7 @@ export function SupplyApyOptimizer() {
                                     )}
                                 {chainNameForLinks && (
                                   <a
-                                    href={morphoAppChainUrl(chainNameForLinks, p.marketId)}
+                                    href={morphoAppMarketUrl(chainNameForLinks, p.marketId)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-white hover:text-blue-400 transition-colors flex items-center"
