@@ -6,6 +6,9 @@ import { useAccount, useReadContracts } from 'wagmi'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
+import { InfoTooltip } from '~/components/ui/info-tooltip'
+import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useSupplyApyOptimizer } from '~/lib/contexts/supply-apy-optimizer'
@@ -13,6 +16,7 @@ import { formatBigintShort } from '~/lib/formatters'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
@@ -51,6 +55,7 @@ export function SupplyApyOptimizer() {
   // If the blended APY improvement is <= this threshold, show a "no-op" plan.
   // 0.25% = 0.0025 in WAD terms (1e18 = 100%).
   const NO_BENEFIT_DELTA_APY_WAD = 2_500_000_000_000_000n
+  const MAX_OPTIMIZER_ITERATIONS = 800
 
   const ctx = useSupplyApyOptimizer()
   const { address: userAddress, chain } = useAccount()
@@ -61,6 +66,11 @@ export function SupplyApyOptimizer() {
   const setNewDepositAmount = ctx.setNewDepositAmount
   const beginRun = ctx.beginRun
   const finishRun = ctx.finishRun
+
+  const [maxMarketsInput, setMaxMarketsInput] = useLocalStorage<string>(
+    'supply-apy-optimizer:max-markets',
+    '5',
+  )
 
   const {
     data: livePositions,
@@ -192,6 +202,7 @@ export function SupplyApyOptimizer() {
     timestamp: bigint
     stepAssets: bigint
     newDepositAssets: bigint
+    maxMarketsUsed: number
     positions: UserSupplyPosition[]
     markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>
   }>(null)
@@ -285,9 +296,21 @@ export function SupplyApyOptimizer() {
         newDepositAssets: optimizeRequest.newDepositAssets,
         stepAssets: optimizeRequest.stepAssets,
         timestamp: optimizeRequest.timestamp,
-        maxIterations: 800,
+        maxIterations: MAX_OPTIMIZER_ITERATIONS,
+        constraints: {
+          maxMarketsUsed: optimizeRequest.maxMarketsUsed,
+        },
       })
-      finishRun(optimizeRequest.runId, res, undefined)
+      if (res.iterations >= MAX_OPTIMIZER_ITERATIONS) {
+        finishRun(
+          optimizeRequest.runId,
+          undefined,
+          'Optimizer stopped early (maximum iterations reached). Try increasing “Minimum move size”.',
+        )
+      }
+      else {
+        finishRun(optimizeRequest.runId, res, undefined)
+      }
     }
     catch (e: any) {
       finishRun(optimizeRequest.runId, undefined, e?.message ?? 'Optimizer failed')
@@ -318,6 +341,10 @@ export function SupplyApyOptimizer() {
   const canOptimize = !!selectedOption
     && (ctx.derived.positions?.length ?? 0) > 0
     && !!ctx.inputs.minMoveSize
+    && (() => {
+      const parsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
+      return Number.isFinite(parsed) && parsed >= 1
+    })()
     && !ctx.run.isRunning
     && !!userAddress
     && !!chain?.id
@@ -329,9 +356,18 @@ export function SupplyApyOptimizer() {
     if (positions.length === 0)
       return
 
+    const timestamp = BigInt(Math.floor(Date.now() / 1000))
+    const runId = beginRun({ timestamp })
+
     const stepAssets = parseTokenAmount(ctx.inputs.minMoveSize ?? '', selectedOption.decimals)
     if (stepAssets <= 0n) {
-      finishRun(ctx.run.runId, undefined, 'Minimum move size must be > 0')
+      finishRun(runId, undefined, 'Minimum move size must be > 0')
+      return
+    }
+
+    const maxMarketsUsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
+    if (!Number.isFinite(maxMarketsUsed) || maxMarketsUsed < 1) {
+      finishRun(runId, undefined, 'Max markets must be >= 1')
       return
     }
 
@@ -349,14 +385,12 @@ export function SupplyApyOptimizer() {
       universe.set(id, { uniqueKey: p.market.uniqueKey as `0x${string}`, irmAddress: p.market.irmAddress as `0x${string}` })
     }
 
-    const timestamp = BigInt(Math.floor(Date.now() / 1000))
-    const runId = beginRun({ timestamp })
-
     setOptimizeRequest({
       runId,
       timestamp,
       stepAssets,
       newDepositAssets,
+      maxMarketsUsed,
       positions,
       markets: [...universe.values()],
     })
@@ -369,6 +403,8 @@ export function SupplyApyOptimizer() {
     return parseTokenAmount(ctx.inputs.newDepositAmount ?? '', selectedOption.decimals)
   }, [selectedOption, ctx.inputs.newDepositAmount])
   const displayResult = useMemo(() => {
+    if (ctx.run.error)
+      return undefined
     if (!result)
       return undefined
     // The "no-op plan" is only meaningful for rebalance-only runs.
@@ -388,7 +424,7 @@ export function SupplyApyOptimizer() {
         deltaAssets: 0n,
       })),
     }
-  }, [NO_BENEFIT_DELTA_APY_WAD, parsedNewDepositAssets, result])
+  }, [NO_BENEFIT_DELTA_APY_WAD, ctx.run.error, parsedNewDepositAssets, result])
 
   const totalAllocatedAssets = useMemo(() => {
     if (!displayResult)
@@ -452,7 +488,7 @@ export function SupplyApyOptimizer() {
             )}
 
             {canPick && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-200">
                     Asset to optimize
@@ -481,9 +517,19 @@ export function SupplyApyOptimizer() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-200">
-                    Minimum move size
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="block text-sm font-medium text-gray-200">
+                      Minimum move size
+                    </label>
+                    <InfoTooltip
+                      ariaLabel="Minimum move size info"
+                      content={(
+                        <span>
+                          Default is 1% of your supplied amount.
+                        </span>
+                      )}
+                    />
+                  </div>
                   <div className="relative">
                     <input
                       type="text"
@@ -496,9 +542,6 @@ export function SupplyApyOptimizer() {
                     <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
                       {symbol}
                     </span>
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Default is 1% of your supplied amount.
                   </div>
                 </div>
 
@@ -528,6 +571,31 @@ export function SupplyApyOptimizer() {
                       {selectedOption.symbol}
                     </div>
                   )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label className="block text-gray-200">
+                      Max markets
+                    </Label>
+                    <InfoTooltip
+                      ariaLabel="Max markets info"
+                      content={(
+                        <span>
+                          Limits the number of markets used in the optimized allocation.
+                        </span>
+                      )}
+                    />
+                  </div>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    value={maxMarketsInput ?? ''}
+                    onChange={e => setMaxMarketsInput(e.target.value)}
+                    className="w-24 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
+                  />
                 </div>
 
                 <div className="flex items-center">

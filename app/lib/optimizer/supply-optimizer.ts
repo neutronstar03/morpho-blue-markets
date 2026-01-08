@@ -1,5 +1,5 @@
 import { adaptiveCurveBorrowRateView } from '../irm/adaptive-curve-irm'
-import { aprWadFromRatePerSecondWad, apyWadFromRatePerSecondWad, supplyRatePerSecondWad, utilizationWad, WAD } from '../irm/apy-math'
+import { aprWadFromRatePerSecondWad, apyWadFromRatePerSecondWad, supplyRatePerSecondWad, utilizationWad } from '../irm/apy-math'
 
 export interface SupplyOptimizerMarketSnapshot {
   /** Morpho market id (bytes32 as 0x-hex). On Morpho GraphQL this is `uniqueKey`. */
@@ -324,7 +324,9 @@ function greedyAllocateUpwards(args: {
   while (remaining > 0n && iterations < maxIterations) {
     let bestIdx = -1
     let bestStep = 0n
-    let bestScore = -1n
+    // Allow negative marginal scores: still pick the least-bad market so we don't stop early
+    // and implicitly "leave funds unallocated" under constraints like maxMarketsUsed.
+    let bestScore = -(2n ** 255n)
 
     for (let i = 0; i < markets.length; i++) {
       if (maxMarketsUsed != null && maxMarketsUsed > 0 && allocations[i] === 0n && used.size >= maxMarketsUsed)
@@ -413,7 +415,9 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
   while (remaining > 0n && iterations < maxIterations) {
     let bestIdx = -1
     let bestStep = 0n
-    let bestScore = -1n
+    // Allow negative marginal scores: still pick the least-bad market so we don't stop early
+    // and implicitly "leave funds unallocated" under constraints like maxMarketsUsed.
+    let bestScore = -(2n ** 255n)
 
     for (let i = 0; i < markets.length; i++) {
       const m = markets[i]
@@ -614,7 +618,9 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
   while (remaining > 0n && iterations < maxIterations) {
     let bestIdx = -1
     let bestStep = 0n
-    let bestScore = -1n
+    // Allow negative marginal scores: still pick the least-bad market so we don't stop early
+    // and implicitly "leave funds unallocated" under constraints like maxMarketsUsed.
+    let bestScore = -(2n ** 255n)
 
     for (let i = 0; i < n; i++) {
       if (maxMarketsUsed != null && maxMarketsUsed > 0 && finalAlloc[i] === 0n && used.size >= maxMarketsUsed)
