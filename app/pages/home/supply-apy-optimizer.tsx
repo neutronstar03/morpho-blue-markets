@@ -49,8 +49,8 @@ interface LoanAssetOption {
 
 export function SupplyApyOptimizer() {
   // If the blended APY improvement is <= this threshold, show a "no-op" plan.
-  // 0.1% = 0.001 in WAD terms (1e18 = 100%).
-  const NO_BENEFIT_DELTA_APY_WAD = 1_000_000_000_000_000n
+  // 0.25% = 0.0025 in WAD terms (1e18 = 100%).
+  const NO_BENEFIT_DELTA_APY_WAD = 2_500_000_000_000_000n
 
   const ctx = useSupplyApyOptimizer()
   const { address: userAddress, chain } = useAccount()
