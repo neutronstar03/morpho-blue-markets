@@ -1,4 +1,4 @@
 ---
 alwaysApply: true
 ---
-Ignore most of eslint errors, the human is good to handle them.
+Ignore most of eslint errors, the human is good to handle them. Also most of them get automatically fixed on save by Eslint itself.

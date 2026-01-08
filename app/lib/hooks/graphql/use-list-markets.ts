@@ -73,6 +73,8 @@ export const QUERY_LIST_MARKETS = gql`
       items {
         uniqueKey
         lltv
+        oracleAddress
+        irmAddress
         morphoBlue {
           chain { id }
         }

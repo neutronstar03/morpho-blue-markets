@@ -1,5 +1,3 @@
-import type { LiveMarketPosition } from './use-live-market-positions'
-
 import { useMemo } from 'react'
 import { useAccount, useReadContracts } from 'wagmi'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
@@ -12,10 +10,20 @@ import { getMorphoBlueAddress } from './use-morpho'
 
 export interface LiveApyResultByMarketKey {
   apy?: number // decimal fraction (e.g. 0.05 = 5%)
+  borrowApy?: number // decimal fraction (e.g. 0.05 = 5%)
   isLive: boolean
 }
 
-function computeMarketId(p: LiveMarketPosition['market']): `0x${string}` | undefined {
+export interface LiveApyMarketInput {
+  uniqueKey: string
+  irmAddress: string
+  oracleAddress?: string
+  lltv?: string
+  loanAsset: { address: string }
+  collateralAsset: { address: string }
+}
+
+function computeMarketId(p: LiveApyMarketInput): `0x${string}` | undefined {
   const oracle = (p.oracleAddress ?? ZERO_ADDRESS) as `0x${string}`
   if (!p.lltv)
     return undefined
@@ -42,47 +50,62 @@ function computeMarketId(p: LiveMarketPosition['market']): `0x${string}` | undef
  *
  * Uses a single multicall with `allowFailure` to keep UI resilient.
  */
-export function useLiveMarketApy(positions: LiveMarketPosition[] | undefined) {
+export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
   const { chainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
   const isWrongNetwork = requiredChainId && chainId !== requiredChainId
 
-  const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
+  const MARKET_CHUNK_SIZE = 20
+  const MAX_CHUNKS = 5 // matches default `useMarkets(first=100)`
+
+  const marketsSafe = useMemo(() => markets ?? [], [markets])
 
   const morphoAddress = useMemo(() => getMorphoBlueAddress(chainId), [chainId])
 
   const marketIds = useMemo(() => {
     const map = new Map<string, `0x${string}` | undefined>()
-    for (const m of markets) {
+    for (const m of marketsSafe) {
       map.set(m.uniqueKey, computeMarketId(m))
     }
     return map
-  }, [markets])
+  }, [marketsSafe])
 
   const rateAtTargetCount = useMemo(
-    () => markets.filter(m => marketIds.get(m.uniqueKey) != null).length,
-    [markets, marketIds],
+    () => marketsSafe.filter(m => marketIds.get(m.uniqueKey) != null).length,
+    [marketsSafe, marketIds],
   )
 
-  const marketRefetchInterval = markets.length > 0 && markets.length <= 20 ? 20_000 : undefined
+  const marketRefetchInterval = marketsSafe.length > 0 && marketsSafe.length <= 20 ? 20_000 : undefined
   const rateAtTargetStaleTime = 5 * 60 * 1000
 
-  const marketStateContracts = useMemo(() => {
-    if (!markets.length || isWrongNetwork)
+  const chunkedMarkets = useMemo(() => {
+    const src = marketsSafe
+    const out: LiveApyMarketInput[][] = []
+    for (let i = 0; i < MAX_CHUNKS; i++) {
+      const start = i * MARKET_CHUNK_SIZE
+      const end = start + MARKET_CHUNK_SIZE
+      const chunk = src.slice(start, end)
+      out.push(chunk)
+    }
+    return out
+  }, [marketsSafe])
+
+  function buildMarketStateContracts(chunk: LiveApyMarketInput[]) {
+    if (!chunk.length || isWrongNetwork)
       return []
-    return markets.map(m => ({
+    return chunk.map(m => ({
       address: morphoAddress,
       abi: SIMPLIFIED_MORPHO_BLUE_ABI,
       functionName: 'market',
       args: [m.uniqueKey as any] as const,
     }))
-  }, [markets, isWrongNetwork, morphoAddress])
+  }
 
-  const rateAtTargetContracts = useMemo(() => {
-    if (!markets.length || isWrongNetwork)
+  function buildRateAtTargetContracts(chunk: LiveApyMarketInput[]) {
+    if (!chunk.length || isWrongNetwork)
       return []
     const calls: any[] = []
-    for (const m of markets) {
+    for (const m of chunk) {
       const marketId = marketIds.get(m.uniqueKey)
       if (!marketId)
         continue
@@ -94,99 +117,194 @@ export function useLiveMarketApy(positions: LiveMarketPosition[] | undefined) {
       })
     }
     return calls
-  }, [markets, isWrongNetwork, marketIds])
+  }
 
-  const { data: marketResults, isLoading: isMarketLoading } = useReadContracts({
-    contracts: marketStateContracts as any,
+  const marketStateContracts0 = useMemo(() => buildMarketStateContracts(chunkedMarkets[0] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
+  const marketStateContracts1 = useMemo(() => buildMarketStateContracts(chunkedMarkets[1] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
+  const marketStateContracts2 = useMemo(() => buildMarketStateContracts(chunkedMarkets[2] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
+  const marketStateContracts3 = useMemo(() => buildMarketStateContracts(chunkedMarkets[3] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
+  const marketStateContracts4 = useMemo(() => buildMarketStateContracts(chunkedMarkets[4] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
+
+  const rateAtTargetContracts0 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[0] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
+  const rateAtTargetContracts1 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[1] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
+  const rateAtTargetContracts2 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[2] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
+  const rateAtTargetContracts3 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[3] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
+  const rateAtTargetContracts4 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[4] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
+
+  const enabledBase = !!chainId && !isWrongNetwork && marketsSafe.length > 0
+
+  const { data: marketResults0, isLoading: isMarketLoading0 } = useReadContracts({
+    contracts: marketStateContracts0 as any,
     allowFailure: true,
-    query: {
-      enabled: !!chainId && !isWrongNetwork && markets.length > 0 && marketStateContracts.length > 0,
-      refetchInterval: marketRefetchInterval,
-    },
+    query: { enabled: enabledBase && marketStateContracts0.length > 0, refetchInterval: marketRefetchInterval },
+  })
+  const { data: marketResults1, isLoading: isMarketLoading1 } = useReadContracts({
+    contracts: marketStateContracts1 as any,
+    allowFailure: true,
+    query: { enabled: enabledBase && marketStateContracts1.length > 0, refetchInterval: marketRefetchInterval },
+  })
+  const { data: marketResults2, isLoading: isMarketLoading2 } = useReadContracts({
+    contracts: marketStateContracts2 as any,
+    allowFailure: true,
+    query: { enabled: enabledBase && marketStateContracts2.length > 0, refetchInterval: marketRefetchInterval },
+  })
+  const { data: marketResults3, isLoading: isMarketLoading3 } = useReadContracts({
+    contracts: marketStateContracts3 as any,
+    allowFailure: true,
+    query: { enabled: enabledBase && marketStateContracts3.length > 0, refetchInterval: marketRefetchInterval },
+  })
+  const { data: marketResults4, isLoading: isMarketLoading4 } = useReadContracts({
+    contracts: marketStateContracts4 as any,
+    allowFailure: true,
+    query: { enabled: enabledBase && marketStateContracts4.length > 0, refetchInterval: marketRefetchInterval },
   })
 
-  const { data: rateAtTargetResults, isLoading: isRateAtTargetLoading } = useReadContracts({
-    contracts: rateAtTargetContracts as any,
+  const { data: rateAtTargetResults0, isLoading: isRateAtTargetLoading0 } = useReadContracts({
+    contracts: rateAtTargetContracts0 as any,
     allowFailure: true,
-    query: {
-      enabled: !!chainId && !isWrongNetwork && rateAtTargetContracts.length > 0,
-      staleTime: rateAtTargetStaleTime,
-    },
+    query: { enabled: enabledBase && rateAtTargetContracts0.length > 0, staleTime: rateAtTargetStaleTime },
+  })
+  const { data: rateAtTargetResults1, isLoading: isRateAtTargetLoading1 } = useReadContracts({
+    contracts: rateAtTargetContracts1 as any,
+    allowFailure: true,
+    query: { enabled: enabledBase && rateAtTargetContracts1.length > 0, staleTime: rateAtTargetStaleTime },
+  })
+  const { data: rateAtTargetResults2, isLoading: isRateAtTargetLoading2 } = useReadContracts({
+    contracts: rateAtTargetContracts2 as any,
+    allowFailure: true,
+    query: { enabled: enabledBase && rateAtTargetContracts2.length > 0, staleTime: rateAtTargetStaleTime },
+  })
+  const { data: rateAtTargetResults3, isLoading: isRateAtTargetLoading3 } = useReadContracts({
+    contracts: rateAtTargetContracts3 as any,
+    allowFailure: true,
+    query: { enabled: enabledBase && rateAtTargetContracts3.length > 0, staleTime: rateAtTargetStaleTime },
+  })
+  const { data: rateAtTargetResults4, isLoading: isRateAtTargetLoading4 } = useReadContracts({
+    contracts: rateAtTargetContracts4 as any,
+    allowFailure: true,
+    query: { enabled: enabledBase && rateAtTargetContracts4.length > 0, staleTime: rateAtTargetStaleTime },
   })
 
   const apyByMarketKey = useMemo<Record<string, LiveApyResultByMarketKey>>(() => {
     const out: Record<string, LiveApyResultByMarketKey> = {}
-    for (const m of markets) {
+    for (const m of marketsSafe) {
       out[m.uniqueKey] = { apy: undefined, isLive: false }
     }
 
-    if (!marketResults || marketResults.length < markets.length)
-      return out
-
     const nowTimestamp = BigInt(Math.floor(Date.now() / 1000))
 
-    // Market states
-    const marketStateByKey = new Map<string, ReturnType<typeof normalizeMorphoMarketState>>()
-    for (let i = 0; i < markets.length; i++) {
-      const res = marketResults[i]
-      if (res?.status !== 'success')
-        continue
-      const st = normalizeMorphoMarketState(res.result)
-      if (!st)
-        continue
-      marketStateByKey.set(markets[i].uniqueKey, st)
-    }
+    const marketResultsAll = [
+      marketResults0,
+      marketResults1,
+      marketResults2,
+      marketResults3,
+      marketResults4,
+    ] as const
+    const rateAtTargetResultsAll = [
+      rateAtTargetResults0,
+      rateAtTargetResults1,
+      rateAtTargetResults2,
+      rateAtTargetResults3,
+      rateAtTargetResults4,
+    ] as const
 
-    // rateAtTarget (only for markets where we computed marketId)
-    let ratIndex = 0
-    const rateAtTargetByKey = new Map<string, bigint>()
-    for (const m of markets) {
-      const marketId = marketIds.get(m.uniqueKey)
-      if (!marketId)
-        continue
-      const res = rateAtTargetResults?.[ratIndex]
-      ratIndex++
-      if (res?.status !== 'success')
-        continue
-      const r = res.result as bigint
-      rateAtTargetByKey.set(m.uniqueKey, r)
-    }
-
-    for (const m of markets) {
-      const tuple = marketStateByKey.get(m.uniqueKey)
-      const rateAtTarget = rateAtTargetByKey.get(m.uniqueKey)
-      const marketId = marketIds.get(m.uniqueKey)
-
-      if (!tuple || rateAtTarget == null || !marketId)
+    for (let chunkIndex = 0; chunkIndex < MAX_CHUNKS; chunkIndex++) {
+      const chunk = chunkedMarkets[chunkIndex] ?? []
+      if (!chunk.length)
         continue
 
-      const totalSupplyAssets = tuple.totalSupplyAssets
-      const totalBorrowAssets = tuple.totalBorrowAssets
-      const lastUpdate = tuple.lastUpdate
-      const feeWad = tuple.fee
+      const marketResults = marketResultsAll[chunkIndex]
+      if (!marketResults || marketResults.length < chunk.length)
+        continue
 
-      const borrowRatePerSecondWad = adaptiveCurveBorrowRateView({
-        marketId,
-        rateAtTarget,
-        market: { totalSupplyAssets, totalBorrowAssets, lastUpdate },
-        timestamp: nowTimestamp,
-      })
+      // Market states (chunk)
+      const marketStateByKey = new Map<string, ReturnType<typeof normalizeMorphoMarketState>>()
+      for (let i = 0; i < chunk.length; i++) {
+        const res = marketResults[i]
+        if (res?.status !== 'success')
+          continue
+        const st = normalizeMorphoMarketState(res.result)
+        if (!st)
+          continue
+        marketStateByKey.set(chunk[i].uniqueKey, st)
+      }
 
-      const utilizationWad = wadDivDown(totalBorrowAssets, totalSupplyAssets)
-      const supplyRate = supplyRatePerSecondWad({ borrowRatePerSecondWad, utilizationWad, feeWad })
+      // rateAtTarget (chunk, only for markets where we computed marketId)
+      let ratIndex = 0
+      const rateAtTargetByKey = new Map<string, bigint>()
+      const rateAtTargetResults = rateAtTargetResultsAll[chunkIndex]
+      for (const m of chunk) {
+        const marketId = marketIds.get(m.uniqueKey)
+        if (!marketId)
+          continue
+        const res = rateAtTargetResults?.[ratIndex]
+        ratIndex++
+        if (res?.status !== 'success')
+          continue
+        const r = res.result as bigint
+        rateAtTargetByKey.set(m.uniqueKey, r)
+      }
 
-      out[m.uniqueKey] = {
-        apy: apyFromRatePerSecondWad(supplyRate),
-        isLive: true,
+      for (const m of chunk) {
+        const tuple = marketStateByKey.get(m.uniqueKey)
+        const rateAtTarget = rateAtTargetByKey.get(m.uniqueKey)
+        const marketId = marketIds.get(m.uniqueKey)
+
+        if (!tuple || rateAtTarget == null || !marketId)
+          continue
+
+        const totalSupplyAssets = tuple.totalSupplyAssets
+        const totalBorrowAssets = tuple.totalBorrowAssets
+        const lastUpdate = tuple.lastUpdate
+        const feeWad = tuple.fee
+
+        const borrowRatePerSecondWad = adaptiveCurveBorrowRateView({
+          marketId,
+          rateAtTarget,
+          market: { totalSupplyAssets, totalBorrowAssets, lastUpdate },
+          timestamp: nowTimestamp,
+        })
+
+        const utilizationWad = wadDivDown(totalBorrowAssets, totalSupplyAssets)
+        const supplyRate = supplyRatePerSecondWad({ borrowRatePerSecondWad, utilizationWad, feeWad })
+
+        out[m.uniqueKey] = {
+          apy: apyFromRatePerSecondWad(supplyRate),
+          borrowApy: apyFromRatePerSecondWad(borrowRatePerSecondWad),
+          isLive: true,
+        }
       }
     }
 
     return out
-  }, [markets, marketResults, rateAtTargetResults, marketIds])
+  }, [
+    marketsSafe,
+    chunkedMarkets,
+    marketIds,
+    marketResults0,
+    marketResults1,
+    marketResults2,
+    marketResults3,
+    marketResults4,
+    rateAtTargetResults0,
+    rateAtTargetResults1,
+    rateAtTargetResults2,
+    rateAtTargetResults3,
+    rateAtTargetResults4,
+  ])
 
   return {
     apyByMarketKey,
-    isLoading: isMarketLoading || isRateAtTargetLoading,
+    isLoading: isMarketLoading0
+      || isMarketLoading1
+      || isMarketLoading2
+      || isMarketLoading3
+      || isMarketLoading4
+      || isRateAtTargetLoading0
+      || isRateAtTargetLoading1
+      || isRateAtTargetLoading2
+      || isRateAtTargetLoading3
+      || isRateAtTargetLoading4,
     refetchInterval: marketRefetchInterval,
     rateAtTargetCount,
   }

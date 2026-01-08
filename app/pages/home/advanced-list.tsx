@@ -1,7 +1,9 @@
 import type { SupportedChain } from '~/lib/addresses'
 import type { MorphoMarket, MarketFilters as TypeMarketFilters } from '~/lib/hooks/graphql/use-list-markets'
+import type { LiveApyMarketInput } from '~/lib/hooks/rpc/use-live-market-apy'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAccount } from 'wagmi'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Card } from '~/components/ui/card'
 import { getSupportedChainName, supportedChainIdMap } from '~/lib/addresses'
@@ -11,8 +13,10 @@ import {
   OrderDirection,
   useMarkets,
 } from '~/lib/hooks/graphql/use-list-markets'
+import { useLiveMarketApy } from '~/lib/hooks/rpc/use-live-market-apy'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
+import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 
 const CONFIG = {
   minSupplyApy: 0.09, // 9% apr
@@ -91,19 +95,19 @@ function getMarketSideColors(side: MarketSide) {
 
 interface MarketData {
   id: string
-  market: string
+  marketLabel: string
   chainId: number
   chainName: string
-  marketSize: string
+  marketSizeUsd: number | null | undefined
   beforeTarget: string
-  utilization: string
-  supplyApr: string
-  supplyApr1d: string
-  supplyApr7d: string
-  borrowApr: string
-  borrowApr1d: string
-  borrowApr7d: string
-  whitelisted: boolean
+  utilizationPct: string
+  netSupplyApy: number
+  netBorrowApy: number
+  collateralAddress: string
+  loanAddress: string
+  oracleAddress?: string
+  irmAddress: string
+  lltv?: string
 }
 
 interface MarketFiltersProps {
@@ -217,22 +221,23 @@ function MarketFilters({
   )
 }
 
-function morphoAppChainUrl(chainName: string, marketId: string) {
-  const exceptions: Record<string, string> = {
-    hyperliquid: 'hyperevm',
-  }
-
-  const safeChainName = exceptions[chainName.toLowerCase()] ?? chainName.toLowerCase()
-  return `https://app.morpho.org/${safeChainName}/market/${marketId}`
-}
-
 interface MarketTableProps {
   markets: MarketData[]
   isLoading: boolean
   rateType: MarketSide
+  immediateApyByMarketKey: Record<string, { apy?: number, borrowApy?: number, isLive: boolean }>
+  canComputeLiveApy: boolean
+  liveChainId?: number
 }
 
-function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
+function MarketTable({
+  markets,
+  isLoading,
+  rateType,
+  immediateApyByMarketKey,
+  canComputeLiveApy,
+  liveChainId,
+}: MarketTableProps) {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -240,7 +245,6 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
       </div>
     )
   }
-  const rateLabel = rateType === 'supply' ? 'Supply' : 'Borrow'
   const colors = getMarketSideColors(rateType)
 
   return (
@@ -253,22 +257,8 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
             <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Size $</th>
             <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">before 90%</th>
             <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">usage %</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-              {rateLabel}
-              {' '}
-              APR
-            </th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-              {rateLabel}
-              {' '}
-              APR 1d
-            </th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-              {rateLabel}
-              {' '}
-              APR 7d
-            </th>
-            <th scope="col" className="hidden lg:table-cell px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Whitelisted</th>
+            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Recent APY</th>
+            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Immediate APY</th>
           </tr>
         </thead>
         <tbody className={`${colors.backgroundLight} divide-y divide-gray-700`}>
@@ -283,10 +273,10 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
                     to={`/market/${market.id}/${market.chainId}`}
                     className="hover:text-blue-400 transition-colors"
                   >
-                    {market.market}
+                    {market.marketLabel}
                   </Link>
                   <a
-                    href={morphoAppChainUrl(market.chainName, market.id)}
+                    href={morphoAppMarketUrl(market.chainName, market.id)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-white hover:text-blue-400 transition-colors relative z-10 flex items-center"
@@ -297,28 +287,22 @@ function MarketTable({ markets, isLoading, rateType }: MarketTableProps) {
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{market.chainName}</td>
-              <td className="px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.marketSize}</td>
+              <td className="px-3 py-4 whitespace-nowrap text-right text-sm text-white">{formatMarketSize(market.marketSizeUsd ?? undefined)}</td>
               <td className="px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.beforeTarget}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilization}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilizationPct}</td>
               <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
-                {rateType === 'supply' ? market.supplyApr : market.borrowApr}
+                {`${((rateType === 'supply' ? market.netSupplyApy : market.netBorrowApy) * 100).toFixed(2)}%`}
               </td>
               <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
-                {rateType === 'supply' ? market.supplyApr1d : market.borrowApr1d}
-              </td>
-              <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
-                {rateType === 'supply' ? market.supplyApr7d : market.borrowApr7d}
-              </td>
-              <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-center text-sm">
-                <span
-                  className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    market.whitelisted
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {market.whitelisted ? 'Yes' : 'No'}
-                </span>
+                {(() => {
+                  const entry = immediateApyByMarketKey[market.id]
+                  const immediate = rateType === 'supply' ? entry?.apy : entry?.borrowApy
+                  if (!canComputeLiveApy || liveChainId == null || market.chainId !== liveChainId)
+                    return '—'
+                  if (!entry?.isLive || immediate == null)
+                    return '—'
+                  return `${(immediate * 100).toFixed(2)}%`
+                })()}
               </td>
             </tr>
           ))}
@@ -406,26 +390,53 @@ export function AdvancedList() {
       return true
     }).map((market: MorphoMarket) => ({
       id: market.uniqueKey,
-      market: `${market.collateralAsset.symbol}/${market.loanAsset.symbol}`,
+      marketLabel: `${market.collateralAsset.symbol}/${market.loanAsset.symbol}`,
       chainId: Number(market.morphoBlue.chain.id),
       chainName: getSupportedChainName(market.morphoBlue.chain.id),
-      marketSize: formatMarketSize(market.state.supplyAssetsUsd),
+      marketSizeUsd: market.state.supplyAssetsUsd,
       beforeTarget: computeBeforeTarget(
         market.state.utilization,
         market.state.supplyAssetsUsd,
         market.state.borrowAssetsUsd,
         displayRateType,
       ),
-      utilization: `${(market.state.utilization * 100).toFixed(2)}%`,
-      supplyApr: `${(market.state.netSupplyApy * 100).toFixed(2)}%`,
-      supplyApr1d: `${(market.state.dailyNetSupplyApy * 100).toFixed(2)}%`,
-      supplyApr7d: `${(market.state.weeklyNetSupplyApy * 100).toFixed(2)}%`,
-      borrowApr: `${(market.state.netBorrowApy * 100).toFixed(2)}%`,
-      borrowApr1d: `${(market.state.dailyNetBorrowApy * 100).toFixed(2)}%`,
-      borrowApr7d: `${(market.state.weeklyNetBorrowApy * 100).toFixed(2)}%`,
-      whitelisted: market.whitelisted,
+      utilizationPct: `${(market.state.utilization * 100).toFixed(2)}%`,
+      netSupplyApy: market.state.netSupplyApy,
+      netBorrowApy: market.state.netBorrowApy,
+      collateralAddress: market.collateralAsset.address,
+      loanAddress: market.loanAsset.address,
+      oracleAddress: market.oracleAddress || undefined,
+      irmAddress: market.irmAddress,
+      lltv: market.lltv || undefined,
     }))
   }, [marketsData, displayRateType])
+
+  const { chainId: walletChainId } = useAccount()
+  const selectedChainId = useMemo(() => {
+    if (chainFilter === 'ALL')
+      return undefined
+    return supportedChainIdMap.get(chainFilter)
+  }, [chainFilter])
+
+  const liveChainId = selectedChainId ?? walletChainId ?? undefined
+  const canComputeLiveApy = liveChainId != null && (selectedChainId == null || walletChainId === selectedChainId)
+
+  const liveApyMarkets = useMemo<LiveApyMarketInput[]>(() => {
+    if (!canComputeLiveApy || liveChainId == null)
+      return []
+    return markets
+      .filter(m => m.chainId === liveChainId)
+      .map(m => ({
+        uniqueKey: m.id,
+        irmAddress: m.irmAddress,
+        oracleAddress: m.oracleAddress,
+        lltv: m.lltv,
+        loanAsset: { address: m.loanAddress },
+        collateralAsset: { address: m.collateralAddress },
+      }))
+  }, [markets, canComputeLiveApy, liveChainId])
+
+  const { apyByMarketKey } = useLiveMarketApy(liveApyMarkets)
 
   // State for last updated time
   const [timeAgo, setTimeAgo] = useState('')
@@ -480,7 +491,14 @@ export function AdvancedList() {
         rateType={displayRateType}
       />
 
-      <MarketTable markets={markets} isLoading={isLoading} rateType={displayRateType} />
+      <MarketTable
+        markets={markets}
+        isLoading={isLoading}
+        rateType={displayRateType}
+        immediateApyByMarketKey={apyByMarketKey}
+        canComputeLiveApy={canComputeLiveApy}
+        liveChainId={liveChainId}
+      />
     </Card>
   )
 }

@@ -107,7 +107,8 @@ function PositionClient() {
     dataUpdatedAt,
   } = useLiveMarketPositions()
 
-  const { apyByMarketKey } = useLiveMarketApy(positions)
+  const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
+  const { apyByMarketKey } = useLiveMarketApy(markets)
 
   const [timeAgo, setTimeAgo] = useState('')
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
