@@ -21,6 +21,7 @@ import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 import { optimizeSupplyAllocationWithPositions } from '~/lib/optimizer/supply-optimizer'
+import { BundleOptimizerResult } from '~/pages/home/bundle-optimizer-result'
 
 function pctFromWad(wad: bigint, digits = 2): string {
   const asNum = Number.parseFloat(formatUnits(wad, 18)) * 100
@@ -751,6 +752,20 @@ export function SupplyApyOptimizer() {
                     </div>
                   )}
                 </div>
+
+                {displayResult && selectedOption && userAddress && chain?.id && (
+                  <BundleOptimizerResult
+                    displayResult={displayResult}
+                    chainId={chain.id}
+                    morphoAddress={morphoAddress}
+                    userAddress={userAddress as `0x${string}`}
+                    loanToken={{
+                      address: selectedOption.address as `0x${string}`,
+                      symbol,
+                      decimals: selectedOption.decimals,
+                    }}
+                  />
+                )}
               </div>
             )}
           </>
