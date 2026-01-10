@@ -29,11 +29,12 @@ export interface BundleOptimizerResultProps {
   chainId: number
   morphoAddress: Address
   userAddress: Address
+  userSupplySharesByMarketId: Map<string, bigint>
   loanToken: { address: Address, symbol: string, decimals: number }
 }
 
 export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
-  const { chainId, morphoAddress, userAddress, displayResult, loanToken } = props
+  const { chainId, morphoAddress, userAddress, userSupplySharesByMarketId, displayResult, loanToken } = props
   const { chain } = useAccount()
 
   const bundlerCfg = useMemo(() => getBundler3Config(chainId), [chainId])
@@ -136,13 +137,14 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
       chainId,
       userAddress,
       marketParamsById,
+      userSupplySharesByMarketId,
       positions: displayResult.positions,
       loanToken: loanToken.address,
       nowSec: frozenNowSec,
       permit2Allowance,
       permit2Signature: permit2Sig,
     })
-  }, [bundlerCfg, chainId, displayResult.positions, frozenNowSec, loanToken.address, marketParamsById, permit2Allowance, permit2Sig, userAddress])
+  }, [bundlerCfg, chainId, displayResult.positions, frozenNowSec, loanToken.address, marketParamsById, permit2Allowance, permit2Sig, userAddress, userSupplySharesByMarketId])
 
   const bundleSummary = bundleBuild && bundleBuild.ok ? bundleBuild.summary : undefined
   const permit2ToSign = bundleBuild && bundleBuild.ok ? bundleBuild.permit2ToSign : undefined

@@ -110,6 +110,14 @@ export function SupplyApyOptimizer() {
     })
   }, [livePositions, selectedLoanAddr])
 
+  const userSupplySharesByMarketId = useMemo(() => {
+    const map = new Map<string, bigint>()
+    for (const p of selectedUserMarkets) {
+      map.set(p.market.uniqueKey.toLowerCase(), p.userState.supplyShares)
+    }
+    return map
+  }, [selectedUserMarkets])
+
   // Fetch top candidate markets (max 200) for the selected loan asset on this chain.
   const { data: topMarkets } = useMarketsByChain(selectedLoanAddr ? chain?.id : undefined, selectedLoanAddr)
 
@@ -759,6 +767,7 @@ export function SupplyApyOptimizer() {
                     chainId={chain.id}
                     morphoAddress={morphoAddress}
                     userAddress={userAddress as `0x${string}`}
+                    userSupplySharesByMarketId={userSupplySharesByMarketId}
                     loanToken={{
                       address: selectedOption.address as `0x${string}`,
                       symbol,

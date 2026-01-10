@@ -25,13 +25,15 @@ export function encodeGeneralAdapterMorphoWithdraw(args: {
   adapter: `0x${string}`
   marketParams: MorphoMarketParams
   assets: bigint
+  shares?: bigint
   receiver: `0x${string}`
 }): Bundler3Call {
-  // Use assets-based withdraw. shares=0. minSharePriceE27=0 to avoid slippage revert.
+  // Use assets- or shares-based withdraw. Set one of (assets, shares) and keep the other at 0.
+  // minSharePriceE27=0 to avoid slippage revert.
   const data = encodeFunctionData({
     abi: GENERAL_ADAPTER1_ABI,
     functionName: 'morphoWithdraw',
-    args: [args.marketParams, args.assets, 0n, 0n, args.receiver] as const,
+    args: [args.marketParams, args.assets, args.shares ?? 0n, 0n, args.receiver] as const,
   })
   return makeBundler3Call({ to: args.adapter, data })
 }

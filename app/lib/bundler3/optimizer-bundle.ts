@@ -18,6 +18,11 @@ export interface BuildOptimizerBundleInputs {
    * Obtainable onchain via Morpho `idToMarketParams(marketId)`.
    */
   marketParamsById: Map<string, MorphoMarketParams>
+  /**
+   * Optional: user supply shares per market id (lowercased).
+   * Used to make "full exit" withdraws burn all shares (avoid dust).
+   */
+  userSupplySharesByMarketId?: Map<string, bigint>
   /** Optimizer output (already in raw loan-token asset units). */
   positions: OptimizedPositionDelta[]
   /**
@@ -177,10 +182,16 @@ export function buildOptimizerBundle(inputs: BuildOptimizerBundleInputs): BuildO
     const params = inputs.marketParamsById.get(idKey(p.marketId))
     if (!params)
       return { ok: false, error: `Missing marketParams for withdraw market ${p.marketId}` }
+
+    const fullExit = p.amountAssets === 0n
+    const userShares = inputs.userSupplySharesByMarketId?.get(idKey(p.marketId)) ?? 0n
+    const useSharesWithdraw = fullExit && userShares > 0n
+
     bundle.push(encodeGeneralAdapterMorphoWithdraw({
       adapter,
       marketParams: params,
-      assets: -p.deltaAssets,
+      assets: useSharesWithdraw ? 0n : -p.deltaAssets,
+      shares: useSharesWithdraw ? userShares : undefined,
       receiver: adapter,
     }))
   }
