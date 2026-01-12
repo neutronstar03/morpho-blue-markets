@@ -1,5 +1,5 @@
 import { adaptiveCurveBorrowRateView } from '../irm/adaptive-curve-irm'
-import { aprWadFromRatePerSecondWad, apyWadFromRatePerSecondWad, supplyRatePerSecondWad, utilizationWad } from '../irm/apy-math'
+import { aprWadFromRatePerSecondWad, displayApyWadFromRatePerSecondWad, supplyRatePerSecondWad, utilizationWad } from '../irm/apy-math'
 
 export interface SupplyOptimizerMarketSnapshot {
   /** Morpho market id (bytes32 as 0x-hex). On Morpho GraphQL this is `uniqueKey`. */
@@ -177,7 +177,7 @@ export function computeSupplyAfterDeltaWad(args: {
   })
 
   const supplyAprWad = aprWadFromRatePerSecondWad(supplyRateWad)
-  const supplyApyWad = apyWadFromRatePerSecondWad(supplyRateWad)
+  const supplyApyWad = displayApyWadFromRatePerSecondWad(supplyRateWad)
   return {
     utilizationAfterWad: utilAfterWad,
     borrowRatePerSecondWad,

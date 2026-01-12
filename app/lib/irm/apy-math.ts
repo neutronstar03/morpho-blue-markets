@@ -3,11 +3,22 @@ import { formatUnits } from 'viem'
 export const WAD = 1_000_000_000_000_000_000n
 export const SECONDS_PER_YEAR = 365n * 24n * 60n * 60n
 
+const MAX_RATE_AT_TARGET_PER_SECOND_WAD = (2n * WAD) / SECONDS_PER_YEAR
+const MAX_BORROW_RATE_PER_SECOND_WAD = (4n * MAX_RATE_AT_TARGET_PER_SECOND_WAD)
+
 export function clamp0ToWad(x: bigint): bigint {
   if (x < 0n)
     return 0n
   if (x > WAD)
     return WAD
+  return x
+}
+
+export function clampRatePerSecondWad(x: bigint): bigint {
+  if (x < 0n)
+    return 0n
+  if (x > MAX_BORROW_RATE_PER_SECOND_WAD)
+    return MAX_BORROW_RATE_PER_SECOND_WAD
   return x
 }
 
@@ -26,12 +37,30 @@ export function utilizationWad(totalBorrowAssets: bigint, totalSupplyAssets: big
   return (totalBorrowAssets * WAD) / totalSupplyAssets
 }
 
+const APR_LINEAR_SWITCH_WAD = 3n * WAD // 300% APR threshold
+
 export function apyFromRatePerSecondWad(ratePerSecondWad: bigint): number {
   const r = Number.parseFloat(formatUnits(ratePerSecondWad, 18))
   if (!Number.isFinite(r) || r <= 0)
     return 0
   // Continuous-compounding style APY (stable for small r via expm1).
   return Math.expm1(r * Number(SECONDS_PER_YEAR))
+}
+
+export function displayApyFromRatePerSecondWad(ratePerSecondWad: bigint): number {
+  const rate = clampRatePerSecondWad(ratePerSecondWad)
+  const annualizedWad = aprWadFromRatePerSecondWad(rate)
+  if (annualizedWad > APR_LINEAR_SWITCH_WAD)
+    return Number(annualizedWad) / 1e18
+  return apyFromRatePerSecondWad(rate)
+}
+
+export function displayApyWadFromRatePerSecondWad(ratePerSecondWad: bigint): bigint {
+  const rate = clampRatePerSecondWad(ratePerSecondWad)
+  const annualizedWad = aprWadFromRatePerSecondWad(rate)
+  if (annualizedWad > APR_LINEAR_SWITCH_WAD)
+    return annualizedWad
+  return apyWadFromRatePerSecondWad(rate)
 }
 
 export function supplyRatePerSecondWad(args: {
@@ -41,8 +70,8 @@ export function supplyRatePerSecondWad(args: {
 }): bigint {
   const feeWad = clamp0ToWad(args.feeWad)
   const utilWad = clamp0ToWad(args.utilizationWad)
-  // supplyRate = borrowRate * utilization * (1 - fee)
-  const afterUtil = (args.borrowRatePerSecondWad * utilWad) / WAD
+  const borrowRate = clampRatePerSecondWad(args.borrowRatePerSecondWad)
+  const afterUtil = (borrowRate * utilWad) / WAD
   return (afterUtil * (WAD - feeWad)) / WAD
 }
 

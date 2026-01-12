@@ -161,7 +161,7 @@ function PositionClient() {
 
       const userPrincipalUsd = marketSupplyUsd * shareRatio
       const marketApy = apyByMarketKey[p.market.uniqueKey]?.apy ?? p.market.state.netSupplyApy ?? 0
-      const dailyRate = marketApy / 365
+      const dailyRate = Math.expm1(Math.log1p(marketApy) / 365)
       const dailyUsd = userPrincipalUsd * dailyRate
 
       totalPrincipalUsd += userPrincipalUsd

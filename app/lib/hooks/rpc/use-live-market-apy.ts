@@ -3,7 +3,7 @@ import { useAccount, useReadContracts } from 'wagmi'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { adaptiveCurveBorrowRateView } from '~/lib/irm/adaptive-curve-irm'
-import { apyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
+import { clampRatePerSecondWad, displayApyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
 import { computeMorphoMarketId, ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { getMorphoBlueAddress } from './use-morpho'
@@ -265,12 +265,13 @@ export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
           timestamp: nowTimestamp,
         })
 
+        const borrowRatePerSecondWadClamped = clampRatePerSecondWad(borrowRatePerSecondWad)
         const utilizationWad = wadDivDown(totalBorrowAssets, totalSupplyAssets)
-        const supplyRate = supplyRatePerSecondWad({ borrowRatePerSecondWad, utilizationWad, feeWad })
+        const supplyRate = supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRatePerSecondWadClamped, utilizationWad, feeWad })
 
         out[m.uniqueKey] = {
-          apy: apyFromRatePerSecondWad(supplyRate),
-          borrowApy: apyFromRatePerSecondWad(borrowRatePerSecondWad),
+          apy: displayApyFromRatePerSecondWad(supplyRate),
+          borrowApy: displayApyFromRatePerSecondWad(borrowRatePerSecondWadClamped),
           isLive: true,
         }
       }

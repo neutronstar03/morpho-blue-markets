@@ -5,7 +5,7 @@ import { useAccount, useReadContracts } from 'wagmi'
 import { IRM_RATE_AT_TARGET_ABI } from '~/lib/abis/simplified'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { adaptiveCurveBorrowRateView } from '~/lib/irm/adaptive-curve-irm'
-import { apyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
+import { displayApyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
 import { computeMorphoMarketId } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 
@@ -143,7 +143,7 @@ export function useMarketPreview(args: {
     if (rateAtTarget == null)
       return undefined
     // rateAtTarget is per-second WAD (int256 onchain). Negative rates are treated as 0 for display.
-    return apyFromRatePerSecondWad(rateAtTarget > 0n ? rateAtTarget : 0n)
+    return displayApyFromRatePerSecondWad(rateAtTarget > 0n ? rateAtTarget : 0n)
   }, [rateAtTarget])
 
   const nowTimestamp = useMemo(() => {
@@ -217,14 +217,14 @@ export function useMarketPreview(args: {
     if (borrowRateBefore == null || utilizationBeforeWad == null || feeWad == null)
       return undefined
     const rate = supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRateBefore, utilizationWad: utilizationBeforeWad, feeWad })
-    return apyFromRatePerSecondWad(rate)
+    return displayApyFromRatePerSecondWad(rate)
   }, [borrowRateBefore, utilizationBeforeWad, feeWad])
 
   const supplyApyAfter = useMemo(() => {
     if (borrowRateAfter == null || utilizationAfterWad == null || feeWad == null)
       return undefined
     const rate = supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRateAfter, utilizationWad: utilizationAfterWad, feeWad })
-    return apyFromRatePerSecondWad(rate)
+    return displayApyFromRatePerSecondWad(rate)
   }, [borrowRateAfter, utilizationAfterWad, feeWad])
 
   const utilizationBefore = useMemo(() => {
