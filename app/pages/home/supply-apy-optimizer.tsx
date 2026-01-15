@@ -1,5 +1,5 @@
 import type { SupplyOptimizerMarketSnapshot, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createSearchParams, Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
 import { useAccount, useReadContracts } from 'wagmi'
@@ -20,7 +20,7 @@ import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
-import { optimizeSupplyAllocationWithPositions } from '~/lib/optimizer/supply-optimizer'
+import { runSupplyOptimizer } from '~/lib/optimizer/supply-optimizer-runner'
 import { BundleOptimizerResult } from '~/pages/home/bundle-optimizer-result'
 
 function pctFromWad(wad: bigint, digits = 2): string {
@@ -45,6 +45,26 @@ function trimTrailingZerosDecimalString(s: string): string {
   return trimmed
 }
 
+function buildMoveSizeCacheKey(args: {
+  chainId?: number
+  loanAssetAddress?: string
+  newDepositAssets: bigint
+  maxMarketsUsed: number
+  positions: UserSupplyPosition[]
+}): string {
+  const positionsKey = [...args.positions]
+    .sort((a, b) => a.marketId.localeCompare(b.marketId))
+    .map(p => `${p.marketId}:${p.suppliedAssets}`)
+    .join('|')
+  return [
+    args.chainId ?? 0,
+    (args.loanAssetAddress ?? 'unknown').toLowerCase(),
+    args.newDepositAssets.toString(),
+    args.maxMarketsUsed.toString(),
+    positionsKey,
+  ].join('::')
+}
+
 interface LoanAssetOption {
   address: string
   symbol: string
@@ -52,21 +72,29 @@ interface LoanAssetOption {
   oraclePriceUsd?: number | null
 }
 
+interface AutoStepInfo {
+  stepAssets: bigint
+  stepRatioWad: bigint
+  attempts: number
+  fromCache: boolean
+}
+
 export function SupplyApyOptimizer() {
   // If the blended APY improvement is <= this threshold, show a "no-op" plan.
   // 0.25% = 0.0025 in WAD terms (1e18 = 100%).
   const NO_BENEFIT_DELTA_APY_WAD = 2_500_000_000_000_000n
-  const MAX_OPTIMIZER_ITERATIONS = 800
+  const MAX_OPTIMIZER_ITERATIONS = 1000
 
   const ctx = useSupplyApyOptimizer()
   const { address: userAddress, chain } = useAccount()
-  const minMoveSize = ctx.inputs.minMoveSize
   const newDepositAmount = ctx.inputs.newDepositAmount
   const setDerived = ctx.setDerived
-  const setMinMoveSize = ctx.setMinMoveSize
   const setNewDepositAmount = ctx.setNewDepositAmount
   const beginRun = ctx.beginRun
   const finishRun = ctx.finishRun
+
+  const heuristicCacheRef = useRef(new Map<string, { stepAssets: bigint }>())
+  const [autoStepInfo, setAutoStepInfo] = useState<AutoStepInfo | null>(null)
 
   const [maxMarketsInput, setMaxMarketsInput] = useLocalStorage<string>(
     'supply-apy-optimizer:max-markets',
@@ -181,16 +209,7 @@ export function SupplyApyOptimizer() {
     }
 
     setDerived({ totalSuppliedAssets: total, positions })
-
-    // Set default only if the user hasn't typed anything yet.
-    // Important: don't treat empty string ("") as "unset" because users often clear the input
-    // before typing a new number; resetting to the default mid-typing feels broken.
-    if (minMoveSize == null) {
-      const rawStep = total / 100n
-      const stepAssets = rawStep > 0n ? rawStep : 1n
-      setMinMoveSize(formatUnits(stepAssets, selectedOption.decimals))
-    }
-  }, [minMoveSize, selectedOption, selectedUserMarkets, setDerived, setMinMoveSize, userMarketStates])
+  }, [selectedOption, selectedUserMarkets, setDerived, userMarketStates])
 
   // Default "additional amount to supply" to the user's wallet balance for the selected token.
   // Only set a default if the user hasn't typed anything yet.
@@ -209,11 +228,13 @@ export function SupplyApyOptimizer() {
   const [optimizeRequest, setOptimizeRequest] = useState<null | {
     runId: number
     timestamp: bigint
-    stepAssets: bigint
+    stepAssets?: bigint
     newDepositAssets: bigint
     maxMarketsUsed: number
     positions: UserSupplyPosition[]
     markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>
+    autoStep: boolean
+    autoCacheKey?: string
   }>(null)
 
   const optimizeContracts = useMemo(() => {
@@ -299,18 +320,58 @@ export function SupplyApyOptimizer() {
     }
 
     try {
-      const res = optimizeSupplyAllocationWithPositions({
+      const cacheKey = optimizeRequest.autoCacheKey
+      let stepAssets = optimizeRequest.stepAssets
+      let usedCachedStep = false
+
+      if (optimizeRequest.autoStep && stepAssets == null && cacheKey) {
+        const cached = heuristicCacheRef.current.get(cacheKey)
+        if (cached) {
+          stepAssets = cached.stepAssets
+          usedCachedStep = true
+        }
+      }
+
+      const runResult = runSupplyOptimizer({
         markets: snapshots,
         positions: optimizeRequest.positions,
         newDepositAssets: optimizeRequest.newDepositAssets,
-        stepAssets: optimizeRequest.stepAssets,
         timestamp: optimizeRequest.timestamp,
-        maxIterations: MAX_OPTIMIZER_ITERATIONS,
         constraints: {
           maxMarketsUsed: optimizeRequest.maxMarketsUsed,
         },
+        maxIterations: MAX_OPTIMIZER_ITERATIONS,
+        stepAssets,
+        auto: optimizeRequest.autoStep,
       })
-      if (res.iterations >= MAX_OPTIMIZER_ITERATIONS) {
+
+      if (runResult.status !== 'success' || !runResult.result) {
+        finishRun(
+          optimizeRequest.runId,
+          undefined,
+          runResult.error ?? 'Optimizer failed',
+        )
+        setOptimizeRequest(null)
+        return
+      }
+
+      if (optimizeRequest.autoStep) {
+        if (runResult.autoInfo) {
+          setAutoStepInfo({
+            stepAssets: runResult.autoInfo.stepAssets,
+            stepRatioWad: runResult.autoInfo.stepRatioWad,
+            attempts: runResult.autoInfo.attempts,
+            fromCache: usedCachedStep && !runResult.autoInfo.fromHeuristic,
+          })
+        }
+        if (cacheKey && runResult.stepAssets != null && (!usedCachedStep || runResult.autoInfo?.fromHeuristic))
+          heuristicCacheRef.current.set(cacheKey, { stepAssets: runResult.stepAssets })
+      }
+      else {
+        setAutoStepInfo(null)
+      }
+
+      if (runResult.result.iterations >= MAX_OPTIMIZER_ITERATIONS) {
         finishRun(
           optimizeRequest.runId,
           undefined,
@@ -318,7 +379,7 @@ export function SupplyApyOptimizer() {
         )
       }
       else {
-        finishRun(optimizeRequest.runId, res, undefined)
+        finishRun(optimizeRequest.runId, runResult.result, undefined)
       }
     }
     catch (e: any) {
@@ -342,14 +403,13 @@ export function SupplyApyOptimizer() {
       loanAssetSymbol: opt?.symbol,
       loanAssetDecimals: opt?.decimals,
     })
-    // Mark as "unset" so the default can be computed/preset for the new selection.
+    // Mark as "unset" so Auto applies for the new selection.
     ctx.setMinMoveSize(undefined)
     ctx.setNewDepositAmount(undefined)
   }
 
   const canOptimize = !!selectedOption
     && (ctx.derived.positions?.length ?? 0) > 0
-    && !!ctx.inputs.minMoveSize
     && (() => {
       const parsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
       return Number.isFinite(parsed) && parsed >= 1
@@ -368,10 +428,18 @@ export function SupplyApyOptimizer() {
     const timestamp = BigInt(Math.floor(Date.now() / 1000))
     const runId = beginRun({ timestamp })
 
-    const stepAssets = parseTokenAmount(ctx.inputs.minMoveSize ?? '', selectedOption.decimals)
-    if (stepAssets <= 0n) {
-      finishRun(runId, undefined, 'Minimum move size must be > 0')
-      return
+    setAutoStepInfo(null)
+
+    const minMoveSizeRaw = (ctx.inputs.minMoveSize ?? '').trim()
+    const useAutoMoveSize = minMoveSizeRaw.length === 0
+    let stepAssets: bigint | undefined
+
+    if (!useAutoMoveSize) {
+      stepAssets = parseTokenAmount(minMoveSizeRaw, selectedOption.decimals)
+      if (stepAssets <= 0n) {
+        finishRun(runId, undefined, 'Minimum move size must be > 0')
+        return
+      }
     }
 
     const maxMarketsUsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
@@ -381,6 +449,20 @@ export function SupplyApyOptimizer() {
     }
 
     const newDepositAssets = parseTokenAmount(ctx.inputs.newDepositAmount ?? '', selectedOption.decimals)
+
+    const cacheKey = buildMoveSizeCacheKey({
+      chainId: chain?.id,
+      loanAssetAddress: selectedOption.address,
+      newDepositAssets,
+      maxMarketsUsed,
+      positions,
+    })
+
+    if (useAutoMoveSize) {
+      const cached = heuristicCacheRef.current.get(cacheKey)
+      if (cached)
+        stepAssets = cached.stepAssets
+    }
 
     // Universe = top markets (<= 200) ∪ user's markets (for safety).
     const universe = new Map<string, { uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>()
@@ -402,6 +484,8 @@ export function SupplyApyOptimizer() {
       maxMarketsUsed,
       positions,
       markets: [...universe.values()],
+      autoStep: useAutoMoveSize,
+      autoCacheKey: useAutoMoveSize ? cacheKey : undefined,
     })
   }
 
@@ -534,7 +618,7 @@ export function SupplyApyOptimizer() {
                       ariaLabel="Minimum move size info"
                       content={(
                         <span>
-                          Default is 1% of your supplied amount.
+                          Leave blank for Auto (finds the smallest move size that converges).
                         </span>
                       )}
                     />
@@ -545,7 +629,7 @@ export function SupplyApyOptimizer() {
                       inputMode="decimal"
                       value={ctx.inputs.minMoveSize ?? ''}
                       onChange={e => ctx.setMinMoveSize(e.target.value)}
-                      placeholder="0.0"
+                      placeholder="Auto"
                       className="w-full px-3 py-2 pr-16 border border-gray-700 bg-gray-900 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                     <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
@@ -729,19 +813,33 @@ export function SupplyApyOptimizer() {
                 </div>
 
                 <div className="pt-2">
-                  <div
-                    className="
-                      flex flex-row justify-center items-center mx-4
-                      sm:justify-end
-                      gap-1 sm:gap-2
-                    "
-                  >
-                    <p className="text-xs text-gray-400 whitespace-nowrap">Total allocated</p>
-                    <p className="text-sm text-white whitespace-nowrap">
-                      {formatBigintShort(totalAllocatedAssets, selectedOption.decimals)}
-                      {' '}
-                      {symbol}
-                    </p>
+                  <div className="flex flex-row items-center mx-4 gap-2">
+                    {autoStepInfo && (
+                      <div className="flex flex-wrap items-center gap-1 text-xs text-gray-400 whitespace-nowrap">
+                        <span>Auto step</span>
+                        <span className="text-sm text-white whitespace-nowrap">
+                          {formatBigintShort(autoStepInfo.stepAssets, selectedOption.decimals)}
+                          {' '}
+                          {symbol}
+                        </span>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">
+                          ({pctFromWad(autoStepInfo.stepRatioWad)})
+                        </span>
+                        {autoStepInfo.attempts > 0 && (
+                          <span className="hidden sm:inline text-xs text-gray-500 whitespace-nowrap">
+                            Auto step found in {autoStepInfo.attempts} tries
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="ml-auto flex items-center gap-1 sm:gap-2">
+                      <p className="text-xs text-gray-400 whitespace-nowrap">Total allocated</p>
+                      <p className="text-sm text-white whitespace-nowrap">
+                        {formatBigintShort(totalAllocatedAssets, selectedOption.decimals)}
+                        {' '}
+                        {symbol}
+                      </p>
+                    </div>
                   </div>
                   {displayResult.unallocatedNewDepositAssets > 0n && (
                     <div
