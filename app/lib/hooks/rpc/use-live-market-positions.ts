@@ -5,6 +5,7 @@ import { useAccount, useReadContracts } from 'wagmi'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName, morphoAddressOnChain } from '~/lib/addresses'
 import { useUserPositions } from '~/lib/hooks/graphql/use-user-positions'
+import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 
 // This interface maps the GraphQL position data to what position.tsx expects
 export interface LiveMarketPosition {
@@ -106,10 +107,19 @@ export function useLiveMarketPositions() {
     if (!graphPositions)
       return []
 
+    const filteredGraphPositions = filterBlacklistedMarkets(graphPositions, position => ({
+      uniqueKey: position.market.uniqueKey,
+      loanAssetAddress: position.market.loanAsset.address,
+      collateralAssetAddress: position.market.collateralAsset.address,
+      loanAssetSymbol: position.market.loanAsset.symbol,
+      collateralAssetSymbol: position.market.collateralAsset.symbol,
+      chainId: chain?.id,
+    }))
+
     // If RPC data is not ready yet, use GraphQL data for display
     // This gives us immediate feedback while RPC is loading
     if (!positionResults || positionResults.length !== graphPositions.length) {
-      return graphPositions.map((gp): LiveMarketPosition => ({
+      return filteredGraphPositions.map((gp): LiveMarketPosition => ({
         market: {
           uniqueKey: gp.market.uniqueKey,
           irmAddress: gp.market.irmAddress,
@@ -133,7 +143,7 @@ export function useLiveMarketPositions() {
     }
 
     // Merge with live RPC data
-    return graphPositions
+    return filteredGraphPositions
       .map((gp, index): LiveMarketPosition | null => {
         const result = positionResults[index]
 
@@ -183,7 +193,7 @@ export function useLiveMarketPositions() {
         }
       })
       .filter((p): p is LiveMarketPosition => p !== null)
-  }, [graphPositions, positionResults])
+  }, [graphPositions, positionResults, chain?.id])
 
   // Combined refetch function
   const refetch = async () => {

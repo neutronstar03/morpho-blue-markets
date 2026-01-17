@@ -20,6 +20,7 @@ interface Portfolio {
   dailyUsd: number | undefined
   weightedAprPct: number | undefined
   totalAssets: bigint | undefined
+  totalAssetsUsd: number | undefined
   totalAssetsSymbol: string | undefined
   totalAssetsDecimals: number | undefined
 }
@@ -125,7 +126,7 @@ function PositionClient() {
 
   const portfolio = useMemo((): Portfolio => {
     if (!positions || !positions.length)
-      return { dailyUsd: undefined, weightedAprPct: undefined, totalAssets: undefined, totalAssetsSymbol: undefined, totalAssetsDecimals: undefined }
+      return { dailyUsd: undefined, weightedAprPct: undefined, totalAssets: undefined, totalAssetsUsd: undefined, totalAssetsSymbol: undefined, totalAssetsDecimals: undefined }
 
     let totalAssets: bigint | undefined
     let totalAssetsSymbol: string | undefined
@@ -183,6 +184,7 @@ function PositionClient() {
       dailyUsd: totalDailyUsd || undefined,
       weightedAprPct,
       totalAssets: totalAssets === 0n ? undefined : totalAssets,
+      totalAssetsUsd: totalPrincipalUsd || undefined,
       totalAssetsSymbol,
       totalAssetsDecimals,
     }
@@ -269,7 +271,7 @@ function PositionClient() {
                     ))}
                 </ul>
               )}
-        {portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null && (
+        {(portfolio.totalAssetsUsd != null || (portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null)) && (
           <div
             className="
               flex flex-row justify-center items-center mx-4
@@ -279,9 +281,17 @@ function PositionClient() {
           >
             <p className="text-xs text-gray-400 whitespace-nowrap">Total Assets</p>
             <p className="text-sm text-white whitespace-nowrap">
-              {formatBigintShort(portfolio.totalAssets, portfolio.totalAssetsDecimals)}
-              {' '}
-              {portfolio.totalAssetsSymbol}
+              {portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null
+                ? (
+                    <>
+                      {formatBigintShort(portfolio.totalAssets, portfolio.totalAssetsDecimals)}
+                      {' '}
+                      {portfolio.totalAssetsSymbol}
+                    </>
+                  )
+                : portfolio.totalAssetsUsd != null
+                  ? formatUsd(portfolio.totalAssetsUsd)
+                  : '—'}
             </p>
           </div>
         )}

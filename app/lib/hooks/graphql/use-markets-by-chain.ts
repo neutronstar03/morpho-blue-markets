@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
+import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 import { graphqlClient } from '../../graphql/client'
 
 // A specific, isolated type for this hook, containing only the fields required
@@ -21,6 +22,7 @@ export interface SupplyMarketData {
   }
   state: {
     netSupplyApy: number
+    supplyApy: number
     supplyAssets: string
     supplyShares: string
     supplyAssetsUsd?: number
@@ -71,6 +73,7 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
         }
         state {
           netSupplyApy
+          supplyApy
           supplyAssets
           supplyShares
           supplyAssetsUsd
@@ -88,25 +91,45 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
         return []
 
       const first = 200
-      const skip = 0
+      let skip = 0
 
       const where: MarketFiltersWithChain & { loanAssetAddress_in?: string[] } = { chainId_in: [chainId] }
       if (loanAssetAddress)
         where.loanAssetAddress_in = [loanAssetAddress]
 
-      const result = await graphqlClient.request<QueryMarketsByChainResult>(
-        QUERY_MARKETS_BY_CHAIN,
-        {
-          where,
-          orderBy: MarketOrderBy.NetSupplyApy,
-          orderDirection: OrderDirection.Desc,
-          first,
-          skip,
-        },
-      )
-      return result.markets.items || []
+      const markets: SupplyMarketData[] = []
+
+      while (true) {
+        const result = await graphqlClient.request<QueryMarketsByChainResult>(
+          QUERY_MARKETS_BY_CHAIN,
+          {
+            where,
+            orderBy: MarketOrderBy.NetSupplyApy,
+            orderDirection: OrderDirection.Desc,
+            first,
+            skip,
+          },
+        )
+        const pageItems = result.markets.items || []
+        markets.push(...pageItems)
+
+        if (pageItems.length < first)
+          break
+
+        skip += first
+      }
+
+      return filterBlacklistedMarkets(markets, market => ({
+        uniqueKey: market.uniqueKey,
+        loanAssetAddress: market.loanAsset?.address,
+        collateralAssetAddress: market.collateralAsset?.address,
+        loanAssetSymbol: market.loanAsset?.symbol,
+        collateralAssetSymbol: market.collateralAsset?.symbol,
+        chainId,
+      }))
     },
     enabled: !!chainId,
+    refetchInterval: 5 * 60 * 1000,
     staleTime: 10 * 60 * 1000, // 10 minutes
   })
 }

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
+import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 import { graphqlClient } from '../../graphql/client'
 
 export interface MorphoMarket {
@@ -172,14 +173,29 @@ export function useMarkets({
 }: UseMarketsProps) {
   return useQuery<QueryMarketsResult>({
     queryKey: ['markets', where, orderBy, orderDirection, first, skip],
-    queryFn: async () =>
-      graphqlClient.request(QUERY_LIST_MARKETS, {
+    queryFn: async () => {
+      const result = await graphqlClient.request<QueryMarketsResult>(QUERY_LIST_MARKETS, {
         where,
         orderBy,
         orderDirection,
         first,
         skip,
-      }),
+      })
+      const markets = result.markets.items || []
+      return {
+        ...result,
+        markets: {
+          items: filterBlacklistedMarkets(markets, market => ({
+            uniqueKey: market.uniqueKey,
+            loanAssetAddress: market.loanAsset?.address,
+            collateralAssetAddress: market.collateralAsset?.address,
+            loanAssetSymbol: market.loanAsset?.symbol,
+            collateralAssetSymbol: market.collateralAsset?.symbol,
+            chainId: market.morphoBlue?.chain?.id,
+          })),
+        },
+      }
+    },
     staleTime,
   })
 }

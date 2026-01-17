@@ -11,7 +11,7 @@ import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
-import { useSupplyApyOptimizer } from '~/lib/contexts/supply-apy-optimizer'
+import { useSupplyApyOptimizer } from '~/lib/contexts/optimizer.context'
 import { formatBigintShort } from '~/lib/formatters'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
@@ -823,11 +823,17 @@ export function SupplyApyOptimizer() {
                           {symbol}
                         </span>
                         <span className="text-xs text-gray-400 whitespace-nowrap">
-                          ({pctFromWad(autoStepInfo.stepRatioWad)})
+                          (
+                          {pctFromWad(autoStepInfo.stepRatioWad)}
+                          )
                         </span>
                         {autoStepInfo.attempts > 0 && (
                           <span className="hidden sm:inline text-xs text-gray-500 whitespace-nowrap">
-                            Auto step found in {autoStepInfo.attempts} tries
+                            Auto step found in
+                            {' '}
+                            {autoStepInfo.attempts}
+                            {' '}
+                            tries
                           </span>
                         )}
                       </div>

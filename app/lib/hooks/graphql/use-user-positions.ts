@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
+import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 import { graphqlClient } from '../../graphql/client'
 
 // Data returned from the GraphQL query for each position
@@ -99,11 +100,18 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
         },
       )
 
-      // Filter out positions with zero shares (no actual position)
-      return (result.marketPositions.items || []).filter((p) => {
+      const positions = (result.marketPositions.items || []).filter((p) => {
         const supplyShares = BigInt(p.state.supplyShares || '0')
         return supplyShares > 0n
       })
+      return filterBlacklistedMarkets(positions, position => ({
+        uniqueKey: position.market.uniqueKey,
+        loanAssetAddress: position.market.loanAsset.address,
+        collateralAssetAddress: position.market.collateralAsset.address,
+        loanAssetSymbol: position.market.loanAsset.symbol,
+        collateralAssetSymbol: position.market.collateralAsset.symbol,
+        chainId,
+      }))
     },
     enabled: !!userAddress && !!chainId,
     staleTime: 30 * 1000, // 30 seconds - positions don't change that often

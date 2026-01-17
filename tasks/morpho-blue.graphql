@@ -1256,3 +1256,39 @@ enum MarketOrderBy {
   CredoraRiskScore
   SizeUsd
 }
+
+
+type MarketWarning {
+  type: String!
+  level: WarningLevel!
+  metadata: MarketWarningMetadata
+}
+
+enum WarningLevel {
+  YELLOW
+  RED
+}
+
+union MarketWarningMetadata = BadDebtUnrealizedMarketWarningMetadata | IncorrectOracleConfigurationMarketWarningMetadata | UnrecognizedCollateralAssetMarketWarningMetadata | UnrecognizedLoanAssetMarketWarningMetadata | CustomMetadata
+
+type BadDebtUnrealizedMarketWarningMetadata {
+  badDebtUsd: Float
+  badDebtAssets: BigInt!
+  totalSupplyAssets: BigInt!
+  badDebtShare: Float!
+}
+
+type IncorrectOracleConfigurationMarketWarningMetadata {
+  type: String!
+  scaleFactor: BigInt
+  expectedScaleFactor: BigInt
+  expectedScaleFactorExponent: BigInt
+}
+
+type UnrecognizedCollateralAssetMarketWarningMetadata {
+  asset: Asset!
+}
+
+type UnrecognizedLoanAssetMarketWarningMetadata {
+  asset: Asset!
+}

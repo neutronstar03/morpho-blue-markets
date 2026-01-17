@@ -431,8 +431,8 @@ export function AdvancedList() {
         irmAddress: m.irmAddress,
         oracleAddress: m.oracleAddress,
         lltv: m.lltv,
-        loanAsset: { address: m.loanAddress },
-        collateralAsset: { address: m.collateralAddress },
+        loanAsset: { address: m.loanAddress, symbol: m.marketLabel.split('/')[1]?.trim() },
+        collateralAsset: { address: m.collateralAddress, symbol: m.marketLabel.split('/')[0]?.trim() },
       }))
   }, [markets, canComputeLiveApy, liveChainId])
 

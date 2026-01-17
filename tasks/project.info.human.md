@@ -1,4 +1,4 @@
-This project is to make a alternative frontend for morpho-blue DEFI protocol. 
+This project is to make a alternative frontend for morpho-blue DEFI protocol.
 REF: https://docs.morpho.org/tools/onchain/
 
 Technical details:
@@ -18,7 +18,6 @@ Many open questions:
 - Which library to connect to wallet should we use in frontend? I care to find a library that is well known by LLM machines.
 - Styling the frontend should be decided with which library to be used. We need some classic web3 modal to track transactions, also input fields for token amounts that doesn't break with stupid Math rounding.
 
-
 MVP:
-Single react page that asks for a Morpho "marketId" and goes to that View - then display some info about the market, and Asks the user to deposit or withdraw.  
+Single react page that asks for a Morpho "marketId" and goes to that View - then display some info about the market, and Asks the user to deposit or withdraw.
 Other pages will be made later.

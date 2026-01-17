@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql, request } from 'graphql-request'
+import { isMarketBlacklisted } from '~/lib/market-blacklist'
 
 const MORPHO_API_URL = 'https://blue-api.morpho.org/graphql'
 
@@ -117,7 +118,18 @@ export function useMarketQuery(uniqueKey?: string, chainId?: number) {
           chainId,
         },
       )
-      return marketByUniqueKey as SingleMorphoMarket
+      const market = marketByUniqueKey as SingleMorphoMarket | null
+      if (!market)
+        return null
+      if (isMarketBlacklisted({
+        uniqueKey: market.uniqueKey,
+        loanAssetAddress: market.loanAsset?.address,
+        collateralAssetAddress: market.collateralAsset?.address,
+        chainId: market.morphoBlue?.chain?.id ?? chainId,
+      })) {
+        return null
+      }
+      return market
     },
     enabled: !!uniqueKey && !!chainId,
     staleTime: 1000 * 60 * 5, // 5 minutes

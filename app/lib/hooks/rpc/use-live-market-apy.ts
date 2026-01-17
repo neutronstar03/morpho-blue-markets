@@ -4,6 +4,7 @@ import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/s
 import { useNetworkContext } from '~/lib/contexts/network'
 import { adaptiveCurveBorrowRateView } from '~/lib/irm/adaptive-curve-irm'
 import { clampRatePerSecondWad, displayApyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
+import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 import { computeMorphoMarketId, ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { getMorphoBlueAddress } from './use-morpho'
@@ -19,8 +20,8 @@ export interface LiveApyMarketInput {
   irmAddress: string
   oracleAddress?: string
   lltv?: string
-  loanAsset: { address: string }
-  collateralAsset: { address: string }
+  loanAsset: { address: string; symbol?: string | null }
+  collateralAsset: { address: string; symbol?: string | null }
 }
 
 function computeMarketId(p: LiveApyMarketInput): `0x${string}` | undefined {
@@ -58,7 +59,17 @@ export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
   const MARKET_CHUNK_SIZE = 20
   const MAX_CHUNKS = 5 // matches default `useMarkets(first=100)`
 
-  const marketsSafe = useMemo(() => markets ?? [], [markets])
+  const marketsSafe = useMemo(() => {
+    const raw = markets ?? []
+    return filterBlacklistedMarkets(raw, market => ({
+      uniqueKey: market.uniqueKey,
+      loanAssetAddress: market.loanAsset.address,
+      collateralAssetAddress: market.collateralAsset.address,
+      loanAssetSymbol: market.loanAsset.symbol ?? undefined,
+      collateralAssetSymbol: market.collateralAsset.symbol ?? undefined,
+      chainId,
+    }))
+  }, [markets, chainId])
 
   const morphoAddress = useMemo(() => getMorphoBlueAddress(chainId), [chainId])
 

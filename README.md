@@ -20,6 +20,14 @@ To run this project locally, follow these steps:
     ```
     The application will be available at `http://localhost:5173`.
 
+## Changelog
+
+See `CHANGELOG.md` for the full release history. Recent updates:
+
+- `v1.1.12` (2026-01-17): blacklists from Morpho warnings, Pendle expiry filter, optimizer chunking.
+- `v1.1.11` (2026-01-15): automatic allocation size detector for optimizer.
+- `v1.1.10` (2026-01-12): fix small markets skewing average APY.
+
 ## Live Version
 
 A live version of this project is automatically built and deployed via GitHub Actions. You can access it on GitHub Pages:

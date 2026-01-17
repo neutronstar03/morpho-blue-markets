@@ -11,3 +11,6 @@ public/curated-markets.json
 
 # Huge graphql schema
 morpho.full.schema.graphql
+
+# Unreleased notes
+UNRELEASED.md
