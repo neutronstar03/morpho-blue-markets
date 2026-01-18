@@ -2,11 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## v1.1.13 - 2026-01-17
-
-### Introduced
-- feat: add Cloudflare Web Analytics in production builds.
-
 ## v1.1.12 - 2026-01-17
 
 ### Introduced

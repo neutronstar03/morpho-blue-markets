@@ -14,8 +14,6 @@ import { Providers } from './lib/providers'
 import './app.css'
 import '@rainbow-me/rainbowkit/styles.css'
 
-const cfAnalyticsToken = import.meta.env.VITE_CF_ANALYTICS_TOKEN?.trim()
-
 export const links: Route.LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
   {
@@ -57,13 +55,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="theme-color" content="#ffffff" />
         <Meta />
         <Links />
-        {import.meta.env.PROD && cfAnalyticsToken ? (
-          <script
-            defer
-            src="https://static.cloudflareinsights.com/beacon.min.js"
-            data-cf-beacon={JSON.stringify({ token: cfAnalyticsToken })}
-          />
-        ) : null}
       </head>
       <body>
         {children}

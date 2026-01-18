@@ -27,7 +27,6 @@ jobs:
         run: bun run build
         env:
           VITE_GIT_SHA: ${{ github.sha }}
-          VITE_CF_ANALYTICS_TOKEN: ${{ vars.VITE_CF_ANALYTICS_TOKEN }}
       - name: Prepare for GitHub Pages SPA
         run: |
           mv build/client/morpho-blue-markets/index.html build/client/
