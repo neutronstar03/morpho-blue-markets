@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo } from 'react'
 import { gql } from 'graphql-request'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
+import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
 import { graphqlClient } from '~/lib/graphql/client'
 
 interface QueryCollateralSupplyAggregateResult {
@@ -38,6 +41,11 @@ export interface UseCollateralSupplyAggregateArgs {
  *
  * NOTE: intentionally not paginated (assumes <= 200 markets per collateral+chain).
  */
+interface CollateralSupplyCache {
+  data: number | undefined
+  updatedAt: number
+}
+
 export function useCollateralSupplyAggregate({
   chainId,
   collateralAddress,
@@ -45,7 +53,19 @@ export function useCollateralSupplyAggregate({
   const collateralLower = collateralAddress?.toLowerCase()
   const enabled = !!chainId && !!collateralLower
 
-  return useQuery<number | undefined>({
+  const storageKey = useMemo(
+    () => ['collateral-supply-agg', chainId, collateralLower ?? ''].join(':'),
+    [chainId, collateralLower],
+  )
+
+  const [cached, setCached] = useLocalStorage<CollateralSupplyCache>(
+    storageKey,
+    { data: undefined, updatedAt: 0 },
+  )
+
+  const initialData = cached.updatedAt > 0 ? cached.data : undefined
+
+  const query = useQuery<number | undefined>({
     queryKey: ['collateral-supply-agg', chainId, collateralLower],
     queryFn: async () => {
       if (!chainId || !collateralLower)
@@ -72,6 +92,16 @@ export function useCollateralSupplyAggregate({
       return sum > 0 ? sum : 0
     },
     enabled,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: STALE_TIME_LONG_MS,
+    refetchOnWindowFocus: false,
+    ...(initialData !== undefined ? { initialData } : {}),
   })
+
+  useEffect(() => {
+    if (query.data == null)
+      return
+    setCached({ data: query.data, updatedAt: Date.now() })
+  }, [query.data, setCached])
+
+  return query
 }

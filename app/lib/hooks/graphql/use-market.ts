@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql, request } from 'graphql-request'
+import { STALE_TIME_SHORT_MS } from '~/lib/hooks/query-stale-times'
 import { isMarketBlacklisted } from '~/lib/market-blacklist'
 
 const MORPHO_API_URL = 'https://blue-api.morpho.org/graphql'
@@ -132,6 +133,6 @@ export function useMarketQuery(uniqueKey?: string, chainId?: number) {
       return market
     },
     enabled: !!uniqueKey && !!chainId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: STALE_TIME_SHORT_MS,
   })
 }

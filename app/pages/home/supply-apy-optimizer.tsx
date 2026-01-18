@@ -14,6 +14,7 @@ import { getSupportedChainName } from '~/lib/addresses'
 import { useSupplyApyOptimizer } from '~/lib/contexts/optimizer.context'
 import { formatBigintShort } from '~/lib/formatters'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
+import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loan-assets-by-chain'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
@@ -106,7 +107,7 @@ export function SupplyApyOptimizer() {
     isLoading: isLoadingPositions,
   } = useLiveMarketPositions()
 
-  const loanAssetOptions = useMemo<LoanAssetOption[]>(() => {
+  const ownedLoanAssetOptions = useMemo<LoanAssetOption[]>(() => {
     const map = new Map<string, LoanAssetOption>()
     for (const p of (livePositions ?? [])) {
       if (p.userState.supplyShares <= 0n)
@@ -120,6 +121,39 @@ export function SupplyApyOptimizer() {
     }
     return [...map.values()].sort((a, b) => a.symbol.localeCompare(b.symbol))
   }, [livePositions])
+
+  const { data: popularLoanAssets } = usePopularLoanAssetsByChain(chain?.id, {
+    enabled: ctx.started,
+    topN: 20,
+    first: 200,
+    minNetSupplyApy: 0.05,
+    maxNetSupplyApy: 6,
+    minBorrowUsd: 20_000,
+    minUtilization: 0.1,
+  })
+
+  const popularLoanAssetOptions = useMemo<LoanAssetOption[]>(() => {
+    return (popularLoanAssets ?? [])
+      .map(a => ({
+        address: a.address,
+        symbol: a.symbol,
+        decimals: a.decimals ?? 18,
+        oraclePriceUsd: a.oraclePriceUsd,
+      }))
+      .sort((a, b) => a.symbol.localeCompare(b.symbol))
+  }, [popularLoanAssets])
+
+  const loanAssetOptions = useMemo(() => {
+    const byAddr = new Map<string, LoanAssetOption>()
+    for (const o of ownedLoanAssetOptions)
+      byAddr.set(o.address.toLowerCase(), o)
+    for (const o of popularLoanAssetOptions) {
+      const key = o.address.toLowerCase()
+      if (!byAddr.has(key))
+        byAddr.set(key, o)
+    }
+    return [...byAddr.values()].sort((a, b) => a.symbol.localeCompare(b.symbol))
+  }, [ownedLoanAssetOptions, popularLoanAssetOptions])
 
   const selectedLoanAddr = ctx.selection.loanAssetAddress?.toLowerCase()
 
@@ -219,10 +253,21 @@ export function SupplyApyOptimizer() {
     if (newDepositAmount != null)
       return
     const bal = walletBalanceRaw ?? 0n
-    if (bal <= 0n)
+    if (bal > 0n) {
+      // Prefill with a parseable string (no locale commas).
+      setNewDepositAmount(formatUnits(bal, selectedOption.decimals))
       return
-    // Prefill with a parseable string (no locale commas).
-    setNewDepositAmount(formatUnits(bal, selectedOption.decimals))
+    }
+
+    const priceUsd = selectedOption.oraclePriceUsd
+    if (priceUsd == null || !Number.isFinite(priceUsd) || priceUsd <= 0)
+      return
+
+    const targetUsd = 100_000
+    const tokenAmt = targetUsd / priceUsd
+    const s = trimTrailingZerosDecimalString(tokenAmt.toFixed(Math.min(6, selectedOption.decimals)))
+    if (s)
+      setNewDepositAmount(s)
   }, [newDepositAmount, selectedOption, setNewDepositAmount, walletBalanceRaw])
 
   const [optimizeRequest, setOptimizeRequest] = useState<null | {
@@ -408,8 +453,15 @@ export function SupplyApyOptimizer() {
     ctx.setNewDepositAmount(undefined)
   }
 
+  // Parsed deposit amount used to enable deposit-only optimization when no positions exist.
+  const parsedDepositAssetsForGate = useMemo(() => {
+    if (!selectedOption)
+      return 0n
+    return parseTokenAmount(ctx.inputs.newDepositAmount ?? '', selectedOption.decimals)
+  }, [selectedOption, ctx.inputs.newDepositAmount])
+
   const canOptimize = !!selectedOption
-    && (ctx.derived.positions?.length ?? 0) > 0
+    && ((ctx.derived.positions?.length ?? 0) > 0 || parsedDepositAssetsForGate > 0n)
     && (() => {
       const parsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
       return Number.isFinite(parsed) && parsed >= 1
@@ -422,8 +474,6 @@ export function SupplyApyOptimizer() {
     if (!selectedOption || !userAddress || !chain?.id)
       return
     const positions = ctx.derived.positions ?? []
-    if (positions.length === 0)
-      return
 
     const timestamp = BigInt(Math.floor(Date.now() / 1000))
     const runId = beginRun({ timestamp })
@@ -449,6 +499,10 @@ export function SupplyApyOptimizer() {
     }
 
     const newDepositAssets = parseTokenAmount(ctx.inputs.newDepositAmount ?? '', selectedOption.decimals)
+    if (positions.length === 0 && newDepositAssets <= 0n) {
+      finishRun(runId, undefined, 'Deposit amount must be > 0')
+      return
+    }
 
     const cacheKey = buildMoveSizeCacheKey({
       chainId: chain?.id,
@@ -592,7 +646,27 @@ export function SupplyApyOptimizer() {
                     className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="" disabled>Select an asset</option>
-                    {loanAssetOptions.map(o => (
+                    {ownedLoanAssetOptions.length > 0 && (
+                      <optgroup label="Owned assets">
+                        {ownedLoanAssetOptions.map(o => (
+                          <option key={o.address} value={o.address}>
+                            {o.symbol}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {popularLoanAssetOptions.length > 0 && (
+                      <optgroup label="Popular assets">
+                        {popularLoanAssetOptions
+                          .filter(o => !ownedLoanAssetOptions.some(x => x.address.toLowerCase() === o.address.toLowerCase()))
+                          .map(o => (
+                            <option key={o.address} value={o.address}>
+                              {o.symbol}
+                            </option>
+                          ))}
+                      </optgroup>
+                    )}
+                    {ownedLoanAssetOptions.length === 0 && popularLoanAssetOptions.length === 0 && loanAssetOptions.map(o => (
                       <option key={o.address} value={o.address}>
                         {o.symbol}
                       </option>

@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
+import { useEffect, useMemo } from 'react'
+import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 import { graphqlClient } from '../../graphql/client'
 
@@ -83,8 +86,25 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
   }
 `
 
+interface MarketsByChainCache {
+  data: SupplyMarketData[]
+  updatedAt: number
+}
+
 export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
-  return useQuery<SupplyMarketData[]>({
+  const storageKey = useMemo(
+    () => ['markets-by-chain', chainId, loanAssetAddress ?? 'all'].join(':'),
+    [chainId, loanAssetAddress],
+  )
+
+  const [cached, setCached] = useLocalStorage<MarketsByChainCache>(
+    storageKey,
+    { data: [], updatedAt: 0 },
+  )
+
+  const initialData = cached.updatedAt > 0 ? cached.data : undefined
+
+  const query = useQuery<SupplyMarketData[]>({
     queryKey: ['markets-by-chain', chainId, loanAssetAddress],
     queryFn: async () => {
       if (!chainId)
@@ -129,7 +149,16 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
       }))
     },
     enabled: !!chainId,
-    refetchInterval: 5 * 60 * 1000,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: STALE_TIME_LONG_MS,
+    refetchOnWindowFocus: false,
+    ...(initialData ? { initialData } : {}),
   })
+
+  useEffect(() => {
+    if (!query.data)
+      return
+    setCached({ data: query.data, updatedAt: Date.now() })
+  }, [query.data, setCached])
+
+  return query
 }

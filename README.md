@@ -24,9 +24,9 @@ To run this project locally, follow these steps:
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.1.14` (2026-01-18): optimizer adds popular assets preview, cleanup of unused hook, revert analytics.
 - `v1.1.12` (2026-01-17): blacklists from Morpho warnings, Pendle expiry filter, optimizer chunking.
 - `v1.1.11` (2026-01-15): automatic allocation size detector for optimizer.
-- `v1.1.10` (2026-01-12): fix small markets skewing average APY.
 
 ## Live Version
 

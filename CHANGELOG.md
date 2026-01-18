@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.14 - 2026-01-18
+
+### Introduced
+- feat: optimizer suggests popular assets on the connected chain for preview without existing positions.
+
+### Changed
+- chore: remove unused hook and annotate chain metadata.
+- revert: remove minimal Cloudflare analytics in production builds.
+
 ## v1.1.12 - 2026-01-17
 
 ### Introduced
