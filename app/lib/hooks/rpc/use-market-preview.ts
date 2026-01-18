@@ -213,19 +213,29 @@ export function useMarketPreview(args: {
 
   const feeWad = marketState?.fee
 
-  const supplyApyBefore = useMemo(() => {
+  const supplyRateBeforeWad = useMemo(() => {
     if (borrowRateBefore == null || utilizationBeforeWad == null || feeWad == null)
       return undefined
-    const rate = supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRateBefore, utilizationWad: utilizationBeforeWad, feeWad })
-    return displayApyFromRatePerSecondWad(rate)
+    return supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRateBefore, utilizationWad: utilizationBeforeWad, feeWad })
   }, [borrowRateBefore, utilizationBeforeWad, feeWad])
 
-  const supplyApyAfter = useMemo(() => {
+  const supplyRateAfterWad = useMemo(() => {
     if (borrowRateAfter == null || utilizationAfterWad == null || feeWad == null)
       return undefined
-    const rate = supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRateAfter, utilizationWad: utilizationAfterWad, feeWad })
-    return displayApyFromRatePerSecondWad(rate)
+    return supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRateAfter, utilizationWad: utilizationAfterWad, feeWad })
   }, [borrowRateAfter, utilizationAfterWad, feeWad])
+
+  const supplyApyBefore = useMemo(() => {
+    if (supplyRateBeforeWad == null)
+      return undefined
+    return displayApyFromRatePerSecondWad(supplyRateBeforeWad)
+  }, [supplyRateBeforeWad])
+
+  const supplyApyAfter = useMemo(() => {
+    if (supplyRateAfterWad == null)
+      return undefined
+    return displayApyFromRatePerSecondWad(supplyRateAfterWad)
+  }, [supplyRateAfterWad])
 
   const utilizationBefore = useMemo(() => {
     if (utilizationBeforeWad == null)
@@ -239,25 +249,23 @@ export function useMarketPreview(args: {
     return Number.parseFloat(formatUnits(utilizationAfterWad, 18))
   }, [utilizationAfterWad])
 
-  const canEstimateApy = utilizationBefore != null && utilizationAfter != null && market.state.supplyApy != null
-  const estimatedSupplyApyAfter = useMemo(() => {
-    if (!canEstimateApy)
-      return undefined
-    if (utilizationBefore <= 0)
-      return market.state.supplyApy
-    // Simple “utilization-only” estimate: assumes borrow rate unchanged.
-    return market.state.supplyApy * (utilizationAfter / utilizationBefore)
-  }, [canEstimateApy, utilizationBefore, utilizationAfter, market.state.supplyApy])
-
   return {
     enabled,
     isBorrowRateLoading,
     borrowRateError,
+    rateAtTarget,
     rateAtTargetApy,
     utilizationBefore,
     utilizationAfter,
+    utilizationBeforeWad,
+    utilizationAfterWad,
+    supplyRateBeforeWad,
+    supplyRateAfterWad,
     supplyApyBefore,
     supplyApyAfter,
-    estimatedSupplyApyAfter,
+    borrowRateBefore,
+    borrowRateAfter,
+    feeWad,
+    canUseLocalIrm,
   }
 }

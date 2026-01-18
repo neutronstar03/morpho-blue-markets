@@ -33,7 +33,7 @@ function versionJsonPlugin(gitSha: string | null): Plugin {
   }
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode }: { mode: string }) => {
   const isProduction = mode === 'production'
   const base = isProduction ? '/morpho-blue-markets/' : ''
   const gitSha = (process.env.VITE_GIT_SHA || process.env.GITHUB_SHA || (!isProduction ? '000dev' : null))?.trim() || null

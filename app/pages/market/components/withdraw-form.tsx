@@ -6,7 +6,8 @@ import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { Button } from '~/components/ui/button'
-import { formatPercent, formatTokenAmountShort } from '~/lib/formatters'
+import { MarketApyPreview } from '~/components/ui/market-apy-preview'
+import { formatTokenAmountShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
@@ -286,9 +287,9 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
   const afterUtil = utilizationAfterWad != null
     ? Number.parseFloat(formatUnits(utilizationAfterWad, 18))
     : preview.utilizationAfter
-  const beforeApy = preview.supplyApyBefore ?? market.state.supplyApy ?? market.state.netSupplyApy
-  const afterApy = preview.supplyApyAfter ?? preview.estimatedSupplyApyAfter
-  const isApyEstimated = preview.supplyApyAfter == null && afterApy != null
+  const beforeApy = preview.supplyApyBefore
+  const afterApy = preview.supplyApyAfter
+  const showApyEstimateLabel = afterApy != null
 
   if (isSuccess && showSuccess) {
     return (
@@ -369,30 +370,14 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
         )}
       />
 
-      {showPreview && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-400">Utilization</span>
-            <span className="text-gray-200">
-              {formatPercent(beforeUtil)}
-              {' '}
-              →
-              {' '}
-              {afterUtil != null ? formatPercent(afterUtil) : '—'}
-            </span>
-          </div>
-          <div className="mt-1 flex items-center justify-between text-xs">
-            <span className="text-gray-400">Supply APY</span>
-            <span className="text-gray-200">
-              {formatPercent(beforeApy)}
-              {' '}
-              →
-              {' '}
-              {afterApy != null ? formatPercent(afterApy) : (preview.isBorrowRateLoading ? 'Loading…' : '—')}
-              {isApyEstimated && <span className="ml-1 text-gray-500">(est.)</span>}
-            </span>
-          </div>
-        </div>
+      {showPreview && afterUtil != null && (
+        <MarketApyPreview
+          beforeUtil={beforeUtil}
+          afterUtil={afterUtil}
+          beforeApy={beforeApy}
+          afterApy={afterApy}
+          showEstimateLabel={showApyEstimateLabel}
+        />
       )}
 
       {isUtilizationAfterAbove100 && (

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { createPublicClient, formatUnits } from 'viem'
 import { mainnet } from 'viem/chains'
 import { adaptiveCurveBorrowRateView } from '../../app/lib/irm/adaptive-curve-irm'
+import { displayApyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '../../app/lib/irm/apy-math'
 import { ADAPTIVE_CURVE_IRM_ABI, MORPHO_BLUE_ABI, MORPHO_BLUE_MAINNET } from './abi'
 import { makeMainnetTransport } from './rpc'
 
@@ -213,6 +214,31 @@ describe('IRM diff harness (block-pinned reads)', () => {
 })
 
 describe('IRM explanation (poor-man APR estimator)', () => {
+  test('display APY is APR-only for monotonic preview', () => {
+    const borrowBefore = 157_587_248_936n
+    const borrowAfter = 81_347_261_336n
+    const utilBeforeWad = 1_000_000_000_000_000_000n
+    const utilAfterWad = 935_655_477_754_847_575n
+    const feeWad = 0n
+
+    const supplyRateBefore = supplyRatePerSecondWad({
+      borrowRatePerSecondWad: borrowBefore,
+      utilizationWad: utilBeforeWad,
+      feeWad,
+    })
+    const supplyRateAfter = supplyRatePerSecondWad({
+      borrowRatePerSecondWad: borrowAfter,
+      utilizationWad: utilAfterWad,
+      feeWad,
+    })
+
+    const apyBefore = displayApyFromRatePerSecondWad(supplyRateBefore)
+    const apyAfter = displayApyFromRatePerSecondWad(supplyRateAfter)
+
+    expect(apyAfter).toBeLessThan(apyBefore)
+    expect(supplyRateAfter).toBeLessThan(supplyRateBefore)
+  })
+
   test('logs borrow APR before/after a +1% supply “deposit”', async () => {
     const client = createPublicClient({
       chain: mainnet,

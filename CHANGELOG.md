@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.15 - 2026-01-18
+
+### Introduced
+- feat: reusable market APY preview component with UI tests for utilization and APY rows.
+
+### Changed
+- fix: display supply rates as APR consistently to avoid misleading APY spikes in previews.
+- ux: deposit/withdraw preview logic uses IRM-only math with clearer fallbacks when data is missing.
+
 ## v1.1.14 - 2026-01-18
 
 ### Introduced

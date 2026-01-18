@@ -1,12 +1,13 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useDebugValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { Button } from '~/components/ui/button'
-import { formatBigintShort, formatDecimalStringShort, formatPercent } from '~/lib/formatters'
+import { MarketApyPreview } from '~/components/ui/market-apy-preview'
+import { formatBigintShort, formatDecimalStringShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
@@ -19,12 +20,42 @@ interface DepositFormProps {
   onSuccess?: () => void
 }
 
-export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: DepositFormProps) {
+const isValidNumberInput = (value: string) => value === '' || /^\d*(?:\.\d*)?$/.test(value)
+
+function useDepositFormState() {
   const isClient = useIsClient()
   const [mode, setMode] = useLocalStorage<'percent' | 'asset'>('market:deposit:unit', 'percent')
   const [percentage, setPercentage] = useState('')
   const [assetAmount, setAssetAmount] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
+
+  useDebugValue({ mode, percentage, assetAmount, showSuccess, isClient })
+
+  return {
+    isClient,
+    mode,
+    setMode,
+    percentage,
+    setPercentage,
+    assetAmount,
+    setAssetAmount,
+    showSuccess,
+    setShowSuccess,
+  }
+}
+
+export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: DepositFormProps) {
+  const {
+    isClient,
+    mode,
+    setMode,
+    percentage,
+    setPercentage,
+    assetAmount,
+    setAssetAmount,
+    showSuccess,
+    setShowSuccess,
+  } = useDepositFormState()
   const { address } = useAccount()
 
   const { data: marketStateRaw } = useMarket(market.uniqueKey)
@@ -60,7 +91,7 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       return (tokenBalance * pctScaled) / (BigInt(100) * BigInt(SCALE))
     }
 
-    if (!assetAmount)
+    if (!assetAmount || !isValidNumberInput(assetAmount))
       return 0n
 
     let assetsWei = 0n
@@ -117,7 +148,7 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
   const isAmountDebounced = amount === debouncedAmount
 
   const debouncedAmountWei = useMemo(() => {
-    if (!debouncedAmount)
+    if (!debouncedAmount || !isValidNumberInput(debouncedAmount))
       return 0n
     try {
       return parseUnits(debouncedAmount, market.loanAsset.decimals!)
@@ -221,9 +252,9 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
   const showPreview = debouncedAmountWei > 0n && preview.utilizationAfter != null
   const beforeUtil = preview.utilizationBefore ?? market.state.utilization
   const afterUtil = preview.utilizationAfter
-  const beforeApy = preview.supplyApyBefore ?? market.state.supplyApy ?? market.state.netSupplyApy
-  const afterApy = preview.supplyApyAfter ?? preview.estimatedSupplyApyAfter
-  const isApyEstimated = preview.supplyApyAfter == null && afterApy != null
+  const beforeApy = preview.supplyApyBefore
+  const afterApy = preview.supplyApyAfter
+  const showApyEstimateLabel = afterApy != null
 
   if (isSuccess && showSuccess) {
     return (
@@ -339,29 +370,13 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       />
 
       {showPreview && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-400">Utilization</span>
-            <span className="text-gray-200">
-              {formatPercent(beforeUtil)}
-              {' '}
-              →
-              {' '}
-              {formatPercent(afterUtil!)}
-            </span>
-          </div>
-          <div className="mt-1 flex items-center justify-between text-xs">
-            <span className="text-gray-400">Supply APY</span>
-            <span className="text-gray-200">
-              {formatPercent(beforeApy)}
-              {' '}
-              →
-              {' '}
-              {afterApy != null ? formatPercent(afterApy) : (preview.isBorrowRateLoading ? 'Loading…' : '—')}
-              {isApyEstimated && <span className="ml-1 text-gray-500">(est.)</span>}
-            </span>
-          </div>
-        </div>
+        <MarketApyPreview
+          beforeUtil={beforeUtil}
+          afterUtil={afterUtil!}
+          beforeApy={beforeApy}
+          afterApy={afterApy}
+          showEstimateLabel={showApyEstimateLabel}
+        />
       )}
 
       {isApproveSuccess && !needsApproval && (

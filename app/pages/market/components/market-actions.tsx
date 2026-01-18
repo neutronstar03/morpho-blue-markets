@@ -74,8 +74,8 @@ export function MarketActions({ market }: MarketActionsProps) {
   })
 
   const utilization = live.utilizationBefore ?? market.state.utilization
-  const supplyApy = live.supplyApyBefore ?? market.state.supplyApy ?? market.state.netSupplyApy
-  const rateAtTargetApy = live.rateAtTargetApy ?? market.state.apyAtTarget
+  const supplyApy = live.supplyApyBefore
+  const rateAtTargetApy = live.rateAtTargetApy
   const targetUtilization = 0.9
   const missingLiquidityTo90Usd = utilization > targetUtilization
     ? Math.max(0, market.state.supplyAssetsUsd * (utilization / targetUtilization - 1))
@@ -96,7 +96,7 @@ export function MarketActions({ market }: MarketActionsProps) {
           <StatPill
             className="flex-1"
             label="Supply APY"
-            value={formatPercent(supplyApy)}
+            value={supplyApy != null ? formatPercent(supplyApy) : '----'}
           />
           <StatPill
             className="flex-1"

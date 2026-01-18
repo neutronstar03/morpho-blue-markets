@@ -194,11 +194,11 @@ export function MarketDetails({ market }: MarketDetailsProps) {
       <SectionTitle title="Supply APY" />
       <DetailRow
         label="Instantaneous"
-        value={formatPercent(liveSupplyApy ?? market.state.supplyApy ?? market.state.netSupplyApy)}
+        value={liveSupplyApy != null ? formatPercent(liveSupplyApy) : '----'}
       />
       <DetailRow
         label="Rate at Target"
-        value={formatPercent(liveRateAtTargetApy ?? market.state.apyAtTarget)}
+        value={liveRateAtTargetApy != null ? formatPercent(liveRateAtTargetApy) : '—'}
       />
 
       <DetailRow

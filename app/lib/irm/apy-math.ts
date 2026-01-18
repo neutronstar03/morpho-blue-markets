@@ -37,8 +37,6 @@ export function utilizationWad(totalBorrowAssets: bigint, totalSupplyAssets: big
   return (totalBorrowAssets * WAD) / totalSupplyAssets
 }
 
-const APR_LINEAR_SWITCH_WAD = 3n * WAD // 300% APR threshold
-
 export function apyFromRatePerSecondWad(ratePerSecondWad: bigint): number {
   const r = Number.parseFloat(formatUnits(ratePerSecondWad, 18))
   if (!Number.isFinite(r) || r <= 0)
@@ -49,18 +47,12 @@ export function apyFromRatePerSecondWad(ratePerSecondWad: bigint): number {
 
 export function displayApyFromRatePerSecondWad(ratePerSecondWad: bigint): number {
   const rate = clampRatePerSecondWad(ratePerSecondWad)
-  const annualizedWad = aprWadFromRatePerSecondWad(rate)
-  if (annualizedWad > APR_LINEAR_SWITCH_WAD)
-    return Number(annualizedWad) / 1e18
-  return apyFromRatePerSecondWad(rate)
+  return Number(aprWadFromRatePerSecondWad(rate)) / 1e18
 }
 
 export function displayApyWadFromRatePerSecondWad(ratePerSecondWad: bigint): bigint {
   const rate = clampRatePerSecondWad(ratePerSecondWad)
-  const annualizedWad = aprWadFromRatePerSecondWad(rate)
-  if (annualizedWad > APR_LINEAR_SWITCH_WAD)
-    return annualizedWad
-  return apyWadFromRatePerSecondWad(rate)
+  return aprWadFromRatePerSecondWad(rate)
 }
 
 export function supplyRatePerSecondWad(args: {
