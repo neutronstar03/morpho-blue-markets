@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.16 - 2026-01-19
+
+### Changed
+- ux: reset supply APY optimizer state when switching networks to avoid stale results.
+
 ## v1.1.15 - 2026-01-18
 
 ### Introduced

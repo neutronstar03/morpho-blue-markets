@@ -282,6 +282,24 @@ export function SupplyApyOptimizer() {
     autoCacheKey?: string
   }>(null)
 
+  const lastChainIdRef = useRef<number | undefined>(chain?.id)
+
+  useEffect(() => {
+    const currentChainId = chain?.id
+    const previousChainId = lastChainIdRef.current
+    lastChainIdRef.current = currentChainId
+
+    if (previousChainId == null || currentChainId == null)
+      return
+    if (previousChainId === currentChainId)
+      return
+
+    ctx.clear()
+    setOptimizeRequest(null)
+    setAutoStepInfo(null)
+    heuristicCacheRef.current.clear()
+  }, [chain?.id, ctx])
+
   const optimizeContracts = useMemo(() => {
     if (!optimizeRequest)
       return []

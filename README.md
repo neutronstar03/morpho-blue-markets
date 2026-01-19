@@ -24,9 +24,9 @@ To run this project locally, follow these steps:
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.1.16` (2026-01-19): optimizer resets on network switch to prevent stale state.
 - `v1.1.15` (2026-01-18): APR-consistent market previews, reusable APY preview component, UI tests.
 - `v1.1.14` (2026-01-18): optimizer adds popular assets preview, cleanup of unused hook, revert analytics.
-- `v1.1.12` (2026-01-17): blacklists from Morpho warnings, Pendle expiry filter, optimizer chunking.
 
 ## Live Version
 
