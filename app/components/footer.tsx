@@ -1,9 +1,11 @@
+import type { MouseEvent } from 'react'
 import pkg from '../../package.json'
 import { Container } from './ui/container'
 
 function getRepoUrl(repository: unknown): string | null {
-  if (typeof repository === 'string')
+  if (typeof repository === 'string') {
     return repository
+  }
   if (repository && typeof repository === 'object' && 'url' in repository) {
     const url = (repository as { url?: unknown }).url
     return typeof url === 'string' ? url : null
@@ -24,8 +26,9 @@ function normalizeRepoUrl(url: string): string {
 
 function isLikelyGithubHandle(value: string): boolean {
   const s = value.trim().replace(/^@/, '')
-  if (!s || /\s/.test(s))
+  if (!s || /\s/.test(s)) {
     return false
+  }
   // very small heuristic; keeps us from linking "John Doe" to GitHub
   return /^[a-z0-9][a-z0-9-]{0,37}$/i.test(s)
 }
@@ -39,16 +42,15 @@ function isLikelyGitSha(value: string): boolean {
 function getAuthorInfo(author: unknown): { name: string, url: string | null } | null {
   if (typeof author === 'string') {
     const name = author
-    const url = isLikelyGithubHandle(name)
-      ? `https://github.com/${name.trim().replace(/^@/, '')}`
-      : null
+    const url = isLikelyGithubHandle(name) ? `https://github.com/${name.trim().replace(/^@/, '')}` : null
     return { name, url }
   }
 
   if (author && typeof author === 'object') {
     const name = 'name' in author ? (author as { name?: unknown }).name : undefined
-    if (typeof name !== 'string' || !name.trim())
+    if (typeof name !== 'string' || !name.trim()) {
       return null
+    }
 
     const urlRaw = 'url' in author ? (author as { url?: unknown }).url : undefined
     const url = typeof urlRaw === 'string' ? urlRaw : null
@@ -67,32 +69,35 @@ export function Footer() {
   const gitShaShort = gitSha ? gitSha.slice(0, 7) : null
   const gitShaTitle = gitSha || undefined
   const shouldLinkCommit = !!(repoUrl && gitSha && isLikelyGitSha(gitSha) && repoUrl.includes('github.com/'))
-  const commitUrl
-    = shouldLinkCommit
-      ? `${repoUrl.replace(/\/$/, '')}/commit/${gitSha}`
-      : null
+  const commitUrl = shouldLinkCommit ? `${repoUrl.replace(/\/$/, '')}/commit/${gitSha}` : null
+
+  const onWipeCache = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    if (typeof window === 'undefined')
+      return
+    try {
+      window.localStorage.clear()
+    }
+    catch {} // Ignore storage errors and still refresh.
+    window.location.reload()
+  }
 
   return (
     <footer className="border-t border-gray-800 text-gray-400 text-xs">
       <Container className="py-4">
         <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start justify-between gap-3 sm:items-center">
             {repoUrl
               ? (
-                  <a
-                    href={repoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 hover:text-gray-200"
-                  >
+                  <a href={repoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-gray-200">
                     <span aria-hidden="true">🐙</span>
                     <span>GitHub</span>
-                    <span aria-hidden="true" className="opacity-80">↗</span>
+                    <span aria-hidden="true" className="opacity-80">
+                      ↗
+                    </span>
                   </a>
                 )
-              : (
-                  <span />
-                )}
+              : <span />}
 
             {(version || gitShaShort) && (
               <span className="tabular-nums">
@@ -117,38 +122,42 @@ export function Footer() {
                             {gitShaShort}
                           </a>
                         )
-                      : (
-                          <span title={gitShaTitle}>{gitShaShort}</span>
-                        )}
+                      : <span title={gitShaTitle}>{gitShaShort}</span>}
                   </>
                 )}
               </span>
             )}
           </div>
 
-          {author && (
-            <div className="inline-flex items-center gap-1.5">
-              <span aria-hidden="true">🤖</span>
-              <span>
-                Made by
-                {' '}
-                {author.url
-                  ? (
-                      <a
-                        href={author.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline underline-offset-2 hover:text-gray-200"
-                      >
-                        {author.name}
-                      </a>
-                    )
-                  : (
-                      <span>{author.name}</span>
-                    )}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center justify-between gap-3">
+            {author
+              ? (
+                  <div className="inline-flex items-center gap-1.5">
+                    <span aria-hidden="true">🤖</span>
+                    <span>
+                      Made by
+                      {' '}
+                      {author.url == null
+                        ? <span>{author.name}</span>
+                        : (
+                            <a href={author.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-gray-200">
+                              {author.name}
+                            </a>
+                          )}
+                    </span>
+                  </div>
+                )
+              : <span />}
+
+            <a
+              href="#"
+              onClick={onWipeCache}
+              className="underline underline-offset-2 hover:text-gray-200"
+              title="Clear local cache and reload"
+            >
+              Wipe cache & reload
+            </a>
+          </div>
         </div>
       </Container>
     </footer>

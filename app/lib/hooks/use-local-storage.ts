@@ -36,25 +36,50 @@ export function useLocalStorage<T>(
     return window.localStorage
   }, [storage])
 
-  const [value, setValue] = useState<T>(initialValue)
+  // Clear corrupt data to avoid repeated parse failures.
+  const handleParseError = useCallback((error: unknown) => {
+    const s = getStorage()
+    if (s)
+      s.removeItem(storageKey)
+    console.warn('useLocalStorage: failed to parse stored value, removing key', storageKey, error)
+  }, [getStorage, storageKey])
+
+  const readRawValue = useCallback(() => {
+    const s = getStorage()
+    if (!s)
+      return null
+    return s.getItem(storageKey)
+  }, [getStorage, storageKey])
+
+  // Deserialize with fallback to initialValue on parse errors.
+  const parseStoredValue = useCallback((raw: string) => {
+    try {
+      return deserialize(raw)
+    }
+    catch (error) {
+      handleParseError(error)
+      return initialValue
+    }
+  }, [deserialize, handleParseError, initialValue])
+
+  const [value, setValue] = useState<T>(() => {
+    if (typeof window === 'undefined')
+      return initialValue
+    const raw = readRawValue()
+    if (raw != null)
+      return parseStoredValue(raw)
+    return initialValue
+  })
 
   useEffect(() => {
     if (!isClient)
       return
-    try {
-      const s = getStorage()
-      if (!s)
-        return
-      const raw = s.getItem(storageKey)
-      if (raw != null) {
-        setValue(deserialize(raw))
-      }
-    }
-    catch {
-      // ignore read/parse errors
-    }
-  }, [isClient, storageKey, getStorage, deserialize])
+    const raw = readRawValue()
+    if (raw != null)
+      setValue(parseStoredValue(raw))
+  }, [isClient, readRawValue, parseStoredValue])
 
+  // Keep value in sync across tabs.
   useEffect(() => {
     if (!isClient || !sync)
       return
@@ -66,16 +91,16 @@ export function useLocalStorage<T>(
           setValue(initialValue)
         }
         else {
-          setValue(deserialize(e.newValue))
+          setValue(parseStoredValue(e.newValue))
         }
       }
-      catch {
-        // ignore parse errors
+      catch (error) {
+        handleParseError(error)
       }
     }
     window.addEventListener('storage', handler)
     return () => window.removeEventListener('storage', handler)
-  }, [isClient, sync, storageKey, deserialize, initialValue])
+  }, [isClient, sync, storageKey, parseStoredValue, initialValue, handleParseError])
 
   const setStoredValue: SetValue<T> = useCallback((next) => {
     setValue((prev) => {

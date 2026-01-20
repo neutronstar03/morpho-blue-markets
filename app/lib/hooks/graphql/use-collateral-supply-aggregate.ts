@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo } from 'react'
 import { gql } from 'graphql-request'
-import { useLocalStorage } from '~/lib/hooks/use-local-storage'
-import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
+import { useEffect, useMemo } from 'react'
 import { graphqlClient } from '~/lib/graphql/client'
+import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 
 interface QueryCollateralSupplyAggregateResult {
   markets: {
