@@ -1,17 +1,19 @@
-import type { SupplyOptimizerMarketSnapshot, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
+import type { SupplyOptimizerDebugRequest } from '~/lib/optimizer/supply-apr-optimizer-debugger'
+import type { UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
+import type { OptimizerReadResult } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createSearchParams, Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
-import { useAccount, useReadContracts } from 'wagmi'
+import { useAccount, usePublicClient, useReadContracts } from 'wagmi'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { InfoTooltip } from '~/components/ui/info-tooltip'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
+import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
-import { useSupplyApyOptimizer } from '~/lib/contexts/optimizer.context'
+import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
 import { formatBigintShort } from '~/lib/formatters'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loan-assets-by-chain'
@@ -21,50 +23,11 @@ import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
+import { dumpSupplyOptimizerFixtures, setSupplyOptimizerDebugState } from '~/lib/optimizer/supply-apr-optimizer-debugger'
 import { runSupplyOptimizer } from '~/lib/optimizer/supply-optimizer-runner'
+import { buildMoveSizeCacheKey, fmtToken, pctFromWad, trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
+import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { BundleOptimizerResult } from '~/pages/home/bundle-optimizer-result'
-
-function pctFromWad(wad: bigint, digits = 2): string {
-  const asNum = Number.parseFloat(formatUnits(wad, 18)) * 100
-  if (!Number.isFinite(asNum))
-    return '—'
-  return `${asNum.toFixed(digits)}%`
-}
-
-function fmtToken(amount: bigint, decimals: number, digits = 4): string {
-  const asNum = Number.parseFloat(formatUnits(amount, decimals))
-  if (!Number.isFinite(asNum))
-    return '—'
-  return asNum.toLocaleString(undefined, { maximumFractionDigits: digits })
-}
-
-function trimTrailingZerosDecimalString(s: string): string {
-  // Ensure "3072.0000" -> "3072" and "12.3400" -> "12.34"
-  if (!s.includes('.'))
-    return s
-  const trimmed = s.replace(/0+$/, '').replace(/\.$/, '')
-  return trimmed
-}
-
-function buildMoveSizeCacheKey(args: {
-  chainId?: number
-  loanAssetAddress?: string
-  newDepositAssets: bigint
-  maxMarketsUsed: number
-  positions: UserSupplyPosition[]
-}): string {
-  const positionsKey = [...args.positions]
-    .sort((a, b) => a.marketId.localeCompare(b.marketId))
-    .map(p => `${p.marketId}:${p.suppliedAssets}`)
-    .join('|')
-  return [
-    args.chainId ?? 0,
-    (args.loanAssetAddress ?? 'unknown').toLowerCase(),
-    args.newDepositAssets.toString(),
-    args.maxMarketsUsed.toString(),
-    positionsKey,
-  ].join('::')
-}
 
 interface LoanAssetOption {
   address: string
@@ -80,13 +43,16 @@ interface AutoStepInfo {
   fromCache: boolean
 }
 
-export function SupplyApyOptimizer() {
-  // If the blended APY improvement is <= this threshold, show a "no-op" plan.
+export function SupplyAprOptimizer() {
+  const WAD = 10n ** 18n
+  // If the blended APR improvement is <= this threshold, show a "no-op" plan.
   // 0.25% = 0.0025 in WAD terms (1e18 = 100%).
-  const NO_BENEFIT_DELTA_APY_WAD = 2_500_000_000_000_000n
+  const NO_BENEFIT_DELTA_APR_WAD = 2_500_000_000_000_000n
   const MAX_OPTIMIZER_ITERATIONS = 1000
+  const OPTIMIZER_READ_CHUNK_SIZE = 50
+  const OPTIMIZER_READ_CACHE_TTL_MS = 60_000
 
-  const ctx = useSupplyApyOptimizer()
+  const ctx = useSupplyAprOptimizer()
   const { address: userAddress, chain } = useAccount()
   const newDepositAmount = ctx.inputs.newDepositAmount
   const setDerived = ctx.setDerived
@@ -96,9 +62,11 @@ export function SupplyApyOptimizer() {
 
   const heuristicCacheRef = useRef(new Map<string, { stepAssets: bigint }>())
   const [autoStepInfo, setAutoStepInfo] = useState<AutoStepInfo | null>(null)
+  const lastOptimizerRequestRef = useRef<SupplyOptimizerDebugRequest | null>(null)
+  const lastOptimizerReadRef = useRef<OptimizerReadResult | null>(null)
 
   const [maxMarketsInput, setMaxMarketsInput] = useLocalStorage<string>(
-    'supply-apy-optimizer:max-markets',
+    'supply-apr-optimizer:max-markets',
     '5',
   )
 
@@ -300,80 +268,32 @@ export function SupplyApyOptimizer() {
     heuristicCacheRef.current.clear()
   }, [chain?.id, ctx])
 
-  const optimizeContracts = useMemo(() => {
-    if (!optimizeRequest)
-      return []
-    return optimizeRequest.markets.flatMap((m) => {
-      return [
-        {
-          address: morphoAddress,
-          abi: SIMPLIFIED_MORPHO_BLUE_ABI,
-          functionName: 'market' as const,
-          args: [m.uniqueKey] as const,
-        },
-        {
-          address: m.irmAddress,
-          abi: IRM_RATE_AT_TARGET_ABI,
-          functionName: 'rateAtTarget' as const,
-          args: [m.uniqueKey] as const,
-        },
-      ] as const
-    })
-  }, [optimizeRequest, morphoAddress])
-
-  const { data: optimizeReadResults } = useReadContracts({
-    contracts: optimizeContracts as any,
-    allowFailure: true,
-    query: { enabled: !!optimizeRequest },
+  const publicClient = usePublicClient()
+  const optimizeReadResult = useSupplyOptimizerReads({
+    input: optimizeRequest,
+    morphoAddress,
+    chainId: chain?.id,
+    publicClient,
+    config: {
+      chunkSize: OPTIMIZER_READ_CHUNK_SIZE,
+      cacheTtlMs: OPTIMIZER_READ_CACHE_TTL_MS,
+    },
   })
 
   // When onchain snapshot is ready, run optimizer.
   useEffect(() => {
     if (!optimizeRequest)
       return
-    if (!optimizeReadResults || optimizeReadResults.length !== optimizeRequest.markets.length * 2)
+    if (!optimizeReadResult)
       return
 
-    const requiredUserMarketIds = new Set(optimizeRequest.positions.map(p => p.marketId.toLowerCase()))
-    const snapshots: SupplyOptimizerMarketSnapshot[] = []
-    const missingRequired: string[] = []
+    const { snapshots, skippedMarkets, missingRequired } = optimizeReadResult
+    lastOptimizerReadRef.current = optimizeReadResult
+    if (import.meta.env.DEV)
+      setSupplyOptimizerDebugState({ readResult: optimizeReadResult })
 
-    for (let i = 0; i < optimizeRequest.markets.length; i++) {
-      const id = optimizeRequest.markets[i].uniqueKey
-      const marketRes = optimizeReadResults[2 * i]
-      const rateRes = optimizeReadResults[2 * i + 1]
-
-      const required = requiredUserMarketIds.has(id.toLowerCase())
-      if (marketRes?.status !== 'success' || rateRes?.status !== 'success' || !marketRes.result || rateRes.result == null) {
-        if (required)
-          missingRequired.push(id)
-        continue
-      }
-
-      const tuple = normalizeMorphoMarketState(marketRes.result)
-      if (!tuple) {
-        if (required)
-          missingRequired.push(id)
-        continue
-      }
-      const rateAtTarget = rateRes.result as bigint
-
-      // Basic sanity: skip if timestamp < lastUpdate.
-      if (optimizeRequest.timestamp < tuple.lastUpdate) {
-        if (required)
-          missingRequired.push(id)
-        continue
-      }
-
-      snapshots.push({
-        marketId: id,
-        uniqueKey: id,
-        totalSupplyAssets: tuple.totalSupplyAssets,
-        totalBorrowAssets: tuple.totalBorrowAssets,
-        lastUpdate: tuple.lastUpdate,
-        feeWad: tuple.fee,
-        rateAtTarget,
-      })
+    if (skippedMarkets > 0) {
+      console.warn(`Optimizer skipped ${skippedMarkets} markets due to missing onchain reads.`)
     }
 
     if (missingRequired.length > 0) {
@@ -451,7 +371,7 @@ export function SupplyApyOptimizer() {
     finally {
       setOptimizeRequest(null)
     }
-  }, [finishRun, optimizeReadResults, optimizeRequest])
+  }, [finishRun, optimizeReadResult, optimizeRequest])
 
   const canStart = !isLoadingPositions
   const canPick = ctx.started && loanAssetOptions.length > 0
@@ -548,7 +468,7 @@ export function SupplyApyOptimizer() {
       universe.set(id, { uniqueKey: p.market.uniqueKey as `0x${string}`, irmAddress: p.market.irmAddress as `0x${string}` })
     }
 
-    setOptimizeRequest({
+    const requestPayload = {
       runId,
       timestamp,
       stepAssets,
@@ -558,7 +478,22 @@ export function SupplyApyOptimizer() {
       markets: [...universe.values()],
       autoStep: useAutoMoveSize,
       autoCacheKey: useAutoMoveSize ? cacheKey : undefined,
-    })
+    }
+
+    const debugRequest: SupplyOptimizerDebugRequest = {
+      runId,
+      timestamp,
+      stepAssets,
+      newDepositAssets,
+      maxMarketsUsed,
+      positions,
+      markets: requestPayload.markets,
+    }
+    lastOptimizerRequestRef.current = debugRequest
+    if (import.meta.env.DEV)
+      setSupplyOptimizerDebugState({ request: debugRequest })
+
+    setOptimizeRequest(requestPayload)
   }
 
   const result = ctx.result
@@ -575,8 +510,8 @@ export function SupplyApyOptimizer() {
     // The "no-op plan" is only meaningful for rebalance-only runs.
     if (parsedNewDepositAssets > 0n)
       return result
-    const apyGainWad = result.optimized.blendedApyWad - result.current.blendedApyWad
-    const noBenefit = apyGainWad <= NO_BENEFIT_DELTA_APY_WAD
+    const aprGainWad = result.optimized.blendedAprWad - result.current.blendedAprWad
+    const noBenefit = aprGainWad <= NO_BENEFIT_DELTA_APR_WAD
     if (!noBenefit)
       return result
 
@@ -589,7 +524,7 @@ export function SupplyApyOptimizer() {
         deltaAssets: 0n,
       })),
     }
-  }, [NO_BENEFIT_DELTA_APY_WAD, ctx.run.error, parsedNewDepositAssets, result])
+  }, [NO_BENEFIT_DELTA_APR_WAD, ctx.run.error, parsedNewDepositAssets, result])
 
   const totalAllocatedAssets = useMemo(() => {
     if (!displayResult)
@@ -611,13 +546,67 @@ export function SupplyApyOptimizer() {
     return map
   }, [topMarkets, selectedUserMarkets])
 
+  useEffect(() => {
+    if (import.meta.env.PROD)
+      return
+
+    const pendingRequest = optimizeRequest
+      ? {
+          runId: optimizeRequest.runId,
+          timestamp: optimizeRequest.timestamp,
+          stepAssets: optimizeRequest.stepAssets,
+          newDepositAssets: optimizeRequest.newDepositAssets,
+          maxMarketsUsed: optimizeRequest.maxMarketsUsed,
+          positions: optimizeRequest.positions,
+          markets: optimizeRequest.markets,
+        }
+      : undefined
+
+    const payload: Parameters<typeof setSupplyOptimizerDebugState>[0] = {
+      request: lastOptimizerRequestRef.current ?? pendingRequest ?? undefined,
+      readResult: lastOptimizerReadRef.current ?? optimizeReadResult ?? undefined,
+      result,
+      displayResult,
+      marketMetaById,
+      loanToken: {
+        symbol: selectedOption?.symbol ?? ctx.selection.loanAssetSymbol,
+        decimals: selectedOption?.decimals,
+      },
+    }
+
+    setSupplyOptimizerDebugState(payload)
+  }, [
+    ctx.selection.loanAssetSymbol,
+    displayResult,
+    marketMetaById,
+    optimizeReadResult,
+    optimizeRequest,
+    result,
+    selectedOption,
+  ])
+
+  useEffect(() => {
+    if (import.meta.env.PROD)
+      return
+    if (typeof window === 'undefined') {
+      return
+    }
+    ;(window as any).dumpSupplyOptimizerFixtures = dumpSupplyOptimizerFixtures
+
+    return () => {
+      if ((window as any).dumpSupplyOptimizerFixtures === dumpSupplyOptimizerFixtures) {
+        delete (window as any).dumpSupplyOptimizerFixtures
+      }
+    }
+  }, [])
+
   return (
     <Card className="mb-8">
       <div className="p-4 border-b border-gray-700 flex items-center gap-3">
         <div className="flex flex-col">
-          <h2 className="text-xl font-bold text-white">Supply APY optimizer</h2>
+          <h2 className="text-xl font-bold text-white">Supply APR optimizer</h2>
           <p className="text-sm text-gray-400">
-            Suggests how to rebalance your existing supply to improve APY.
+            Suggests how to rebalance your existing supply to improve APR.
           </p>
         </div>
         {ctx.started && (
@@ -805,12 +794,12 @@ export function SupplyApyOptimizer() {
               <div className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="bg-gray-900 border border-gray-700 rounded-md p-3">
-                    <div className="text-xs text-gray-400">Current blended APY</div>
-                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.current.blendedApyWad)}</div>
+                    <div className="text-xs text-gray-400">Current blended APR</div>
+                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.current.blendedAprWad)}</div>
                   </div>
                   <div className="bg-gray-900 border border-gray-700 rounded-md p-3">
-                    <div className="text-xs text-gray-400">Optimized blended APY</div>
-                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.optimized.blendedApyWad)}</div>
+                    <div className="text-xs text-gray-400">Optimized blended APR</div>
+                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.optimized.blendedAprWad)}</div>
                   </div>
                   <div className="bg-gray-900 border border-gray-700 rounded-md p-3">
                     <div className="text-xs text-gray-400">Iterations</div>
@@ -826,7 +815,8 @@ export function SupplyApyOptimizer() {
                         <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Current</th>
                         <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Target</th>
                         <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Delta</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">APY after</th>
+                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">APR after</th>
+                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Yearly return</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-700 bg-gray-900/20">
@@ -846,6 +836,8 @@ export function SupplyApyOptimizer() {
                               amount: deepLinkAmount,
                             }).toString()
                           : ''
+                        const yearlyReturnAssets = (p.amountAssets * p.supplyAprAfterWad) / WAD
+
                         return (
                           <tr key={p.marketId}>
                             <td className="px-3 sm:px-4 py-2 text-sm text-white">
@@ -895,7 +887,10 @@ export function SupplyApyOptimizer() {
                               {symbol}
                             </td>
                             <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
-                              {pctFromWad(p.supplyApyAfterWad)}
+                              {pctFromWad(p.supplyAprAfterWad)}
+                            </td>
+                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
+                              {fmtToken(yearlyReturnAssets, selectedOption.decimals)}
                             </td>
                           </tr>
                         )

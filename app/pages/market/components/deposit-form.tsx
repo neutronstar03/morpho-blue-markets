@@ -6,7 +6,7 @@ import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { Button } from '~/components/ui/button'
-import { MarketApyPreview } from '~/components/ui/market-apy-preview'
+import { MarketAprPreview } from '~/components/ui/market-apr-preview'
 import { formatBigintShort, formatDecimalStringShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '~/lib/hooks/rpc/use-morpho'
@@ -252,9 +252,9 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
   const showPreview = debouncedAmountWei > 0n && preview.utilizationAfter != null
   const beforeUtil = preview.utilizationBefore ?? market.state.utilization
   const afterUtil = preview.utilizationAfter
-  const beforeApy = preview.supplyApyBefore
-  const afterApy = preview.supplyApyAfter
-  const showApyEstimateLabel = afterApy != null
+  const beforeApr = preview.supplyAprBefore
+  const afterApr = preview.supplyAprAfter
+  const showAprEstimateLabel = afterApr != null
 
   if (isSuccess && showSuccess) {
     return (
@@ -370,12 +370,12 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       />
 
       {showPreview && (
-        <MarketApyPreview
+        <MarketAprPreview
           beforeUtil={beforeUtil}
           afterUtil={afterUtil!}
-          beforeApy={beforeApy}
-          afterApy={afterApy}
-          showEstimateLabel={showApyEstimateLabel}
+          beforeApr={beforeApr}
+          afterApr={afterApr}
+          showEstimateLabel={showAprEstimateLabel}
         />
       )}
 

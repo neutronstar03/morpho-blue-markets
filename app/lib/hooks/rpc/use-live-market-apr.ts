@@ -3,19 +3,19 @@ import { useAccount, useReadContracts } from 'wagmi'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { adaptiveCurveBorrowRateView } from '~/lib/irm/adaptive-curve-irm'
-import { clampRatePerSecondWad, displayApyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
+import { clampRatePerSecondWad, displayAprFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
 import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 import { computeMorphoMarketId, ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { getMorphoBlueAddress } from './use-morpho'
 
-export interface LiveApyResultByMarketKey {
-  apy?: number // decimal fraction (e.g. 0.05 = 5%)
-  borrowApy?: number // decimal fraction (e.g. 0.05 = 5%)
+export interface LiveAprResultByMarketKey {
+  apr?: number // decimal fraction (e.g. 0.05 = 5%)
+  borrowApr?: number // decimal fraction (e.g. 0.05 = 5%)
   isLive: boolean
 }
 
-export interface LiveApyMarketInput {
+export interface LiveAprMarketInput {
   uniqueKey: string
   irmAddress: string
   oracleAddress?: string
@@ -24,7 +24,7 @@ export interface LiveApyMarketInput {
   collateralAsset: { address: string; symbol?: string | null }
 }
 
-function computeMarketId(p: LiveApyMarketInput): `0x${string}` | undefined {
+function computeMarketId(p: LiveAprMarketInput): `0x${string}` | undefined {
   const oracle = (p.oracleAddress ?? ZERO_ADDRESS) as `0x${string}`
   if (!p.lltv)
     return undefined
@@ -44,14 +44,14 @@ function computeMarketId(p: LiveApyMarketInput): `0x${string}` | undefined {
 }
 
 /**
- * Batched, on-chain “live APY”:
+ * Batched, on-chain “live APR”:
  * - Reads Morpho `market(id)` state for each market
  * - Reads IRM `rateAtTarget(marketId)` for each market (AdaptiveCurve-style)
- * - Computes borrowRate locally + converts to supply APY (fee + utilization)
+ * - Computes borrowRate locally + converts to supply APR (fee + utilization)
  *
  * Uses a single multicall with `allowFailure` to keep UI resilient.
  */
-export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
+export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined) {
   const { chainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
   const isWrongNetwork = requiredChainId && chainId !== requiredChainId
@@ -91,7 +91,7 @@ export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
 
   const chunkedMarkets = useMemo(() => {
     const src = marketsSafe
-    const out: LiveApyMarketInput[][] = []
+    const out: LiveAprMarketInput[][] = []
     for (let i = 0; i < MAX_CHUNKS; i++) {
       const start = i * MARKET_CHUNK_SIZE
       const end = start + MARKET_CHUNK_SIZE
@@ -101,7 +101,7 @@ export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
     return out
   }, [marketsSafe])
 
-  function buildMarketStateContracts(chunk: LiveApyMarketInput[]) {
+  function buildMarketStateContracts(chunk: LiveAprMarketInput[]) {
     if (!chunk.length || isWrongNetwork)
       return []
     return chunk.map(m => ({
@@ -112,7 +112,7 @@ export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
     }))
   }
 
-  function buildRateAtTargetContracts(chunk: LiveApyMarketInput[]) {
+  function buildRateAtTargetContracts(chunk: LiveAprMarketInput[]) {
     if (!chunk.length || isWrongNetwork)
       return []
     const calls: any[] = []
@@ -196,10 +196,10 @@ export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
     query: { enabled: enabledBase && rateAtTargetContracts4.length > 0, staleTime: rateAtTargetStaleTime },
   })
 
-  const apyByMarketKey = useMemo<Record<string, LiveApyResultByMarketKey>>(() => {
-    const out: Record<string, LiveApyResultByMarketKey> = {}
+  const aprByMarketKey = useMemo<Record<string, LiveAprResultByMarketKey>>(() => {
+    const out: Record<string, LiveAprResultByMarketKey> = {}
     for (const m of marketsSafe) {
-      out[m.uniqueKey] = { apy: undefined, isLive: false }
+      out[m.uniqueKey] = { apr: undefined, isLive: false }
     }
 
     const nowTimestamp = BigInt(Math.floor(Date.now() / 1000))
@@ -281,8 +281,8 @@ export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
         const supplyRate = supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRatePerSecondWadClamped, utilizationWad, feeWad })
 
         out[m.uniqueKey] = {
-          apy: displayApyFromRatePerSecondWad(supplyRate),
-          borrowApy: displayApyFromRatePerSecondWad(borrowRatePerSecondWadClamped),
+          apr: displayAprFromRatePerSecondWad(supplyRate),
+          borrowApr: displayAprFromRatePerSecondWad(borrowRatePerSecondWadClamped),
           isLive: true,
         }
       }
@@ -306,7 +306,7 @@ export function useLiveMarketApy(markets: LiveApyMarketInput[] | undefined) {
   ])
 
   return {
-    apyByMarketKey,
+    aprByMarketKey,
     isLoading: isMarketLoading0
       || isMarketLoading1
       || isMarketLoading2

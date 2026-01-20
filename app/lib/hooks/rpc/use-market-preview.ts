@@ -5,7 +5,7 @@ import { useAccount, useReadContracts } from 'wagmi'
 import { IRM_RATE_AT_TARGET_ABI } from '~/lib/abis/simplified'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { adaptiveCurveBorrowRateView } from '~/lib/irm/adaptive-curve-irm'
-import { displayApyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
+import { displayAprFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
 import { computeMorphoMarketId } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 
@@ -139,11 +139,11 @@ export function useMarketPreview(args: {
 
   const canUseLocalIrm = enabled && before != null && after != null && rateAtTarget != null
 
-  const rateAtTargetApy = useMemo(() => {
+  const rateAtTargetApr = useMemo(() => {
     if (rateAtTarget == null)
       return undefined
     // rateAtTarget is per-second WAD (int256 onchain). Negative rates are treated as 0 for display.
-    return displayApyFromRatePerSecondWad(rateAtTarget > 0n ? rateAtTarget : 0n)
+    return displayAprFromRatePerSecondWad(rateAtTarget > 0n ? rateAtTarget : 0n)
   }, [rateAtTarget])
 
   const nowTimestamp = useMemo(() => {
@@ -225,16 +225,16 @@ export function useMarketPreview(args: {
     return supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRateAfter, utilizationWad: utilizationAfterWad, feeWad })
   }, [borrowRateAfter, utilizationAfterWad, feeWad])
 
-  const supplyApyBefore = useMemo(() => {
+  const supplyAprBefore = useMemo(() => {
     if (supplyRateBeforeWad == null)
       return undefined
-    return displayApyFromRatePerSecondWad(supplyRateBeforeWad)
+    return displayAprFromRatePerSecondWad(supplyRateBeforeWad)
   }, [supplyRateBeforeWad])
 
-  const supplyApyAfter = useMemo(() => {
+  const supplyAprAfter = useMemo(() => {
     if (supplyRateAfterWad == null)
       return undefined
-    return displayApyFromRatePerSecondWad(supplyRateAfterWad)
+    return displayAprFromRatePerSecondWad(supplyRateAfterWad)
   }, [supplyRateAfterWad])
 
   const utilizationBefore = useMemo(() => {
@@ -254,15 +254,15 @@ export function useMarketPreview(args: {
     isBorrowRateLoading,
     borrowRateError,
     rateAtTarget,
-    rateAtTargetApy,
+    rateAtTargetApr,
     utilizationBefore,
     utilizationAfter,
     utilizationBeforeWad,
     utilizationAfterWad,
     supplyRateBeforeWad,
     supplyRateAfterWad,
-    supplyApyBefore,
-    supplyApyAfter,
+    supplyAprBefore,
+    supplyAprAfter,
     borrowRateBefore,
     borrowRateAfter,
     feeWad,

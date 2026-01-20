@@ -6,7 +6,7 @@ import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { Button } from '~/components/ui/button'
-import { MarketApyPreview } from '~/components/ui/market-apy-preview'
+import { MarketAprPreview } from '~/components/ui/market-apr-preview'
 import { formatTokenAmountShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
@@ -287,9 +287,9 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
   const afterUtil = utilizationAfterWad != null
     ? Number.parseFloat(formatUnits(utilizationAfterWad, 18))
     : preview.utilizationAfter
-  const beforeApy = preview.supplyApyBefore
-  const afterApy = preview.supplyApyAfter
-  const showApyEstimateLabel = afterApy != null
+  const beforeApr = preview.supplyAprBefore
+  const afterApr = preview.supplyAprAfter
+  const showAprEstimateLabel = afterApr != null
 
   if (isSuccess && showSuccess) {
     return (
@@ -371,12 +371,12 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
       />
 
       {showPreview && afterUtil != null && (
-        <MarketApyPreview
+        <MarketAprPreview
           beforeUtil={beforeUtil}
           afterUtil={afterUtil}
-          beforeApy={beforeApy}
-          afterApy={afterApy}
-          showEstimateLabel={showApyEstimateLabel}
+          beforeApr={beforeApr}
+          afterApr={afterApr}
+          showEstimateLabel={showAprEstimateLabel}
         />
       )}
 

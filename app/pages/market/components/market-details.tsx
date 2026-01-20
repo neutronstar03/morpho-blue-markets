@@ -42,8 +42,8 @@ function SectionTitle({ title }: { title: string }) {
 export function MarketDetails({ market }: MarketDetailsProps) {
   const { data: marketStateRaw } = useMarket(market.uniqueKey)
   const live = useMarketPreview({ market, marketStateRaw, deltaSupplyAssets: 0n })
-  const liveSupplyApy = live.supplyApyBefore
-  const liveRateAtTargetApy = live.rateAtTargetApy
+  const liveSupplyApr = live.supplyAprBefore
+  const liveRateAtTargetApr = live.rateAtTargetApr
 
   const {
     liquidityUsd,
@@ -191,26 +191,26 @@ export function MarketDetails({ market }: MarketDetailsProps) {
         value={market.supplyingVaults.length}
       />
 
-      <SectionTitle title="Supply APY" />
+      <SectionTitle title="Supply Rates" />
       <DetailRow
-        label="Instantaneous"
-        value={liveSupplyApy != null ? formatPercent(liveSupplyApy) : '----'}
+        label="Instantaneous APR"
+        value={liveSupplyApr != null ? formatPercent(liveSupplyApr) : '----'}
       />
       <DetailRow
-        label="Rate at Target"
-        value={liveRateAtTargetApy != null ? formatPercent(liveRateAtTargetApy) : '—'}
+        label="Rate at Target APR"
+        value={liveRateAtTargetApr != null ? formatPercent(liveRateAtTargetApr) : '—'}
       />
 
       <DetailRow
-        label="Daily"
+        label="Daily APY"
         value={formatPercent(market.state.dailySupplyApy ?? market.state.dailyNetSupplyApy)}
       />
       <DetailRow
-        label="Weekly"
+        label="Weekly APY"
         value={formatPercent(market.state.weeklySupplyApy ?? market.state.weeklyNetSupplyApy)}
       />
       <DetailRow
-        label="Average"
+        label="Average APY"
         value={formatPercent(market.state.avgSupplyApy ?? market.state.avgNetSupplyApy)}
       />
 

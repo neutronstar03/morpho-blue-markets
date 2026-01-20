@@ -5,7 +5,7 @@ import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { AdvancedList } from '~/pages/home/advanced-list'
 import { Position } from '~/pages/home/position'
-import { SupplyApyOptimizer } from '~/pages/home/supply-apy-optimizer'
+import { SupplyAprOptimizer } from '~/pages/home/supply-apr-optimizer'
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -35,7 +35,7 @@ export default function HomePage() {
         <div className="w-full">
           <Position />
           <div className="mt-8">
-            <SupplyApyOptimizer />
+            <SupplyAprOptimizer />
           </div>
           <div className="mt-8">
             <AdvancedList />

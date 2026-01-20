@@ -1,5 +1,6 @@
 import { adaptiveCurveBorrowRateView } from '../irm/adaptive-curve-irm'
-import { aprWadFromRatePerSecondWad, displayApyWadFromRatePerSecondWad, supplyRatePerSecondWad, utilizationWad } from '../irm/apy-math'
+import { aprWadFromRatePerSecondWad, apyWadFromRatePerSecondWad, supplyRatePerSecondWad, utilizationWad } from '../irm/apy-math'
+import { addDepositProRata, getPerMarketCap, max0, minBigint, normalizeId, sumBigints } from './supply-optimizer-utils'
 
 export interface SupplyOptimizerMarketSnapshot {
   /** Morpho market id (bytes32 as 0x-hex). On Morpho GraphQL this is `uniqueKey`. */
@@ -32,10 +33,15 @@ export interface SupplyOptimizerConstraints {
   /** Optional market-specific cap resolver (raw assets). Overrides `perMarketCapAssets` when provided. */
   perMarketCapAssetsByMarket?: (m: SupplyOptimizerMarketSnapshot) => bigint | undefined
   /**
-   * Minimum acceptable supply APY (WAD). Markets whose *post-step* APY is below this are skipped.
-   * Example: 0.02e18 = 2% APY.
+   * Minimum acceptable supply APR (WAD). Markets whose *post-step* APR is below this are skipped.
+   * Example: 0.02e18 = 2% APR.
    */
-  minSupplyApyWad?: bigint
+  minSupplyAprWad?: bigint
+  /**
+   * Minimum annualized benefit (assets * WAD) required to open a new market.
+   * Example: targetTotalAssets * 0.001e18 for a 10 bps threshold.
+   */
+  minNewMarketBenefitWad?: bigint
 }
 
 export interface OptimizeSupplyAllocationArgs {
@@ -177,7 +183,7 @@ export function computeSupplyAfterDeltaWad(args: {
   })
 
   const supplyAprWad = aprWadFromRatePerSecondWad(supplyRateWad)
-  const supplyApyWad = displayApyWadFromRatePerSecondWad(supplyRateWad)
+  const supplyApyWad = apyWadFromRatePerSecondWad(supplyRateWad)
   return {
     utilizationAfterWad: utilAfterWad,
     borrowRatePerSecondWad,
@@ -185,73 +191,6 @@ export function computeSupplyAfterDeltaWad(args: {
     supplyAprWad,
     supplyApyWad,
   }
-}
-
-function minBigint(a: bigint, b: bigint): bigint {
-  return a <= b ? a : b
-}
-
-function max0(x: bigint): bigint {
-  return x > 0n ? x : 0n
-}
-
-function normalizeId(id: `0x${string}`): string {
-  return id.toLowerCase()
-}
-
-function sumBigints(values: readonly bigint[]): bigint {
-  let s = 0n
-  for (const v of values)
-    s += v
-  return s
-}
-
-function addDepositProRata(currentUser: readonly bigint[], newDepositAssets: bigint): bigint[] {
-  const deposit = newDepositAssets > 0n ? newDepositAssets : 0n
-  if (deposit === 0n)
-    return [...currentUser]
-
-  const total = sumBigints(currentUser)
-  if (total <= 0n)
-    return [...currentUser]
-
-  // Distribute floor(proportion) first, then allocate remaining 1-wei units by largest remainder.
-  const extra: bigint[] = Array.from({ length: currentUser.length }, () => 0n)
-  const remainders: Array<{ idx: number, rem: bigint }> = []
-  let distributed = 0n
-
-  for (let i = 0; i < currentUser.length; i++) {
-    const u = currentUser[i]
-    if (u <= 0n) {
-      remainders.push({ idx: i, rem: 0n })
-      continue
-    }
-    const numer = deposit * u
-    const q = numer / total
-    const r = numer % total
-    extra[i] = q
-    distributed += q
-    remainders.push({ idx: i, rem: r })
-  }
-
-  let leftover = deposit - distributed
-  if (leftover > 0n) {
-    remainders.sort((a, b) => (a.rem === b.rem ? 0 : (a.rem > b.rem ? -1 : 1)))
-    for (let k = 0; k < remainders.length && leftover > 0n; k++) {
-      extra[remainders[k].idx] += 1n
-      leftover -= 1n
-    }
-  }
-
-  const out: bigint[] = Array.from({ length: currentUser.length }, (_, i) => currentUser[i] + extra[i])
-  return out
-}
-
-function getPerMarketCap(m: SupplyOptimizerMarketSnapshot, c?: SupplyOptimizerConstraints): bigint | undefined {
-  const byMarket = c?.perMarketCapAssetsByMarket?.(m)
-  if (byMarket != null)
-    return byMarket
-  return c?.perMarketCapAssets
 }
 
 function blendedRatesFromFinalAllocations(args: {
@@ -317,7 +256,8 @@ function greedyAllocateUpwards(args: {
     throw new Error('stepAssets must be > 0')
 
   let remaining = remainingIn
-  const minApyWad = constraints?.minSupplyApyWad
+  const minAprWad = constraints?.minSupplyAprWad
+  const minNewMarketBenefitWad = constraints?.minNewMarketBenefitWad
   const maxMarketsUsed = constraints?.maxMarketsUsed
 
   let iterations = 0
@@ -353,22 +293,24 @@ function greedyAllocateUpwards(args: {
         totalSupplyAssets: exUserSupplyAssets[i] + candidateFinal,
       }
 
-      const { supplyApyWad: supplyApyCurrentWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({
         market: currentMarket,
         deltaSupplyAssets: 0n,
         timestamp,
       })
-      const { supplyApyWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad } = computeSupplyAfterDeltaWad({
         market: modeledMarket,
         deltaSupplyAssets: 0n,
         timestamp,
       })
-      if (minApyWad != null && supplyApyWad < minApyWad)
+      if (minAprWad != null && supplyAprWad < minAprWad)
         continue
 
-      // Score by *delta* expected 1y yield (assets * WAD), accounting for the APY shift on existing
-      // allocated assets when utilization changes. This reduces step-size sensitivity vs step*APY.
-      const score = (candidateFinal * supplyApyWad) - (currentFinal * supplyApyCurrentWad)
+      // Score by *delta* expected 1y yield (assets * WAD), accounting for the APR shift on existing
+      // allocated assets when utilization changes. This reduces step-size sensitivity vs step*APR.
+      const score = (candidateFinal * supplyAprWad) - (currentFinal * supplyAprCurrentWad)
+      if (minNewMarketBenefitWad != null && currentFinal === 0n && score < minNewMarketBenefitWad)
+        continue
       if (score > bestScore) {
         bestScore = score
         bestIdx = i
@@ -408,7 +350,8 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
   const used = new Set<number>()
   let remaining = totalAmountAssets
 
-  const minApyWad = constraints?.minSupplyApyWad
+  const minAprWad = constraints?.minSupplyAprWad
+  const minNewMarketBenefitWad = constraints?.minNewMarketBenefitWad
   const maxMarketsUsed = constraints?.maxMarketsUsed
 
   let iterations = 0
@@ -440,13 +383,15 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
       const currentAmt = allocated[i]
       const candidateAmt = allocated[i] + step
 
-      const { supplyApyWad: supplyApyCurrentWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: currentAmt, timestamp })
-      const { supplyApyWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: candidateAmt, timestamp })
-      if (minApyWad != null && supplyApyWad < minApyWad)
+      const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: currentAmt, timestamp })
+      const { supplyAprWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: candidateAmt, timestamp })
+      if (minAprWad != null && supplyAprWad < minAprWad)
         continue
 
-      // Score by *delta* expected 1y yield (assets * WAD), accounting for APY shift on already-allocated assets.
-      const score = (candidateAmt * supplyApyWad) - (currentAmt * supplyApyCurrentWad)
+      // Score by *delta* expected 1y yield (assets * WAD), accounting for APR shift on already-allocated assets.
+      const score = (candidateAmt * supplyAprWad) - (currentAmt * supplyAprCurrentWad)
+      if (minNewMarketBenefitWad != null && currentAmt === 0n && score < minNewMarketBenefitWad)
+        continue
       if (score > bestScore) {
         bestScore = score
         bestIdx = i
@@ -611,7 +556,8 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
       used.add(i)
   }
 
-  const minApyWad = constraints?.minSupplyApyWad
+  const minAprWad = constraints?.minSupplyAprWad
+  const minNewMarketBenefitWad = constraints?.minNewMarketBenefitWad
   const maxMarketsUsed = constraints?.maxMarketsUsed
 
   let iterations = 0
@@ -647,22 +593,24 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
         totalSupplyAssets: exUserSupply[i] + candidateFinal,
       }
 
-      const { supplyApyWad: supplyApyCurrentWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({
         market: currentMarket,
         deltaSupplyAssets: 0n,
         timestamp,
       })
-      const { supplyApyWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad } = computeSupplyAfterDeltaWad({
         market: modeledMarket,
         deltaSupplyAssets: 0n,
         timestamp,
       })
-      if (minApyWad != null && supplyApyWad < minApyWad)
+      if (minAprWad != null && supplyAprWad < minAprWad)
         continue
 
-      // Score by *delta* expected 1y yield (assets * WAD), accounting for the APY shift on existing
+      // Score by *delta* expected 1y yield (assets * WAD), accounting for the APR shift on existing
       // allocated assets when utilization changes.
-      const score = (candidateFinal * supplyApyWad) - (currentFinal * supplyApyCurrentWad)
+      const score = (candidateFinal * supplyAprWad) - (currentFinal * supplyAprCurrentWad)
+      if (minNewMarketBenefitWad != null && currentFinal === 0n && score < minNewMarketBenefitWad)
+        continue
       if (score > bestScore) {
         bestScore = score
         bestIdx = i
@@ -744,12 +692,12 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
     exUserSupplyAssets: exUserSupply,
     timestamp,
   })
-  if (newDepositAssets === 0n && optimizedRates.blendedApyWad < currentRates.blendedApyWad) {
+  if (newDepositAssets === 0n && optimizedRates.blendedAprWad < currentRates.blendedAprWad) {
     optimizedFinalAlloc = currentUser
     optimizedRates = currentRates
   }
   // Also, if a "no-rebalance" baseline exists, never return something strictly worse than it.
-  if (baselineAllocForFallback && baselineRatesForFallback && optimizedRates.blendedApyWad < baselineRatesForFallback.blendedApyWad) {
+  if (baselineAllocForFallback && baselineRatesForFallback && optimizedRates.blendedAprWad < baselineRatesForFallback.blendedAprWad) {
     optimizedFinalAlloc = baselineAllocForFallback
     optimizedRates = baselineRatesForFallback
   }

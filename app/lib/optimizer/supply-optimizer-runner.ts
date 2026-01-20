@@ -3,6 +3,7 @@ import { getMoveSizeBaseTotalAssets, optimizeSupplyWithMoveSizeHeuristic } from 
 import { optimizeSupplyAllocationWithPositions } from './supply-optimizer'
 
 const WAD = 10n ** 18n
+const MIN_NEW_MARKET_BENEFIT_BPS_WAD = 10_000_000_000_000_000n // 100 bps
 
 export interface AutoMoveSizeInfo {
   stepAssets: bigint
@@ -32,13 +33,18 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
   let result = undefined as OptimizeSupplyWithPositionsResult | undefined
 
   const runManual = (manualStepAssets: bigint): OptimizeSupplyWithPositionsResult => {
+    const targetTotalAssets = getMoveSizeBaseTotalAssets(args.positions, args.newDepositAssets)
+    const minNewMarketBenefitWad = targetTotalAssets * MIN_NEW_MARKET_BENEFIT_BPS_WAD
     return optimizeSupplyAllocationWithPositions({
       markets: args.markets,
       positions: args.positions,
       newDepositAssets: args.newDepositAssets,
       stepAssets: manualStepAssets,
       timestamp: args.timestamp,
-      constraints: args.constraints,
+      constraints: {
+        ...args.constraints,
+        minNewMarketBenefitWad: args.constraints?.minNewMarketBenefitWad ?? minNewMarketBenefitWad,
+      },
       maxIterations: args.maxIterations,
     })
   }

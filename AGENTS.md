@@ -24,6 +24,7 @@ Runtime/toolchain: Node 20 + bun
 ## Gotchas + Notes learned (auto-update)
 - Market APY previews must use IRM math only; no coarse utilization estimates. If IRM data is missing, show "----" or an explicit error.
 - All Morpho markets use IRM; do not mention or implement non-IRM fallbacks in market preview logic.
+- Supply optimizer outputs use APR (blendedAprWad/supplyAprAfterWad), not APY -> Keep optimizer UI labels and calculations on APR.
 
 ## Quote rule
 - Use plain ASCII quotes only: 'single quotes' and "double quotes". Do not use “ ” or ‘ ’.

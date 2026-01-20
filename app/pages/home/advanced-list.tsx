@@ -1,6 +1,6 @@
 import type { SupportedChain } from '~/lib/addresses'
 import type { MorphoMarket, MarketFilters as TypeMarketFilters } from '~/lib/hooks/graphql/use-list-markets'
-import type { LiveApyMarketInput } from '~/lib/hooks/rpc/use-live-market-apy'
+import type { LiveAprMarketInput } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
@@ -13,14 +13,14 @@ import {
   OrderDirection,
   useMarkets,
 } from '~/lib/hooks/graphql/use-list-markets'
-import { useLiveMarketApy } from '~/lib/hooks/rpc/use-live-market-apy'
+import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 
 const CONFIG = {
-  minSupplyApy: 0.09, // 9% apr
-  maxSupplyApy: 10, // 200% max apr
+  minSupplyApy: 0.09, // 9% apy
+  maxSupplyApy: 10, // 200% max apy
   minTvlUsd: 20000, // $20k minimum TVL
 }
 
@@ -176,8 +176,8 @@ function MarketFilters({
           onChange={e => onChangeDirection(e.target.value as MarketSide)}
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="supply">Supply APR</option>
-          <option value="borrow">Borrow APR</option>
+          <option value="supply">Supply APY</option>
+          <option value="borrow">Borrow APY</option>
         </select>
         <select
           value={comparison}
@@ -225,8 +225,8 @@ interface MarketTableProps {
   markets: MarketData[]
   isLoading: boolean
   rateType: MarketSide
-  immediateApyByMarketKey: Record<string, { apy?: number, borrowApy?: number, isLive: boolean }>
-  canComputeLiveApy: boolean
+  immediateAprByMarketKey: Record<string, { apr?: number, borrowApr?: number, isLive: boolean }>
+  canComputeLiveApr: boolean
   liveChainId?: number
 }
 
@@ -234,8 +234,8 @@ function MarketTable({
   markets,
   isLoading,
   rateType,
-  immediateApyByMarketKey,
-  canComputeLiveApy,
+  immediateAprByMarketKey,
+  canComputeLiveApr,
   liveChainId,
 }: MarketTableProps) {
   if (isLoading) {
@@ -258,7 +258,7 @@ function MarketTable({
             <th scope="col" className="px-2 sm:px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">before 90%</th>
             <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">usage %</th>
             <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Recent APY</th>
-            <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Immediate APY</th>
+            <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Immediate APR</th>
           </tr>
         </thead>
         <tbody className={`${colors.backgroundLight} divide-y divide-gray-700`}>
@@ -295,9 +295,9 @@ function MarketTable({
               </td>
               <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
                 {(() => {
-                  const entry = immediateApyByMarketKey[market.id]
-                  const immediate = rateType === 'supply' ? entry?.apy : entry?.borrowApy
-                  if (!canComputeLiveApy || liveChainId == null || market.chainId !== liveChainId)
+                  const entry = immediateAprByMarketKey[market.id]
+                  const immediate = rateType === 'supply' ? entry?.apr : entry?.borrowApr
+                  if (!canComputeLiveApr || liveChainId == null || market.chainId !== liveChainId)
                     return '—'
                   if (!entry?.isLive || immediate == null)
                     return '—'
@@ -419,10 +419,10 @@ export function AdvancedList() {
   }, [chainFilter])
 
   const liveChainId = selectedChainId ?? walletChainId ?? undefined
-  const canComputeLiveApy = liveChainId != null && (selectedChainId == null || walletChainId === selectedChainId)
+  const canComputeLiveApr = liveChainId != null && (selectedChainId == null || walletChainId === selectedChainId)
 
-  const liveApyMarkets = useMemo<LiveApyMarketInput[]>(() => {
-    if (!canComputeLiveApy || liveChainId == null)
+  const liveAprMarkets = useMemo<LiveAprMarketInput[]>(() => {
+    if (!canComputeLiveApr || liveChainId == null)
       return []
     return markets
       .filter(m => m.chainId === liveChainId)
@@ -434,9 +434,9 @@ export function AdvancedList() {
         loanAsset: { address: m.loanAddress, symbol: m.marketLabel.split('/')[1]?.trim() },
         collateralAsset: { address: m.collateralAddress, symbol: m.marketLabel.split('/')[0]?.trim() },
       }))
-  }, [markets, canComputeLiveApy, liveChainId])
+  }, [markets, canComputeLiveApr, liveChainId])
 
-  const { apyByMarketKey } = useLiveMarketApy(liveApyMarkets)
+  const { aprByMarketKey } = useLiveMarketApr(liveAprMarkets)
 
   // State for last updated time
   const [timeAgo, setTimeAgo] = useState('')
@@ -495,8 +495,8 @@ export function AdvancedList() {
         markets={markets}
         isLoading={isLoading}
         rateType={displayRateType}
-        immediateApyByMarketKey={apyByMarketKey}
-        canComputeLiveApy={canComputeLiveApy}
+        immediateAprByMarketKey={aprByMarketKey}
+        canComputeLiveApr={canComputeLiveApr}
         liveChainId={liveChainId}
       />
     </Card>

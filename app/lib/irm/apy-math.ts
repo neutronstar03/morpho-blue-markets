@@ -45,12 +45,12 @@ export function apyFromRatePerSecondWad(ratePerSecondWad: bigint): number {
   return Math.expm1(r * Number(SECONDS_PER_YEAR))
 }
 
-export function displayApyFromRatePerSecondWad(ratePerSecondWad: bigint): number {
+export function displayAprFromRatePerSecondWad(ratePerSecondWad: bigint): number {
   const rate = clampRatePerSecondWad(ratePerSecondWad)
   return Number(aprWadFromRatePerSecondWad(rate)) / 1e18
 }
 
-export function displayApyWadFromRatePerSecondWad(ratePerSecondWad: bigint): bigint {
+export function displayAprWadFromRatePerSecondWad(ratePerSecondWad: bigint): bigint {
   const rate = clampRatePerSecondWad(ratePerSecondWad)
   return aprWadFromRatePerSecondWad(rate)
 }

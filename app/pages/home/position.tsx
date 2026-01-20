@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Card } from '~/components/ui/card'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
-import { useLiveMarketApy } from '~/lib/hooks/rpc/use-live-market-apy'
+import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import {
   useLiveMarketPositions,
 } from '~/lib/hooks/rpc/use-live-market-positions'
@@ -18,6 +18,7 @@ import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
 
 interface Portfolio {
   dailyUsd: number | undefined
+  yearlyUsd: number | undefined
   weightedAprPct: number | undefined
   totalAssets: bigint | undefined
   totalAssetsUsd: number | undefined
@@ -28,12 +29,15 @@ interface Portfolio {
 function PositionListItem({
   position,
   chainId,
-  liveApy,
+  liveApr,
+  totalYearlyUsd,
 }: {
   position: LiveMarketPosition
   chainId: number
-  liveApy?: number
+  liveApr?: number
+  totalYearlyUsd?: number
 }) {
+  const WAD = 10n ** 18n
   const marketSupplyAssets = BigInt(position.market.state.supplyAssets)
   const marketSupplyShares = BigInt(position.market.state.supplyShares)
   const userSupplyShares = BigInt(position.userState.supplyShares)
@@ -45,7 +49,30 @@ function PositionListItem({
     return (userSupplyShares * marketSupplyAssets) / marketSupplyShares
   }, [userSupplyShares, marketSupplyAssets, marketSupplyShares])
 
-  const apy = (liveApy ?? position.market.state.netSupplyApy) * 100 // Convert to percentage
+  const apr = liveApr != null ? liveApr * 100 : undefined // Convert to percentage
+  const aprWad = liveApr != null ? BigInt(Math.round(liveApr * 1e18)) : undefined
+  const yearlyReturnAssets = aprWad != null ? (suppliedAssets * aprWad) / WAD : undefined
+
+  const yearlyUsd = useMemo(() => {
+    if (liveApr == null)
+      return undefined
+    const marketSupplyUsd = position.market.state.supplyAssetsUsd
+    if (typeof marketSupplyUsd !== 'number')
+      return undefined
+    if (marketSupplyShares === 0n)
+      return undefined
+    const shareRatio = Number(userSupplyShares) / Number(marketSupplyShares)
+    if (!Number.isFinite(shareRatio) || shareRatio <= 0)
+      return undefined
+    const userPrincipalUsd = marketSupplyUsd * shareRatio
+    return userPrincipalUsd * liveApr
+  }, [liveApr, marketSupplyShares, position.market.state.supplyAssetsUsd, userSupplyShares])
+
+  const contributionPct = useMemo(() => {
+    if (totalYearlyUsd == null || totalYearlyUsd <= 0 || yearlyUsd == null)
+      return undefined
+    return (yearlyUsd / totalYearlyUsd) * 100
+  }, [totalYearlyUsd, yearlyUsd])
 
   const { safuness } = useSafuness({
     chainId,
@@ -55,44 +82,42 @@ function PositionListItem({
   return (
     <Link to={`/market/${position.market.uniqueKey}/${chainId}`}>
       <li className="mb-4 p-3 sm:p-4 bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors duration-200 cursor-pointer">
-        <div className="flex justify-between items-start mb-2">
-          <div>
-            <p className="text-lg font-semibold text-white">
-              {position.market.collateralAsset.symbol}
+        <div className="flex flex-row justify-between items-center">
+          <div className="space-y-1">
+            <div>
+              <p className="text-lg font-semibold text-white">
+                {`${position.market.collateralAsset.symbol} / ${position.market.loanAsset.symbol}`}
+              </p>
+              <p className="text-xs text-gray-500">
+                {`Chain ID: ${chainId}`}
+              </p>
+            </div>
+
+            <p className="text-gray-300">
+              <span className="text-gray-400">Supply:</span>
               {' '}
-              /
+              {formatBigintShort(suppliedAssets, loanDecimals)}
               {' '}
               {position.market.loanAsset.symbol}
             </p>
-            <p className="text-xs text-gray-500">
-              Chain ID:
-              {' '}
-              {chainId}
-            </p>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-green-400">
-              APY:
-              {' '}
-              {apy.toFixed(2)}
-              %
-            </p>
-            <p className={`text-sm ${safunessColorClass(safuness)}`}>
-              SAFU:
-              {' '}
-              {safuness != null ? `${safuness.toFixed(2)}x` : '—'}
-            </p>
-          </div>
-        </div>
 
-        <div className="space-y-1">
-          <p className="text-gray-300">
-            <span className="text-gray-400">Supply:</span>
-            {' '}
-            {formatBigintShort(suppliedAssets, loanDecimals)}
-            {' '}
-            {position.market.loanAsset.symbol}
-          </p>
+          <div className="flex justify-between items-start mb-2">
+            <div className="text-right">
+              <p className="text-sm text-green-400">
+                {`APR: ${apr != null ? apr.toFixed(2) : '—'} %`}
+              </p>
+              <p className={`text-sm ${safunessColorClass(safuness)}`}>
+                {`SAFU: ${safuness != null ? `${safuness.toFixed(2)}x` : '—'}`}
+              </p>
+              <p className="text-xs text-gray-400">
+                {`weight: ${contributionPct != null ? `${contributionPct.toFixed(1)}%` : '—'}`}
+              </p>
+              {/* <p className="text-xs text-gray-400">
+              {`Est. yearly: ${yearlyReturnAssets != null ? `${formatBigintShort(yearlyReturnAssets, loanDecimals)} ${position.market.loanAsset.symbol}` : '—'}`}
+            </p> */}
+            </div>
+          </div>
         </div>
       </li>
     </Link>
@@ -109,7 +134,7 @@ function PositionClient() {
   } = useLiveMarketPositions()
 
   const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
-  const { apyByMarketKey } = useLiveMarketApy(markets)
+  const { aprByMarketKey } = useLiveMarketApr(markets)
 
   const [timeAgo, setTimeAgo] = useState('')
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
@@ -126,7 +151,7 @@ function PositionClient() {
 
   const portfolio = useMemo((): Portfolio => {
     if (!positions || !positions.length)
-      return { dailyUsd: undefined, weightedAprPct: undefined, totalAssets: undefined, totalAssetsUsd: undefined, totalAssetsSymbol: undefined, totalAssetsDecimals: undefined }
+      return { dailyUsd: undefined, yearlyUsd: undefined, weightedAprPct: undefined, totalAssets: undefined, totalAssetsUsd: undefined, totalAssetsSymbol: undefined, totalAssetsDecimals: undefined }
 
     let totalAssets: bigint | undefined
     let totalAssetsSymbol: string | undefined
@@ -161,13 +186,15 @@ function PositionClient() {
         continue
 
       const userPrincipalUsd = marketSupplyUsd * shareRatio
-      const marketApy = apyByMarketKey[p.market.uniqueKey]?.apy ?? p.market.state.netSupplyApy ?? 0
-      const dailyRate = Math.expm1(Math.log1p(marketApy) / 365)
+      const marketApr = aprByMarketKey[p.market.uniqueKey]?.apr
+      if (marketApr == null)
+        continue
+      const dailyRate = marketApr / 365
       const dailyUsd = userPrincipalUsd * dailyRate
 
       totalPrincipalUsd += userPrincipalUsd
       totalDailyUsd += dailyUsd
-      totalAprWeighted += userPrincipalUsd * marketApy
+      totalAprWeighted += userPrincipalUsd * marketApr
 
       // Calculate total assets if all positions have the same asset
       if (allSameAsset && totalAssets !== undefined) {
@@ -182,13 +209,14 @@ function PositionClient() {
     const weightedAprPct = totalPrincipalUsd > 0 ? (totalAprWeighted / totalPrincipalUsd) * 100 : undefined
     return {
       dailyUsd: totalDailyUsd || undefined,
+      yearlyUsd: totalAprWeighted || undefined,
       weightedAprPct,
       totalAssets: totalAssets === 0n ? undefined : totalAssets,
       totalAssetsUsd: totalPrincipalUsd || undefined,
       totalAssetsSymbol,
       totalAssetsDecimals,
     }
-  }, [positions, apyByMarketKey])
+  }, [positions, aprByMarketKey])
 
   if (!isConnected) {
     return (
@@ -232,7 +260,7 @@ function PositionClient() {
         </div>
         <div className="ml-auto flex items-center space-x-6">
           <div className="text-right">
-            <p className="text-xs text-gray-400">Weighted APY</p>
+            <p className="text-xs text-gray-400">Weighted APR</p>
             <p className="text-sm text-white">{portfolio.weightedAprPct != null ? `${portfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
           </div>
           <div className="text-right">
@@ -266,7 +294,8 @@ function PositionClient() {
                         key={position.market.uniqueKey}
                         position={position}
                         chainId={chain.id}
-                        liveApy={apyByMarketKey[position.market.uniqueKey]?.apy}
+                        liveApr={aprByMarketKey[position.market.uniqueKey]?.apr}
+                        totalYearlyUsd={portfolio.yearlyUsd}
                       />
                     ))}
                 </ul>

@@ -2,62 +2,62 @@ import type { ReactNode } from 'react'
 import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 
-export interface SupplyApyOptimizerSelection {
+export interface SupplyAprOptimizerSelection {
   chainId?: number
   loanAssetAddress?: string
   loanAssetSymbol?: string
   loanAssetDecimals?: number
 }
 
-export interface SupplyApyOptimizerInputs {
+export interface SupplyAprOptimizerInputs {
   /** Human input in token units (e.g. "123.45"). Parsed later using decimals. */
   minMoveSize?: string
   /** Optional: additional amount to supply (new deposit), in token units (e.g. "123.45"). */
   newDepositAmount?: string
 }
 
-export interface SupplyApyOptimizerDerived {
+export interface SupplyAprOptimizerDerived {
   /** Total currently supplied for the selected loan asset (raw units). */
   totalSuppliedAssets?: bigint
   /** Positions for selected loan asset (raw units). */
   positions?: UserSupplyPosition[]
 }
 
-export interface SupplyApyOptimizerRunState {
+export interface SupplyAprOptimizerRunState {
   isRunning: boolean
   runId: number
   error?: string
   timestamp?: bigint
 }
 
-export interface SupplyApyOptimizerState {
+export interface SupplyAprOptimizerState {
   started: boolean
-  selection: SupplyApyOptimizerSelection
-  inputs: SupplyApyOptimizerInputs
-  derived: SupplyApyOptimizerDerived
-  run: SupplyApyOptimizerRunState
+  selection: SupplyAprOptimizerSelection
+  inputs: SupplyAprOptimizerInputs
+  derived: SupplyAprOptimizerDerived
+  run: SupplyAprOptimizerRunState
   result?: OptimizeSupplyWithPositionsResult
 }
 
-interface SupplyApyOptimizerContextValue extends SupplyApyOptimizerState {
+interface SupplyAprOptimizerContextValue extends SupplyAprOptimizerState {
   start: () => void
   clear: () => void
-  setSelection: (next: SupplyApyOptimizerSelection) => void
+  setSelection: (next: SupplyAprOptimizerSelection) => void
   setMinMoveSize: (v: string | undefined) => void
   setNewDepositAmount: (v: string | undefined) => void
-  setDerived: (next: SupplyApyOptimizerDerived) => void
+  setDerived: (next: SupplyAprOptimizerDerived) => void
   beginRun: (meta?: { timestamp?: bigint }) => number
   finishRun: (runId: number, res?: OptimizeSupplyWithPositionsResult, err?: string) => void
 }
 
-const SupplyApyOptimizerContext = createContext<SupplyApyOptimizerContextValue | null>(null)
+const SupplyAprOptimizerContext = createContext<SupplyAprOptimizerContextValue | null>(null)
 
-export function SupplyApyOptimizerProvider({ children }: { children: ReactNode }) {
+export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }) {
   const [started, setStarted] = useState(false)
-  const [selection, setSelectionState] = useState<SupplyApyOptimizerSelection>({})
-  const [inputs, setInputs] = useState<SupplyApyOptimizerInputs>({})
-  const [derived, setDerivedState] = useState<SupplyApyOptimizerDerived>({})
-  const [run, setRun] = useState<SupplyApyOptimizerRunState>({ isRunning: false, runId: 0 })
+  const [selection, setSelectionState] = useState<SupplyAprOptimizerSelection>({})
+  const [inputs, setInputs] = useState<SupplyAprOptimizerInputs>({})
+  const [derived, setDerivedState] = useState<SupplyAprOptimizerDerived>({})
+  const [run, setRun] = useState<SupplyAprOptimizerRunState>({ isRunning: false, runId: 0 })
   const [result, setResult] = useState<OptimizeSupplyWithPositionsResult | undefined>(undefined)
   const runIdRef = useRef<number>(0)
 
@@ -76,7 +76,7 @@ export function SupplyApyOptimizerProvider({ children }: { children: ReactNode }
     setResult(undefined)
   }, [])
 
-  const setSelection = useCallback((next: SupplyApyOptimizerSelection) => {
+  const setSelection = useCallback((next: SupplyAprOptimizerSelection) => {
     setSelectionState(next)
     // Reset derived + result when changing selection
     setDerivedState({})
@@ -92,7 +92,7 @@ export function SupplyApyOptimizerProvider({ children }: { children: ReactNode }
     setInputs(prev => ({ ...prev, newDepositAmount: v }))
   }, [])
 
-  const setDerived = useCallback((next: SupplyApyOptimizerDerived) => {
+  const setDerived = useCallback((next: SupplyAprOptimizerDerived) => {
     setDerivedState(next)
   }, [])
 
@@ -118,7 +118,7 @@ export function SupplyApyOptimizerProvider({ children }: { children: ReactNode }
     }
   }, [])
 
-  const value = useMemo<SupplyApyOptimizerContextValue>(() => {
+  const value = useMemo<SupplyAprOptimizerContextValue>(() => {
     return {
       started,
       selection,
@@ -138,15 +138,15 @@ export function SupplyApyOptimizerProvider({ children }: { children: ReactNode }
   }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMinMoveSize, setNewDepositAmount, setDerived, beginRun, finishRun])
 
   return (
-    <SupplyApyOptimizerContext.Provider value={value}>
+    <SupplyAprOptimizerContext.Provider value={value}>
       {children}
-    </SupplyApyOptimizerContext.Provider>
+    </SupplyAprOptimizerContext.Provider>
   )
 }
 
-export function useSupplyApyOptimizer() {
-  const ctx = useContext(SupplyApyOptimizerContext)
+export function useSupplyAprOptimizer() {
+  const ctx = useContext(SupplyAprOptimizerContext)
   if (!ctx)
-    throw new Error('useSupplyApyOptimizer must be used within SupplyApyOptimizerProvider')
+    throw new Error('useSupplyAprOptimizer must be used within SupplyAprOptimizerProvider')
   return ctx
 }

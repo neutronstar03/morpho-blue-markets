@@ -1,21 +1,21 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { MarketApyPreview } from '../../app/components/ui/market-apy-preview'
+import { MarketAprPreview } from '../../app/components/ui/market-apr-preview'
 
-describe('test MarketApyPreview component', () => {
-  it('renders utilization and APY with estimate label', () => {
+describe('test MarketAprPreview component', () => {
+  it('renders utilization and APR with estimate label', () => {
     render(
-      <MarketApyPreview
+      <MarketAprPreview
         beforeUtil={1}
         afterUtil={0.9412}
-        beforeApy={4.8582}
-        afterApy={11.814}
+        beforeApr={4.8582}
+        afterApr={11.814}
         showEstimateLabel
       />,
     )
 
     expect(screen.getByText('Utilization')).toBeInTheDocument()
-    expect(screen.getByText('Supply APY')).toBeInTheDocument()
+    expect(screen.getByText('Supply APR')).toBeInTheDocument()
     expect(screen.getByText(/100\.00%/)).toBeInTheDocument()
     expect(screen.getByText(/94\.12%/)).toBeInTheDocument()
     expect(screen.getByText(/485\.82%/)).toBeInTheDocument()
@@ -23,18 +23,18 @@ describe('test MarketApyPreview component', () => {
     expect(screen.getByText('(est.)')).toBeInTheDocument()
   })
 
-  it('renders placeholders when APY missing', () => {
+  it('renders placeholders when APR missing', () => {
     render(
-      <MarketApyPreview
+      <MarketAprPreview
         beforeUtil={1}
         afterUtil={1}
       />,
     )
 
-    const apyRow = screen.getByText('Supply APY').parentElement
-    expect(apyRow).not.toBeNull()
-    if (apyRow) {
-      const count = (apyRow.textContent?.match(/----/g) ?? []).length
+    const aprRow = screen.getByText('Supply APR').parentElement
+    expect(aprRow).not.toBeNull()
+    if (aprRow) {
+      const count = (aprRow.textContent?.match(/----/g) ?? []).length
       expect(count).toBe(2)
     }
   })
