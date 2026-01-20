@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 
 interface UseLocalStorageOptions<T> {
@@ -27,6 +27,10 @@ export function useLocalStorage<T>(
   const isClient = useIsClient()
 
   const storageKey = useMemo(() => `${prefix}${key}`, [prefix, key])
+  const initialValueRef = useRef<{ key: string, value: T } | null>(null)
+  if (!initialValueRef.current || initialValueRef.current.key !== storageKey)
+    initialValueRef.current = { key: storageKey, value: initialValue }
+  const stableInitialValue = initialValueRef.current.value
 
   const getStorage = useCallback((): Storage | undefined => {
     if (storage)
@@ -58,17 +62,17 @@ export function useLocalStorage<T>(
     }
     catch (error) {
       handleParseError(error)
-      return initialValue
+      return stableInitialValue
     }
-  }, [deserialize, handleParseError, initialValue])
+  }, [deserialize, handleParseError, stableInitialValue])
 
   const [value, setValue] = useState<T>(() => {
     if (typeof window === 'undefined')
-      return initialValue
+      return stableInitialValue
     const raw = readRawValue()
     if (raw != null)
       return parseStoredValue(raw)
-    return initialValue
+    return stableInitialValue
   })
 
   useEffect(() => {
@@ -88,7 +92,7 @@ export function useLocalStorage<T>(
         return
       try {
         if (e.newValue == null) {
-          setValue(initialValue)
+          setValue(stableInitialValue)
         }
         else {
           setValue(parseStoredValue(e.newValue))
@@ -100,7 +104,7 @@ export function useLocalStorage<T>(
     }
     window.addEventListener('storage', handler)
     return () => window.removeEventListener('storage', handler)
-  }, [isClient, sync, storageKey, parseStoredValue, initialValue, handleParseError])
+  }, [isClient, sync, storageKey, parseStoredValue, stableInitialValue, handleParseError])
 
   const setStoredValue: SetValue<T> = useCallback((next) => {
     setValue((prev) => {
@@ -126,8 +130,8 @@ export function useLocalStorage<T>(
     catch {
       // ignore remove errors
     }
-    setValue(initialValue)
-  }, [getStorage, storageKey, initialValue])
+    setValue(stableInitialValue)
+  }, [getStorage, storageKey, stableInitialValue])
 
   return [value, setStoredValue, remove]
 }
