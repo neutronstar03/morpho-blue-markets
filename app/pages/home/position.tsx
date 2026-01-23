@@ -37,7 +37,6 @@ function PositionListItem({
   liveApr?: number
   totalYearlyUsd?: number
 }) {
-  const WAD = 10n ** 18n
   const marketSupplyAssets = BigInt(position.market.state.supplyAssets)
   const marketSupplyShares = BigInt(position.market.state.supplyShares)
   const userSupplyShares = BigInt(position.userState.supplyShares)
@@ -50,8 +49,6 @@ function PositionListItem({
   }, [userSupplyShares, marketSupplyAssets, marketSupplyShares])
 
   const apr = liveApr != null ? liveApr * 100 : undefined // Convert to percentage
-  const aprWad = liveApr != null ? BigInt(Math.round(liveApr * 1e18)) : undefined
-  const yearlyReturnAssets = aprWad != null ? (suppliedAssets * aprWad) / WAD : undefined
 
   const yearlyUsd = useMemo(() => {
     if (liveApr == null)

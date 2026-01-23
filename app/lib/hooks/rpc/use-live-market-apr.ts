@@ -20,8 +20,8 @@ export interface LiveAprMarketInput {
   irmAddress: string
   oracleAddress?: string
   lltv?: string
-  loanAsset: { address: string; symbol?: string | null }
-  collateralAsset: { address: string; symbol?: string | null }
+  loanAsset: { address: string, symbol?: string | null }
+  collateralAsset: { address: string, symbol?: string | null }
 }
 
 function computeMarketId(p: LiveAprMarketInput): `0x${string}` | undefined {

@@ -50,6 +50,11 @@ export function displayAprFromRatePerSecondWad(ratePerSecondWad: bigint): number
   return Number(aprWadFromRatePerSecondWad(rate)) / 1e18
 }
 
+export function displayApyFromRatePerSecondWad(ratePerSecondWad: bigint): number {
+  const rate = clampRatePerSecondWad(ratePerSecondWad)
+  return apyFromRatePerSecondWad(rate)
+}
+
 export function displayAprWadFromRatePerSecondWad(ratePerSecondWad: bigint): bigint {
   const rate = clampRatePerSecondWad(ratePerSecondWad)
   return aprWadFromRatePerSecondWad(rate)

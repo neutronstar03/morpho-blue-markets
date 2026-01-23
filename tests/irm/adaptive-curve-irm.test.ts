@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { createPublicClient, formatUnits } from 'viem'
 import { mainnet } from 'viem/chains'
 import { adaptiveCurveBorrowRateView } from '../../app/lib/irm/adaptive-curve-irm'
-import { displayApyFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '../../app/lib/irm/apy-math'
+import { displayApyFromRatePerSecondWad, supplyRatePerSecondWad } from '../../app/lib/irm/apy-math'
 import { ADAPTIVE_CURVE_IRM_ABI, MORPHO_BLUE_ABI, MORPHO_BLUE_MAINNET } from './abi'
 import { makeMainnetTransport } from './rpc'
 
