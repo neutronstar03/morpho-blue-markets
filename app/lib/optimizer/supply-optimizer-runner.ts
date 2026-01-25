@@ -3,7 +3,13 @@ import { getMoveSizeBaseTotalAssets, optimizeSupplyWithMoveSizeHeuristic } from 
 import { optimizeSupplyAllocationWithPositions } from './supply-optimizer'
 
 const WAD = 10n ** 18n
-const MIN_NEW_MARKET_BENEFIT_BPS_WAD = 10_000_000_000_000_000n // 100 bps
+// Default: opening a new market should only be rejected if it is strictly worse (negative marginal benefit).
+// A portfolio-size-based threshold is unintuitive when the optimizer step is small.
+const DEFAULT_MIN_NEW_MARKET_BENEFIT_WAD = 0n
+
+// For rebalance-only runs (no newDeposit), require a tiny edge to open new markets.
+// 2 bps = 0.02%.
+const DEFAULT_REBALANCE_NEW_MARKET_HYSTERESIS_APR_WAD = 200_000_000_000_000n
 
 export interface AutoMoveSizeInfo {
   stepAssets: bigint
@@ -32,9 +38,16 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
   let autoInfo: AutoMoveSizeInfo | undefined
   let result = undefined as OptimizeSupplyWithPositionsResult | undefined
 
+  const baseConstraints = {
+    ...args.constraints,
+    // Keep an explicit absolute gate available, but default it to 0 (disabled).
+    minNewMarketBenefitWad: args.constraints?.minNewMarketBenefitWad ?? DEFAULT_MIN_NEW_MARKET_BENEFIT_WAD,
+    // Relative gating: only apply (by default) when not adding new capital.
+    newMarketHysteresisAprWad: args.constraints?.newMarketHysteresisAprWad
+      ?? (args.newDepositAssets > 0n ? 0n : DEFAULT_REBALANCE_NEW_MARKET_HYSTERESIS_APR_WAD),
+  }
+
   const runManual = (manualStepAssets: bigint): OptimizeSupplyWithPositionsResult => {
-    const targetTotalAssets = getMoveSizeBaseTotalAssets(args.positions, args.newDepositAssets)
-    const minNewMarketBenefitWad = targetTotalAssets * MIN_NEW_MARKET_BENEFIT_BPS_WAD
     return optimizeSupplyAllocationWithPositions({
       markets: args.markets,
       positions: args.positions,
@@ -42,8 +55,7 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
       stepAssets: manualStepAssets,
       timestamp: args.timestamp,
       constraints: {
-        ...args.constraints,
-        minNewMarketBenefitWad: args.constraints?.minNewMarketBenefitWad ?? minNewMarketBenefitWad,
+        ...baseConstraints,
       },
       maxIterations: args.maxIterations,
     })
@@ -72,7 +84,7 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
         positions: args.positions,
         newDepositAssets: args.newDepositAssets,
         timestamp: args.timestamp,
-        constraints: args.constraints,
+        constraints: baseConstraints,
         maxIterations: args.maxIterations,
       })
       if (heuristicResult.status !== 'success' || !heuristicResult.result) {

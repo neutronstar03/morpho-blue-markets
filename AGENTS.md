@@ -43,6 +43,44 @@ If you are unsure where a bug lives, start from the relevant file in `app/pages/
 - bun run lint
 - bun run build (if change touches routing, bundling, or shared libs)
 
+## Debugging (UI via MCP DevTools)
+
+When debugging the Supply APR optimizer UI, use stable `data-testid` hooks:
+
+- Form container: `data-testid="supply-apr-optimizer-form"`
+- Result table: `data-testid="supply-apr-optimizer-result-table"`
+
+Reusable DevTools snippet to dump result-table rows (run in the selected `localhost:5173` tab):
+
+```js
+(() => {
+  const table = document.querySelector('[data-testid="supply-apr-optimizer-result-table"]')
+  if (!table)
+    return { found: false }
+  const headers = [...table.querySelectorAll('thead th')].map(th => (th.textContent || '').trim())
+  const rows = [...table.querySelectorAll('tbody tr')].map((tr) => {
+    const cells = [...tr.querySelectorAll('td')].map(td => (td.textContent || '').trim())
+    const marketLink = tr.querySelector('td a[href^="/market/"]')
+    return {
+      market: cells[0],
+      current: cells[1],
+      target: cells[2],
+      delta: cells[3],
+      aprAfter: cells[4],
+      yearlyReturn: cells[5],
+      href: marketLink ? marketLink.getAttribute('href') : undefined,
+    }
+  })
+  return { found: true, capturedAt: new Date().toISOString(), headers, rowCount: rows.length, rows }
+})()
+```
+
+Notes/pitfalls seen in practice:
+
+- `maxMarketsUsed` + greedy step scoring can cause "slot stealing": a market that looks good for a tiny first step can consume the last available slot and then collapse at size, blocking better scalable markets.
+- Relative gating (`newMarketHysteresisAprWad`) helps reduce churn in rebalance-only runs; deposit runs can set it to 0 to allow opening new markets.
+- Auto move size should target a fixed iteration budget (e.g. 300), not the smallest step that merely stays under the iteration cap.
+
 ## Where things go
 - README.md: what this project is + fastest way to run it.
 - AGENTS.md: how to work in this repo (agent-facing, self-updating).

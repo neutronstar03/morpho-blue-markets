@@ -1,8 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
-import { useEffect, useMemo } from 'react'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
-import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { isAssetBlacklisted } from '~/lib/market-blacklist'
 import { graphqlClient } from '../../graphql/client'
 
@@ -100,11 +98,6 @@ export interface UsePopularLoanAssetsByChainOptions {
   staleTimeMs?: number
 }
 
-interface PopularLoanAssetsCache {
-  data: PopularLoanAsset[]
-  updatedAt: number
-}
-
 export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLoanAssetsByChainOptions = {}) {
   const {
     first = 100,
@@ -117,37 +110,6 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
     enabled = true,
     staleTimeMs = STALE_TIME_LONG_MS,
   } = opts
-
-  const storageKey = useMemo(
-    () => [
-      'popular-loan-assets-by-chain',
-      chainId,
-      first,
-      skip,
-      minNetSupplyApy,
-      maxNetSupplyApy,
-      minBorrowUsd,
-      minUtilization,
-      topN,
-    ].join(':'),
-    [
-      chainId,
-      first,
-      skip,
-      minNetSupplyApy,
-      maxNetSupplyApy,
-      minBorrowUsd,
-      minUtilization,
-      topN,
-    ],
-  )
-
-  const [cached, setCached] = useLocalStorage<PopularLoanAssetsCache>(
-    storageKey,
-    { data: [], updatedAt: 0 },
-  )
-
-  const initialData = cached.updatedAt > 0 ? cached.data : undefined
 
   const query = useQuery<PopularLoanAsset[]>({
     queryKey: [
@@ -246,14 +208,8 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
     enabled: !!chainId && enabled,
     staleTime: staleTimeMs,
     refetchOnWindowFocus: false,
-    ...(initialData ? { initialData } : {}),
+    refetchOnMount: 'always',
   })
-
-  useEffect(() => {
-    if (!query.data)
-      return
-    setCached({ data: query.data, updatedAt: Date.now() })
-  }, [query.data, setCached])
 
   return query
 }

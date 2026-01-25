@@ -1,11 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
-import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 import { graphqlClient } from '../../graphql/client'
-
 // A specific, isolated type for this hook, containing only the fields required
 // for the supply-side of the `useLiveMarketPositions` hook.
 export interface SupplyMarketData {
@@ -16,6 +14,10 @@ export interface SupplyMarketData {
     symbol: string
     name?: string | null
     decimals?: number | null
+    chain?: {
+      id: number
+      network?: string | null
+    }
   }
   collateralAsset: {
     address: string
@@ -67,6 +69,7 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
           symbol
           name
           decimals
+          chain { id network }
         }
         collateralAsset {
           address
@@ -86,26 +89,11 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
   }
 `
 
-interface MarketsByChainCache {
-  data: SupplyMarketData[]
-  updatedAt: number
-}
-
 export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
-  const storageKey = useMemo(
-    () => ['markets-by-chain', chainId, loanAssetAddress ?? 'all'].join(':'),
-    [chainId, loanAssetAddress],
-  )
-
-  const [cached, setCached] = useLocalStorage<MarketsByChainCache>(
-    storageKey,
-    { data: [], updatedAt: 0 },
-  )
-
-  const initialData = cached.updatedAt > 0 ? cached.data : undefined
+  const loanAssetAddrLower = loanAssetAddress?.toLowerCase()
 
   const query = useQuery<SupplyMarketData[]>({
-    queryKey: ['markets-by-chain', chainId, loanAssetAddress],
+    queryKey: ['markets-by-chain', chainId, loanAssetAddrLower],
     queryFn: async () => {
       if (!chainId)
         return []
@@ -114,8 +102,8 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
       let skip = 0
 
       const where: MarketFiltersWithChain & { loanAssetAddress_in?: string[] } = { chainId_in: [chainId] }
-      if (loanAssetAddress)
-        where.loanAssetAddress_in = [loanAssetAddress]
+      if (loanAssetAddrLower)
+        where.loanAssetAddress_in = [loanAssetAddrLower]
 
       const markets: SupplyMarketData[] = []
 
@@ -151,14 +139,25 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
     enabled: !!chainId,
     staleTime: STALE_TIME_LONG_MS,
     refetchOnWindowFocus: false,
-    ...(initialData ? { initialData } : {}),
   })
 
-  useEffect(() => {
-    if (!query.data)
-      return
-    setCached({ data: query.data, updatedAt: Date.now() })
-  }, [query.data, setCached])
+  // Defensive: during chain/asset switching, React Query can briefly surface previous data.
+  // Filter by the requested loanAssetAddress so we never render mismatched markets.
+  const filteredData = useMemo(() => {
+    const data = query.data
+    if (!data)
+      return data
 
-  return query
+    let out = data
+
+    if (loanAssetAddrLower)
+      out = out.filter(m => (m.loanAsset?.address || '').toLowerCase() === loanAssetAddrLower)
+
+    return out
+  }, [chainId, loanAssetAddrLower, query.data])
+
+  return {
+    ...query,
+    data: filteredData,
+  }
 }

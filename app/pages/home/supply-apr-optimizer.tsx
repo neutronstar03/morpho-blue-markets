@@ -149,7 +149,8 @@ export function SupplyAprOptimizer() {
   }, [selectedUserMarkets])
 
   // Fetch top candidate markets (max 200) for the selected loan asset on this chain.
-  const { data: topMarkets } = useMarketsByChain(selectedLoanAddr ? chain?.id : undefined, selectedLoanAddr)
+  const topMarketsQuery = useMarketsByChain(selectedLoanAddr ? chain?.id : undefined, selectedLoanAddr)
+  const topMarkets = topMarketsQuery.data
 
   const { data: walletBalanceRaw } = useTokenBalance(
     selectedOption?.address ?? ZERO_ADDRESS,
@@ -250,16 +251,21 @@ export function SupplyAprOptimizer() {
     autoCacheKey?: string
   }>(null)
 
-  const lastChainIdRef = useRef<number | undefined>(chain?.id)
+  // Note: some wallets transiently report `chainId = undefined` during network switching.
+  // Track the last *non-null* chain id to ensure we still clear state on real chain changes.
+  const lastNonNullChainIdRef = useRef<number | undefined>(chain?.id)
 
   useEffect(() => {
     const currentChainId = chain?.id
-    const previousChainId = lastChainIdRef.current
-    lastChainIdRef.current = currentChainId
-
-    if (previousChainId == null || currentChainId == null)
+    if (currentChainId == null)
       return
-    if (previousChainId === currentChainId)
+
+    const previousNonNull = lastNonNullChainIdRef.current
+    lastNonNullChainIdRef.current = currentChainId
+
+    if (previousNonNull == null)
+      return
+    if (previousNonNull === currentChainId)
       return
 
     ctx.clear()
@@ -411,6 +417,27 @@ export function SupplyAprOptimizer() {
   const onOptimize = () => {
     if (!selectedOption || !userAddress || !chain?.id)
       return
+
+    // Avoid silently running with an incomplete market universe.
+    // If `topMarkets` isn't ready, show an explicit message instead of a dead "Optimize" button.
+    if (topMarketsQuery.isLoading || topMarketsQuery.isFetching) {
+      const timestamp = BigInt(Math.floor(Date.now() / 1000))
+      const runId = beginRun({ timestamp })
+      finishRun(runId, undefined, 'Loading top markets… please retry in a moment.')
+      return
+    }
+    if (topMarketsQuery.isError) {
+      const timestamp = BigInt(Math.floor(Date.now() / 1000))
+      const runId = beginRun({ timestamp })
+      finishRun(runId, undefined, 'Failed to load top markets. Please retry.')
+      return
+    }
+    if (!topMarkets || topMarkets.length === 0) {
+      const timestamp = BigInt(Math.floor(Date.now() / 1000))
+      const runId = beginRun({ timestamp })
+      finishRun(runId, undefined, 'No markets found for this asset on this chain.')
+      return
+    }
     const positions = ctx.derived.positions ?? []
 
     const timestamp = BigInt(Math.floor(Date.now() / 1000))

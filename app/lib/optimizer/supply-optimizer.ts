@@ -33,6 +33,11 @@ export interface SupplyOptimizerConstraints {
   /** Optional market-specific cap resolver (raw assets). Overrides `perMarketCapAssets` when provided. */
   perMarketCapAssetsByMarket?: (m: SupplyOptimizerMarketSnapshot) => bigint | undefined
   /**
+   * Minimum allocation required to open a new market (raw assets).
+   * If set, the optimizer will not create tiny new positions below this size.
+   */
+  minNewMarketAssets?: bigint
+  /**
    * Minimum acceptable supply APR (WAD). Markets whose *post-step* APR is below this are skipped.
    * Example: 0.02e18 = 2% APR.
    */
@@ -42,6 +47,18 @@ export interface SupplyOptimizerConstraints {
    * Example: targetTotalAssets * 0.001e18 for a 10 bps threshold.
    */
   minNewMarketBenefitWad?: bigint
+
+  /**
+   * Relative gating when opening a new market.
+   *
+   * If set, the optimizer will only open a new market when its best marginal step benefit
+   * beats the best marginal step benefit among already-used markets by at least:
+   *   stepAssets * newMarketHysteresisAprWad
+   *
+   * This avoids portfolio-size-based thresholds that can be skewed by locked or very high-APR
+   * positions, while still preventing churn/noise in rebalance-only runs.
+   */
+  newMarketHysteresisAprWad?: bigint
 }
 
 export interface OptimizeSupplyAllocationArgs {
@@ -258,15 +275,20 @@ function greedyAllocateUpwards(args: {
   let remaining = remainingIn
   const minAprWad = constraints?.minSupplyAprWad
   const minNewMarketBenefitWad = constraints?.minNewMarketBenefitWad
+  const minNewMarketAssets = constraints?.minNewMarketAssets ?? stepAssets
   const maxMarketsUsed = constraints?.maxMarketsUsed
+  const newMarketHysteresisAprWad = constraints?.newMarketHysteresisAprWad
 
   let iterations = 0
   while (remaining > 0n && iterations < maxIterations) {
-    let bestIdx = -1
-    let bestStep = 0n
+    let bestNewIdx = -1
+    let bestNewStep = 0n
+    let bestExistingIdx = -1
+    let bestExistingStep = 0n
     // Allow negative marginal scores: still pick the least-bad market so we don't stop early
     // and implicitly "leave funds unallocated" under constraints like maxMarketsUsed.
-    let bestScore = -(2n ** 255n)
+    let bestNewScore = -(2n ** 255n)
+    let bestExistingScore = -(2n ** 255n)
 
     for (let i = 0; i < markets.length; i++) {
       if (maxMarketsUsed != null && maxMarketsUsed > 0 && allocations[i] === 0n && used.size >= maxMarketsUsed)
@@ -282,7 +304,35 @@ function greedyAllocateUpwards(args: {
         continue
 
       const currentFinal = allocations[i]
-      const candidateFinal = allocations[i] + step
+
+      // If we're about to consume the final available market slot, score opening this new market
+      // on a "probe" equal to the remaining allocation. This avoids opening markets that look
+      // good for a single tiny step but collapse at meaningful size.
+      const isLastSlotNewMarket = (currentFinal === 0n)
+        && (maxMarketsUsed != null && maxMarketsUsed > 0)
+        && (used.size === (maxMarketsUsed - 1))
+
+      // Avoid opening tiny new markets.
+      if (currentFinal === 0n && minNewMarketAssets != null && minNewMarketAssets > 0n) {
+        if (remaining < minNewMarketAssets)
+          continue
+        const desired = minBigint(minNewMarketAssets, capRemaining)
+        if (desired <= 0n)
+          continue
+        step = desired > step ? desired : step
+        step = minBigint(step, remaining)
+        step = minBigint(step, capRemaining)
+        if (step < minNewMarketAssets)
+          continue
+      }
+
+      let scoreStep = step
+      if (isLastSlotNewMarket) {
+        const probe = minBigint(remaining, capRemaining)
+        if (probe > scoreStep)
+          scoreStep = probe
+      }
+      const candidateFinalForScore = allocations[i] + scoreStep
 
       const currentMarket: SupplyOptimizerMarketSnapshot = {
         ...markets[i],
@@ -290,7 +340,7 @@ function greedyAllocateUpwards(args: {
       }
       const modeledMarket: SupplyOptimizerMarketSnapshot = {
         ...markets[i],
-        totalSupplyAssets: exUserSupplyAssets[i] + candidateFinal,
+        totalSupplyAssets: exUserSupplyAssets[i] + candidateFinalForScore,
       }
 
       const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({
@@ -308,23 +358,52 @@ function greedyAllocateUpwards(args: {
 
       // Score by *delta* expected 1y yield (assets * WAD), accounting for the APR shift on existing
       // allocated assets when utilization changes. This reduces step-size sensitivity vs step*APR.
-      const score = (candidateFinal * supplyAprWad) - (currentFinal * supplyAprCurrentWad)
+      const score = (candidateFinalForScore * supplyAprWad) - (currentFinal * supplyAprCurrentWad)
       if (minNewMarketBenefitWad != null && currentFinal === 0n && score < minNewMarketBenefitWad)
         continue
-      if (score > bestScore) {
-        bestScore = score
-        bestIdx = i
-        bestStep = step
+
+      if (currentFinal === 0n) {
+        if (score > bestNewScore) {
+          bestNewScore = score
+          bestNewIdx = i
+          bestNewStep = step
+        }
+      }
+      else {
+        if (score > bestExistingScore) {
+          bestExistingScore = score
+          bestExistingIdx = i
+          bestExistingStep = step
+        }
       }
     }
 
-    if (bestIdx < 0 || bestStep <= 0n)
+    if (bestNewIdx < 0 && bestExistingIdx < 0)
       break
 
-    allocations[bestIdx] += bestStep
-    if (allocations[bestIdx] > 0n)
-      used.add(bestIdx)
-    remaining -= bestStep
+    let chosenIdx = bestExistingIdx
+    let chosenStep = bestExistingStep
+
+    if (bestNewIdx >= 0 && (bestExistingIdx < 0 || bestNewScore > bestExistingScore)) {
+      let allowNew = true
+      if (bestExistingIdx >= 0 && newMarketHysteresisAprWad != null && newMarketHysteresisAprWad > 0n) {
+        const hysteresisBenefitWad = stepAssets * newMarketHysteresisAprWad
+        if (bestNewScore < bestExistingScore + hysteresisBenefitWad)
+          allowNew = false
+      }
+      if (allowNew) {
+        chosenIdx = bestNewIdx
+        chosenStep = bestNewStep
+      }
+    }
+
+    if (chosenIdx < 0 || chosenStep <= 0n)
+      break
+
+    allocations[chosenIdx] += chosenStep
+    if (allocations[chosenIdx] > 0n)
+      used.add(chosenIdx)
+    remaining -= chosenStep
     iterations++
   }
 
@@ -352,15 +431,20 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
 
   const minAprWad = constraints?.minSupplyAprWad
   const minNewMarketBenefitWad = constraints?.minNewMarketBenefitWad
+  const minNewMarketAssets = constraints?.minNewMarketAssets ?? stepAssets
   const maxMarketsUsed = constraints?.maxMarketsUsed
+  const newMarketHysteresisAprWad = constraints?.newMarketHysteresisAprWad
 
   let iterations = 0
   while (remaining > 0n && iterations < maxIterations) {
-    let bestIdx = -1
-    let bestStep = 0n
+    let bestNewIdx = -1
+    let bestNewStep = 0n
+    let bestExistingIdx = -1
+    let bestExistingStep = 0n
     // Allow negative marginal scores: still pick the least-bad market so we don't stop early
     // and implicitly "leave funds unallocated" under constraints like maxMarketsUsed.
-    let bestScore = -(2n ** 255n)
+    let bestNewScore = -(2n ** 255n)
+    let bestExistingScore = -(2n ** 255n)
 
     for (let i = 0; i < markets.length; i++) {
       const m = markets[i]
@@ -381,30 +465,85 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
         continue
 
       const currentAmt = allocated[i]
-      const candidateAmt = allocated[i] + step
+
+      const isLastSlotNewMarket = (currentAmt === 0n)
+        && (maxMarketsUsed != null && maxMarketsUsed > 0)
+        && (used.size === (maxMarketsUsed - 1))
+
+      // Avoid opening tiny new markets.
+      if (currentAmt === 0n && minNewMarketAssets != null && minNewMarketAssets > 0n) {
+        if (remaining < minNewMarketAssets)
+          continue
+        const desired = capRemaining != null ? minBigint(minNewMarketAssets, capRemaining) : minNewMarketAssets
+        if (desired <= 0n)
+          continue
+        step = desired > step ? desired : step
+        if (capRemaining != null)
+          step = minBigint(step, capRemaining)
+        step = minBigint(step, remaining)
+        if (step < minNewMarketAssets)
+          continue
+      }
+
+      let scoreStep = step
+      if (isLastSlotNewMarket) {
+        const probe = capRemaining != null ? minBigint(remaining, capRemaining) : remaining
+        if (probe > scoreStep)
+          scoreStep = probe
+      }
+      const candidateAmtForScore = allocated[i] + scoreStep
 
       const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: currentAmt, timestamp })
-      const { supplyAprWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: candidateAmt, timestamp })
+      const { supplyAprWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: candidateAmtForScore, timestamp })
       if (minAprWad != null && supplyAprWad < minAprWad)
         continue
 
       // Score by *delta* expected 1y yield (assets * WAD), accounting for APR shift on already-allocated assets.
-      const score = (candidateAmt * supplyAprWad) - (currentAmt * supplyAprCurrentWad)
+      const score = (candidateAmtForScore * supplyAprWad) - (currentAmt * supplyAprCurrentWad)
       if (minNewMarketBenefitWad != null && currentAmt === 0n && score < minNewMarketBenefitWad)
         continue
-      if (score > bestScore) {
-        bestScore = score
-        bestIdx = i
-        bestStep = step
+
+      if (currentAmt === 0n) {
+        if (score > bestNewScore) {
+          bestNewScore = score
+          bestNewIdx = i
+          bestNewStep = step
+        }
+      }
+      else {
+        if (score > bestExistingScore) {
+          bestExistingScore = score
+          bestExistingIdx = i
+          bestExistingStep = step
+        }
       }
     }
 
-    if (bestIdx < 0 || bestStep <= 0n)
+    if (bestNewIdx < 0 && bestExistingIdx < 0)
       break
 
-    allocated[bestIdx] += bestStep
-    used.add(bestIdx)
-    remaining -= bestStep
+    let chosenIdx = bestExistingIdx
+    let chosenStep = bestExistingStep
+
+    if (bestNewIdx >= 0 && (bestExistingIdx < 0 || bestNewScore > bestExistingScore)) {
+      let allowNew = true
+      if (bestExistingIdx >= 0 && newMarketHysteresisAprWad != null && newMarketHysteresisAprWad > 0n) {
+        const hysteresisBenefitWad = stepAssets * newMarketHysteresisAprWad
+        if (bestNewScore < bestExistingScore + hysteresisBenefitWad)
+          allowNew = false
+      }
+      if (allowNew) {
+        chosenIdx = bestNewIdx
+        chosenStep = bestNewStep
+      }
+    }
+
+    if (chosenIdx < 0 || chosenStep <= 0n)
+      break
+
+    allocated[chosenIdx] += chosenStep
+    used.add(chosenIdx)
+    remaining -= chosenStep
     iterations++
   }
 
@@ -558,15 +697,20 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
 
   const minAprWad = constraints?.minSupplyAprWad
   const minNewMarketBenefitWad = constraints?.minNewMarketBenefitWad
+  const minNewMarketAssets = constraints?.minNewMarketAssets ?? stepAssets
   const maxMarketsUsed = constraints?.maxMarketsUsed
+  const newMarketHysteresisAprWad = constraints?.newMarketHysteresisAprWad
 
   let iterations = 0
   while (remaining > 0n && iterations < maxIterations) {
-    let bestIdx = -1
-    let bestStep = 0n
+    let bestNewIdx = -1
+    let bestNewStep = 0n
+    let bestExistingIdx = -1
+    let bestExistingStep = 0n
     // Allow negative marginal scores: still pick the least-bad market so we don't stop early
     // and implicitly "leave funds unallocated" under constraints like maxMarketsUsed.
-    let bestScore = -(2n ** 255n)
+    let bestNewScore = -(2n ** 255n)
+    let bestExistingScore = -(2n ** 255n)
 
     for (let i = 0; i < n; i++) {
       if (maxMarketsUsed != null && maxMarketsUsed > 0 && finalAlloc[i] === 0n && used.size >= maxMarketsUsed)
@@ -582,7 +726,32 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
         continue
 
       const currentFinal = finalAlloc[i]
-      const candidateFinal = finalAlloc[i] + step
+
+      const isLastSlotNewMarket = (currentFinal === 0n)
+        && (maxMarketsUsed != null && maxMarketsUsed > 0)
+        && (used.size === (maxMarketsUsed - 1))
+
+      // Avoid opening tiny new markets.
+      if (currentFinal === 0n && minNewMarketAssets != null && minNewMarketAssets > 0n) {
+        if (remaining < minNewMarketAssets)
+          continue
+        const desired = minBigint(minNewMarketAssets, capRemaining)
+        if (desired <= 0n)
+          continue
+        step = desired > step ? desired : step
+        step = minBigint(step, remaining)
+        step = minBigint(step, capRemaining)
+        if (step < minNewMarketAssets)
+          continue
+      }
+
+      let scoreStep = step
+      if (isLastSlotNewMarket) {
+        const probe = minBigint(remaining, capRemaining)
+        if (probe > scoreStep)
+          scoreStep = probe
+      }
+      const candidateFinalForScore = finalAlloc[i] + scoreStep
 
       const currentMarket: SupplyOptimizerMarketSnapshot = {
         ...markets[i],
@@ -590,7 +759,7 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
       }
       const modeledMarket: SupplyOptimizerMarketSnapshot = {
         ...markets[i],
-        totalSupplyAssets: exUserSupply[i] + candidateFinal,
+        totalSupplyAssets: exUserSupply[i] + candidateFinalForScore,
       }
 
       const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({
@@ -608,23 +777,52 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
 
       // Score by *delta* expected 1y yield (assets * WAD), accounting for the APR shift on existing
       // allocated assets when utilization changes.
-      const score = (candidateFinal * supplyAprWad) - (currentFinal * supplyAprCurrentWad)
+      const score = (candidateFinalForScore * supplyAprWad) - (currentFinal * supplyAprCurrentWad)
       if (minNewMarketBenefitWad != null && currentFinal === 0n && score < minNewMarketBenefitWad)
         continue
-      if (score > bestScore) {
-        bestScore = score
-        bestIdx = i
-        bestStep = step
+
+      if (currentFinal === 0n) {
+        if (score > bestNewScore) {
+          bestNewScore = score
+          bestNewIdx = i
+          bestNewStep = step
+        }
+      }
+      else {
+        if (score > bestExistingScore) {
+          bestExistingScore = score
+          bestExistingIdx = i
+          bestExistingStep = step
+        }
       }
     }
 
-    if (bestIdx < 0 || bestStep <= 0n)
+    if (bestNewIdx < 0 && bestExistingIdx < 0)
       break
 
-    finalAlloc[bestIdx] += bestStep
-    if (finalAlloc[bestIdx] > 0n)
-      used.add(bestIdx)
-    remaining -= bestStep
+    let chosenIdx = bestExistingIdx
+    let chosenStep = bestExistingStep
+
+    if (bestNewIdx >= 0 && (bestExistingIdx < 0 || bestNewScore > bestExistingScore)) {
+      let allowNew = true
+      if (bestExistingIdx >= 0 && newMarketHysteresisAprWad != null && newMarketHysteresisAprWad > 0n) {
+        const hysteresisBenefitWad = stepAssets * newMarketHysteresisAprWad
+        if (bestNewScore < bestExistingScore + hysteresisBenefitWad)
+          allowNew = false
+      }
+      if (allowNew) {
+        chosenIdx = bestNewIdx
+        chosenStep = bestNewStep
+      }
+    }
+
+    if (chosenIdx < 0 || chosenStep <= 0n)
+      break
+
+    finalAlloc[chosenIdx] += chosenStep
+    if (finalAlloc[chosenIdx] > 0n)
+      used.add(chosenIdx)
+    remaining -= chosenStep
     iterations++
   }
 

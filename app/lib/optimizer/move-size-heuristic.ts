@@ -5,11 +5,17 @@ const WAD = 10n ** 18n
 const DEFAULT_MIN_PCT_WAD = 10n ** 13n // 0.001%
 const DEFAULT_MAX_PCT_WAD = 5n * 10n ** 16n // 5%
 const DEFAULT_MAX_ATTEMPTS = 8
+const DEFAULT_TARGET_ITERATIONS = 300
 
 export interface MoveSizeHeuristicConfig {
   minPercentWad?: bigint
   maxPercentWad?: bigint
   maxAttempts?: number
+  /**
+   * Target iteration budget for the greedy optimizer.
+   * Auto move size will choose the smallest stepAssets that stays within this budget.
+   */
+  targetIterations?: number
 }
 
 export interface MoveSizeHeuristicResult {
@@ -64,6 +70,7 @@ export function optimizeSupplyWithMoveSizeHeuristic(args: Omit<OptimizeSupplyWit
 }): MoveSizeHeuristicResult {
   const { maxIterations, config, baseTotalAssets: baseTotalOverride, ...optimizerArgs } = args
   const maxAttempts = config?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS
+  const targetIterations = Math.max(1, Math.min(config?.targetIterations ?? DEFAULT_TARGET_ITERATIONS, maxIterations))
 
   const baseTotalAssets = baseTotalOverride ?? getMoveSizeBaseTotalAssets(optimizerArgs.positions, optimizerArgs.newDepositAssets)
   if (baseTotalAssets <= 0n) {
@@ -99,7 +106,7 @@ export function optimizeSupplyWithMoveSizeHeuristic(args: Omit<OptimizeSupplyWit
     })
     attempts++
 
-    if (result.iterations < maxIterations) {
+    if (result.iterations <= targetIterations) {
       bestStep = stepAssets
       bestResult = result
       break
@@ -124,31 +131,34 @@ export function optimizeSupplyWithMoveSizeHeuristic(args: Omit<OptimizeSupplyWit
       attempts,
       minStepAssets,
       maxStepAssets: cappedMaxStepAssets,
-      error: 'Auto move size could not converge within the iteration cap.',
+      error: 'Auto move size could not reach the target iteration budget.',
     }
   }
 
-  let low = lastFailStep ?? 0n
-  let high = bestStep
-  while (attempts < maxAttempts && high - low > 1n) {
-    const mid = low + ((high - low) / 2n)
-    if (mid <= 0n || mid === low || mid === high)
-      break
+  // Refine only when we observed at least one "over-budget" step.
+  if (lastFailStep != null) {
+    let low = lastFailStep
+    let high = bestStep
+    while (attempts < maxAttempts && high - low > 1n) {
+      const mid = low + ((high - low) / 2n)
+      if (mid <= 0n || mid === low || mid === high)
+        break
 
-    const result = optimizeSupplyAllocationWithPositions({
-      ...optimizerArgs,
-      stepAssets: mid,
-      maxIterations,
-    })
-    attempts++
+      const result = optimizeSupplyAllocationWithPositions({
+        ...optimizerArgs,
+        stepAssets: mid,
+        maxIterations,
+      })
+      attempts++
 
-    if (result.iterations < maxIterations) {
-      bestStep = mid
-      bestResult = result
-      high = mid
-    }
-    else {
-      low = mid
+      if (result.iterations <= targetIterations) {
+        bestStep = mid
+        bestResult = result
+        high = mid
+      }
+      else {
+        low = mid
+      }
     }
   }
 
