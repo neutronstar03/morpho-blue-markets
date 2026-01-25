@@ -640,7 +640,7 @@ export function SupplyAprOptimizer() {
           <button
             type="button"
             onClick={() => ctx.clear()}
-            className="ml-auto px-2 py-1 rounded-md border border-gray-700 text-gray-200 hover:bg-gray-800"
+            className="ml-auto px-2 py-1 rounded-md border border-gray-700 text-gray-200 hover:bg-gray-800 cursor-pointer"
             title="Clear"
           >
             X

@@ -5,6 +5,7 @@ import { darkTheme, RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { WagmiProvider } from 'wagmi'
+import { BatchWithdrawProvider } from './contexts/batch-withdraw.context'
 import { NetworkProvider } from './contexts/network'
 import { SupplyAprOptimizerProvider } from './contexts/optimizer.context'
 import { config } from './wagmi'
@@ -27,7 +28,9 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <NetworkProvider>
           <SupplyAprOptimizerProvider>
-            <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
+            <BatchWithdrawProvider>
+              <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
+            </BatchWithdrawProvider>
           </SupplyAprOptimizerProvider>
         </NetworkProvider>
       </QueryClientProvider>
