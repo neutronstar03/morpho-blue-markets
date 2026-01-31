@@ -583,7 +583,10 @@ export function BatchWithdraw() {
     <Card className="mb-8" data-testid="batch-withdraw-card">
       <div className="p-4 border-b border-gray-700 flex items-center gap-3">
         <div className="flex flex-col">
-          <h2 className="text-xl font-bold text-white">Batch withdraw</h2>
+          <h2 className="text-xl font-bold text-white">
+            Batch withdraw
+            <span className="text-xs text-gray-400"> (beta)</span>
+          </h2>
           <p className="text-sm text-gray-400">
             Withdraws from your lowest-APR markets first.
           </p>
