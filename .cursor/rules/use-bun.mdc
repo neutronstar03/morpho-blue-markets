@@ -1,4 +1,0 @@
----
-alwaysApply: true
----
-to run commands use Bun. Currently using Bun 1.3.x

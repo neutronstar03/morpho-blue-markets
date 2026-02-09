@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.22 - 2026-02-09
+
+### Introduced
+- feat: reusable `Select` and `Badge` UI primitives with loading-capable button states.
+
+### Changed
+- ui: refreshed home controls (markets filters, optimizer, batch withdraw) to use consistent select/button/input components.
+- ui: improved mobile density for optimizer, batch withdraw, and positions; made comparison `<`/`>` selector clearer.
+- ui: show immediate APR on mobile markets table and hide chain column when a single chain is selected.
+- ui: updated deposit/withdraw alert colors to match the app dark theme.
+
 ## v1.1.16 - 2026-01-19
 
 ### Changed
