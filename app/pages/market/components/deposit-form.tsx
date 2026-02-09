@@ -258,13 +258,13 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
 
   if (isSuccess && showSuccess) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+      <div className="bg-green-950/30 border border-green-800/40 rounded-lg p-4">
         <div className="flex items-center">
           <div className="flex-shrink-0">
             <CheckCircleIcon className="h-5 w-5 text-green-400" aria-hidden="true" />
           </div>
           <div className="ml-3">
-            <p className="text-sm font-medium text-green-800">
+            <p className="text-sm font-medium text-green-300">
               Deposit successful!
             </p>
           </div>
@@ -275,7 +275,7 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
                   setShowSuccess(false)
                   onSuccess?.()
                 }}
-                className="inline-flex bg-green-50 rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-50 focus:ring-green-600"
+                className="inline-flex rounded-md p-1.5 text-green-400 hover:bg-green-900/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-950 focus:ring-green-600"
               >
                 <span className="sr-only">Dismiss</span>
                 <XMarkIcon className="h-5 w-5" aria-hidden="true" />
@@ -380,8 +380,8 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       )}
 
       {isApproveSuccess && !needsApproval && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-          <p className="text-sm text-green-800">
+        <div className="bg-green-950/30 border border-green-800/40 rounded-lg p-3">
+          <p className="text-sm text-green-300">
             Approval successful! You can now deposit your
             {' '}
             {loanTokenSymbol}
@@ -391,8 +391,8 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       )}
 
       {needsApproval && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-sm text-yellow-800">
+        <div className="bg-yellow-950/30 border border-yellow-800/40 rounded-lg p-3">
+          <p className="text-sm text-yellow-300">
             You need to approve the token spending first. This transaction will allow Morpho Blue to use your
             {' '}
             {loanTokenSymbol}
@@ -402,16 +402,16 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       )}
 
       {!!amount && !!address && tokenBalance !== undefined && !needsApproval && !hasSufficientBalance && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-sm text-yellow-800">
+        <div className="bg-yellow-950/30 border border-yellow-800/40 rounded-lg p-3">
+          <p className="text-sm text-yellow-300">
             Insufficient wallet balance for this deposit amount. Preview is shown, but deposit is disabled.
           </p>
         </div>
       )}
 
       {hasError && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="text-sm text-red-800">
+        <div className="bg-red-950/30 border border-red-800/40 rounded-lg p-3">
+          <p className="text-sm text-red-300">
             {effectiveSupplyError?.message || approveError?.message || 'Transaction failed'}
           </p>
         </div>
