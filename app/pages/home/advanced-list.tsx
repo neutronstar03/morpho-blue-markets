@@ -5,7 +5,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
+import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import { getSupportedChainName, supportedChainIdMap } from '~/lib/addresses'
 import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
 import {
@@ -155,38 +163,41 @@ function MarketFilters({
   }
 
   return (
-    <div className={`p-4 flex flex-wrap items-center gap-4 ${colors.background} border-b ${colors.border}`}>
+    <div className={`p-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 ${colors.background} border-b ${colors.border}`}>
       <div className="flex items-center space-x-2">
-        <span className="text-sm font-medium text-gray-300">Filter by Chain:</span>
-        <select
-          value={chainFilter}
-          onChange={e => setChainFilter(e.target.value as MarketChainFilter)}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="ALL">ALL</option>
-          {Array.from(supportedChainIdMap.keys()).map(chainName => (
-            <option key={chainName} value={chainName}>{chainName}</option>
-          ))}
-        </select>
+        <span className="text-sm font-medium text-gray-300">Chain:</span>
+        <Select value={chainFilter} onValueChange={v => setChainFilter(v as MarketChainFilter)}>
+          <SelectTrigger className="h-8 w-auto min-w-[5rem] bg-gray-700 border-gray-600 text-white text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">ALL</SelectItem>
+            {Array.from(supportedChainIdMap.keys()).map(chainName => (
+              <SelectItem key={chainName} value={chainName}>{chainName}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex items-center space-x-2">
         <span className="text-sm font-medium text-gray-300">Filter:</span>
-        <select
-          value={aprType}
-          onChange={e => onChangeDirection(e.target.value as MarketSide)}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="supply">Supply APY</option>
-          <option value="borrow">Borrow APY</option>
-        </select>
-        <select
-          value={comparison}
-          onChange={e => setComparison(e.target.value as '>' | '<')}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value=">">{'>'}</option>
-          <option value="<">{'<'}</option>
-        </select>
+        <Select value={aprType} onValueChange={v => onChangeDirection(v as MarketSide)}>
+          <SelectTrigger className="h-8 w-auto min-w-[6rem] bg-gray-700 border-gray-600 text-white text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="supply">Supply APY</SelectItem>
+            <SelectItem value="borrow">Borrow APY</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={comparison} onValueChange={v => setComparison(v as '>' | '<')}>
+          <SelectTrigger className="h-8 w-auto min-w-[3.75rem] justify-center bg-gray-700 border-gray-600 text-white text-base font-semibold">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value=">" className="text-base font-semibold justify-center">&gt;</SelectItem>
+            <SelectItem value="<" className="text-base font-semibold justify-center">&lt;</SelectItem>
+          </SelectContent>
+        </Select>
         <input
           type="number"
           value={aprValue}
@@ -199,23 +210,25 @@ function MarketFilters({
 
       <div className="flex items-center space-x-2">
         <span className="text-sm font-medium text-gray-300">Order by:</span>
-        <select
-          value={orderBy}
-          onChange={e => setOrderBy(e.target.value as MarketOrderBy)}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="NetSupplyApy">Supply APY</option>
-          <option value="NetBorrowApy">Borrow APY</option>
-          <option value="SizeUsd">Size USD</option>
-        </select>
-        <select
-          value={orderDirection}
-          onChange={e => setOrderDirection(e.target.value as OrderDirection)}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="Desc">Desc</option>
-          <option value="Asc">Asc</option>
-        </select>
+        <Select value={orderBy} onValueChange={v => setOrderBy(v as MarketOrderBy)}>
+          <SelectTrigger className="h-8 w-auto min-w-[6rem] bg-gray-700 border-gray-600 text-white text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NetSupplyApy">Supply APY</SelectItem>
+            <SelectItem value="NetBorrowApy">Borrow APY</SelectItem>
+            <SelectItem value="SizeUsd">Size USD</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={orderDirection} onValueChange={v => setOrderDirection(v as OrderDirection)}>
+          <SelectTrigger className="h-8 w-auto min-w-[4rem] bg-gray-700 border-gray-600 text-white text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Desc">Desc</SelectItem>
+            <SelectItem value="Asc">Asc</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   )
@@ -228,6 +241,7 @@ interface MarketTableProps {
   immediateAprByMarketKey: Record<string, { apr?: number, borrowApr?: number, isLive: boolean }>
   canComputeLiveApr: boolean
   liveChainId?: number
+  hideChainColumn: boolean
 }
 
 function MarketTable({
@@ -237,6 +251,7 @@ function MarketTable({
   immediateAprByMarketKey,
   canComputeLiveApr,
   liveChainId,
+  hideChainColumn,
 }: MarketTableProps) {
   if (isLoading) {
     return (
@@ -253,19 +268,24 @@ function MarketTable({
         <thead className={colors.background}>
           <tr>
             <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
-            <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Chain</th>
+            {!hideChainColumn && (
+              <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Chain</th>
+            )}
             <th scope="col" className="px-2 sm:px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Size $</th>
-            <th scope="col" className="px-2 sm:px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">before 90%</th>
-            <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">usage %</th>
+            <th scope="col" className="hidden sm:table-cell px-2 sm:px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">before 90%</th>
+            <th scope="col" className="hidden sm:table-cell px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">usage %</th>
             <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Recent APY</th>
-            <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Immediate APR</th>
+            <th scope="col" className="px-2 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <span className="sm:hidden">Imm APR</span>
+              <span className="hidden sm:inline">Immediate APR</span>
+            </th>
           </tr>
         </thead>
         <tbody className={`${colors.backgroundLight} divide-y divide-gray-700`}>
           {markets.map(market => (
             <tr
               key={market.id}
-              className={`${colors.hover} transition-colors relative`}
+              className={`even:bg-white/[0.02] ${rateType === 'supply' ? 'hover:bg-gray-700/70' : 'hover:bg-orange-900/60'} transition-colors relative`}
             >
               <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                 <div className="flex items-center gap-2">
@@ -286,14 +306,16 @@ function MarketTable({
                   </a>
                 </div>
               </td>
-              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-400">{market.chainName}</td>
+              {!hideChainColumn && (
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-400">{market.chainName}</td>
+              )}
               <td className="px-2 sm:px-3 py-4 whitespace-nowrap text-right text-sm text-white">{formatMarketSize(market.marketSizeUsd ?? undefined)}</td>
-              <td className="px-2 sm:px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.beforeTarget}</td>
-              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilizationPct}</td>
+              <td className="hidden sm:table-cell px-2 sm:px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.beforeTarget}</td>
+              <td className="hidden sm:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilizationPct}</td>
               <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
                 {`${((rateType === 'supply' ? market.netSupplyApy : market.netBorrowApy) * 100).toFixed(2)}%`}
               </td>
-              <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
+              <td className={`px-2 sm:px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
                 {(() => {
                   const entry = immediateAprByMarketKey[market.id]
                   const immediate = rateType === 'supply' ? entry?.apr : entry?.borrowApr
@@ -466,13 +488,13 @@ export function AdvancedList() {
             {timeAgo || '—'}
           </span>
         </div>
-        <button
+        <Button
           onClick={() => handleRefresh()}
           disabled={isRefreshing || isCooldown}
-          className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
+          className="ml-auto"
         >
           {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
-        </button>
+        </Button>
       </div>
 
       <MarketFilters
@@ -498,6 +520,7 @@ export function AdvancedList() {
         immediateAprByMarketKey={aprByMarketKey}
         canComputeLiveApr={canComputeLiveApr}
         liveChainId={liveChainId}
+        hideChainColumn={chainFilter !== 'ALL'}
       />
     </Card>
   )

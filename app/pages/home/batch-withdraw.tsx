@@ -1,5 +1,6 @@
 import type { Address } from 'viem'
 import type { SupplyOptimizerMarketSnapshot } from '~/lib/optimizer/supply-optimizer'
+import { Maximize2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createSearchParams, Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
@@ -14,8 +15,16 @@ import {
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
+import { InfoTooltip } from '~/components/ui/info-tooltip'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import { MORPHO_AUTH_ABI } from '~/lib/abis/bundler3'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
@@ -593,18 +602,21 @@ export function BatchWithdraw() {
         </div>
 
         {(selectedLoanAssetAddress || withdrawAmount || executeError) && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={clear}
-            className="ml-auto px-2 py-1 rounded-md border border-gray-700 text-gray-200 hover:bg-gray-800 cursor-pointer"
+            className="ml-auto h-8 px-2.5 text-xs"
             title="Clear"
           >
-            X
-          </button>
+            <X className="h-3.5 w-3.5" />
+            Clear
+          </Button>
         )}
       </div>
 
-      <div className="p-4 sm:p-6 space-y-5">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
         {!userAddress && (
           <div className="text-sm text-gray-300">
             Connect your wallet to plan a batch withdraw.
@@ -613,47 +625,66 @@ export function BatchWithdraw() {
 
         {userAddress && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4" data-testid="batch-withdraw-form">
-              <div className="space-y-2 md:col-span-2">
-                <Label className="block text-gray-200">Asset</Label>
-                <select
-                  value={selectedLoanAssetAddress}
-                  onChange={e => onChangeLoanAsset(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 items-start" data-testid="batch-withdraw-form">
+              <div className="flex flex-col gap-1.5 md:gap-2 md:col-span-2">
+                <div className="h-5 flex items-center">
+                  <Label className="text-gray-200">Asset</Label>
+                </div>
+                <Select
+                  value={selectedLoanAssetAddress || undefined}
+                  onValueChange={onChangeLoanAsset}
                   disabled={isLoadingPositions || loanAssetOptions.length === 0}
                 >
-                  <option value="" disabled>
-                    {isLoadingPositions ? 'Loading…' : 'Select an asset'}
-                  </option>
-                  {loanAssetOptions.map(o => (
-                    <option key={o.address} value={o.address}>
-                      {o.symbol}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-10 bg-gray-900 border-gray-700 text-white text-sm">
+                    <SelectValue placeholder={isLoadingPositions ? 'Loading…' : 'Select an asset'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loanAssetOptions.map(o => (
+                      <SelectItem key={o.address} value={o.address}>
+                        {o.symbol}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="h-0 md:h-4" />
               </div>
 
-              <div className="space-y-2 md:col-span-2">
-                <Label className="block text-gray-200">Amount</Label>
+              <div className="flex flex-col gap-1.5 md:gap-2 md:col-span-2">
+                <div className="h-5 flex items-center">
+                  <Label className="text-gray-200" htmlFor="batch-withdraw-amount">Amount</Label>
+                </div>
                 <div className="relative">
                   <Input
+                    id="batch-withdraw-amount"
                     type="text"
                     inputMode="decimal"
                     value={withdrawAmount}
                     onChange={e => ctx.setWithdrawAmount(e.target.value)}
                     placeholder="0.0"
-                    className="w-full pr-20 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
+                    className="w-full h-10 pr-20 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
                     disabled={!selectedOption}
                   />
                   <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
                     {symbol}
                   </span>
                 </div>
+                <div className="h-0 md:h-4" />
               </div>
 
-              <div className="flex items-end">
+              <div className="flex flex-col gap-1.5 md:gap-2">
+                <div className="h-5 flex items-center gap-2">
+                  <Label className="text-gray-200">Quick action</Label>
+                  <InfoTooltip
+                    ariaLabel="Max amount info"
+                    content={(
+                      <span>
+                        Sets the amount to your maximum withdrawable balance across all markets for this asset (accounting for liquidity constraints).
+                      </span>
+                    )}
+                  />
+                </div>
                 <Button
-                  className="w-full"
+                  className="w-full h-10"
                   onClick={() => {
                     if (!selectedOption)
                       return
@@ -662,10 +693,11 @@ export function BatchWithdraw() {
                       ctx.setWithdrawAmount(s)
                   }}
                   disabled={!selectedOption || !computedMarkets.ok}
-                  title="Set amount to max withdrawable"
                 >
+                  <Maximize2 className="w-4 h-4 mr-1" />
                   Max
                 </Button>
+                <div className="h-0 md:h-4" />
               </div>
             </div>
 

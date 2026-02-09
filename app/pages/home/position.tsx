@@ -1,10 +1,14 @@
 import type {
   LiveMarketPosition,
 } from '~/lib/hooks/rpc/use-live-market-positions'
+import { Wallet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
+import { Badge, BadgeLabel } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
+import { getSupportedChainName } from '~/lib/addresses'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import {
@@ -78,20 +82,20 @@ function PositionListItem({
 
   return (
     <Link to={`/market/${position.market.uniqueKey}/${chainId}`}>
-      <li className="mb-4 p-3 sm:p-4 bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors duration-200 cursor-pointer">
+      <li className="py-3 px-2.5 sm:p-4 bg-gray-900/50 border border-gray-800 rounded-lg hover:bg-gray-900 hover:border-gray-700 transition-all duration-200 cursor-pointer group">
         <div className="flex flex-row justify-between items-center">
-          <div className="space-y-1">
+          <div className="space-y-0.5 sm:space-y-1">
             <div>
-              <p className="text-lg font-semibold text-white">
+              <p className="text-base sm:text-lg font-semibold text-white">
                 {`${position.market.collateralAsset.symbol} / ${position.market.loanAsset.symbol}`}
               </p>
               <p className="text-xs text-gray-500">
-                {`Chain ID: ${chainId}`}
+                {getSupportedChainName(chainId)}
               </p>
             </div>
 
-            <p className="text-gray-300">
-              <span className="text-gray-400">Supply:</span>
+            <p className="text-sm sm:text-base text-gray-300">
+              <span className="text-xs sm:text-sm text-gray-400">Supply:</span>
               {' '}
               {formatBigintShort(suppliedAssets, loanDecimals)}
               {' '}
@@ -99,21 +103,19 @@ function PositionListItem({
             </p>
           </div>
 
-          <div className="flex justify-between items-start mb-2">
-            <div className="text-right">
-              <p className="text-sm text-green-400">
-                {`APR: ${apr != null ? apr.toFixed(2) : '—'} %`}
-              </p>
-              <p className={`text-sm ${safunessColorClass(safuness)}`}>
-                {`SAFU: ${safuness != null ? `${safuness.toFixed(2)}x` : '—'}`}
-              </p>
-              <p className="text-xs text-gray-400">
-                {`weight: ${contributionPct != null ? `${contributionPct.toFixed(1)}%` : '—'}`}
-              </p>
-              {/* <p className="text-xs text-gray-400">
-              {`Est. yearly: ${yearlyReturnAssets != null ? `${formatBigintShort(yearlyReturnAssets, loanDecimals)} ${position.market.loanAsset.symbol}` : '—'}`}
-            </p> */}
-            </div>
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant="success" size="sm">
+              <BadgeLabel>APR</BadgeLabel>
+              {apr != null ? `${apr.toFixed(2)}%` : '—'}
+            </Badge>
+            <Badge variant="neutral" size="sm" className={safunessColorClass(safuness)}>
+              <BadgeLabel>Safety</BadgeLabel>
+              {safuness != null ? `${safuness.toFixed(2)}x` : '—'}
+            </Badge>
+            <Badge variant="subtle" size="sm">
+              <span>Weight</span>
+              <span className="text-gray-400">{contributionPct != null ? `${contributionPct.toFixed(1)}%` : '—'}</span>
+            </Badge>
           </div>
         </div>
       </li>
@@ -255,35 +257,40 @@ function PositionClient() {
             {timeAgo || '—'}
           </span>
         </div>
-        <div className="ml-auto flex items-center space-x-6">
+        <div className="ml-auto flex items-center space-x-3 sm:space-x-6">
           <div className="text-right">
             <p className="text-xs text-gray-400">Weighted APR</p>
-            <p className="text-sm text-white">{portfolio.weightedAprPct != null ? `${portfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
+            <p className="text-xs sm:text-sm text-white">{portfolio.weightedAprPct != null ? `${portfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-gray-400">Daily USD</p>
-            <p className="text-sm text-white">{portfolio.dailyUsd != null ? formatUsd(portfolio.dailyUsd) : '—'}</p>
+            <p className="text-xs sm:text-sm text-white">{portfolio.dailyUsd != null ? formatUsd(portfolio.dailyUsd) : '—'}</p>
           </div>
-          <button
+          <Button
             onClick={() => handleRefresh()}
             disabled={isRefreshing || isCooldown}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 cursor-pointer"
           >
             {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
-          </button>
+          </Button>
         </div>
       </div>
-      <div className="py-6 px-4">
+      <div className="py-4 sm:py-6 px-3 sm:px-4">
         {isLoading
           ? (
               <p className="text-gray-400">Loading your positions...</p>
             )
           : positions && positions.length === 0
             ? (
-                <p className="text-gray-400">You have no open positions.</p>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mb-4">
+                    <Wallet className="w-6 h-6 text-gray-500" />
+                  </div>
+                  <p className="text-gray-300 font-medium mb-1">No open positions</p>
+                  <p className="text-sm text-gray-500">Supply assets to a market to see your positions here.</p>
+                </div>
               )
             : (
-                <ul>
+                <ul className="space-y-2 sm:space-y-3">
                   {positions
                     && chain?.id
                     && positions.map((position: LiveMarketPosition) => (
@@ -300,7 +307,7 @@ function PositionClient() {
         {(portfolio.totalAssetsUsd != null || (portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null)) && (
           <div
             className="
-              flex flex-row justify-center items-center mx-4
+              flex flex-row justify-center items-center mx-4 mt-6 pt-4 border-t border-gray-700/50
               sm:justify-end
               gap-1 sm:gap-2
             "

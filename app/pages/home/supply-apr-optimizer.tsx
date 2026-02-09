@@ -1,6 +1,7 @@
 import type { SupplyOptimizerDebugRequest } from '~/lib/optimizer/supply-apr-optimizer-debugger'
 import type { UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import type { OptimizerReadResult } from '~/lib/optimizer/use-supply-optimizer-reads'
+import { Coins, Minus, Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createSearchParams, Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
@@ -11,6 +12,15 @@ import { Card } from '~/components/ui/card'
 import { InfoTooltip } from '~/components/ui/info-tooltip'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
@@ -414,6 +424,11 @@ export function SupplyAprOptimizer() {
     && !!userAddress
     && !!chain?.id
 
+  const parseMaxMarkets = (value: string) => {
+    const parsed = Number.parseInt(value.trim(), 10)
+    return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1
+  }
+
   const onOptimize = () => {
     if (!selectedOption || !userAddress || !chain?.id)
       return
@@ -637,14 +652,17 @@ export function SupplyAprOptimizer() {
           </p>
         </div>
         {ctx.started && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => ctx.clear()}
-            className="ml-auto px-2 py-1 rounded-md border border-gray-700 text-gray-200 hover:bg-gray-800 cursor-pointer"
+            className="ml-auto h-8 px-2.5 text-xs"
             title="Clear"
           >
-            X
-          </button>
+            <X className="h-3.5 w-3.5" />
+            Clear
+          </Button>
         )}
       </div>
 
@@ -654,8 +672,8 @@ export function SupplyAprOptimizer() {
             <div className="text-sm text-gray-300">
               Pick a supplied token and compute an optimized rebalance plan.
             </div>
-            <Button onClick={onStart} disabled={!canStart}>
-              {isLoadingPositions ? 'Loading…' : 'Start'}
+            <Button onClick={onStart} disabled={!canStart} isLoading={isLoadingPositions}>
+              Start
             </Button>
           </div>
         )}
@@ -663,65 +681,74 @@ export function SupplyAprOptimizer() {
         {ctx.started && (
           <>
             {loanAssetOptions.length === 0 && (
-              <div className="text-sm text-gray-300">
-                No supply positions detected on this chain.
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mb-3">
+                  <Coins className="w-5 h-5 text-gray-500" />
+                </div>
+                <p className="text-gray-300 font-medium mb-1">No supply positions detected</p>
+                <p className="text-sm text-gray-500">You need to have active supply positions to use the optimizer.</p>
               </div>
             )}
 
             {canPick && (
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4" data-testid="supply-apr-optimizer-form">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-200">
-                    Asset to optimize
-                  </label>
-                  <select
-                    value={ctx.selection.loanAssetAddress ?? ''}
-                    onChange={e => onChangeLoanAsset(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 md:gap-4 items-start" data-testid="supply-apr-optimizer-form">
+                <div className="flex flex-col gap-1.5 md:gap-2">
+                  <div className="h-5 flex items-center">
+                    <Label>Asset to optimize</Label>
+                  </div>
+                  <Select
+                    value={ctx.selection.loanAssetAddress ?? undefined}
+                    onValueChange={onChangeLoanAsset}
                   >
-                    <option value="" disabled>Select an asset</option>
-                    {ownedLoanAssetOptions.length > 0 && (
-                      <optgroup label="Owned assets">
-                        {ownedLoanAssetOptions.map(o => (
-                          <option key={o.address} value={o.address}>
-                            {o.symbol}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {popularLoanAssetOptions.length > 0 && (
-                      <optgroup label="Popular assets">
-                        {popularLoanAssetOptions
-                          .filter(o => !ownedLoanAssetOptions.some(x => x.address.toLowerCase() === o.address.toLowerCase()))
-                          .map(o => (
-                            <option key={o.address} value={o.address}>
+                    <SelectTrigger className="w-full h-10 bg-gray-900 border-gray-700 text-white text-sm">
+                      <SelectValue placeholder="Select an asset" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ownedLoanAssetOptions.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Owned assets</SelectLabel>
+                          {ownedLoanAssetOptions.map(o => (
+                            <SelectItem key={o.address} value={o.address}>
                               {o.symbol}
-                            </option>
+                            </SelectItem>
                           ))}
-                      </optgroup>
+                        </SelectGroup>
+                      )}
+                      {popularLoanAssetOptions.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Popular assets</SelectLabel>
+                          {popularLoanAssetOptions
+                            .filter(o => !ownedLoanAssetOptions.some(x => x.address.toLowerCase() === o.address.toLowerCase()))
+                            .map(o => (
+                              <SelectItem key={o.address} value={o.address}>
+                                {o.symbol}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      )}
+                      {ownedLoanAssetOptions.length === 0 && popularLoanAssetOptions.length === 0 && loanAssetOptions.map(o => (
+                        <SelectItem key={o.address} value={o.address}>
+                          {o.symbol}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-xs text-gray-500 min-h-0 md:h-4">
+                    {selectedOption && (
+                      <>
+                        Your supplied:
+                        {' '}
+                        {fmtToken(ctx.derived.totalSuppliedAssets ?? 0n, selectedOption.decimals)}
+                        {' '}
+                        {selectedOption.symbol}
+                      </>
                     )}
-                    {ownedLoanAssetOptions.length === 0 && popularLoanAssetOptions.length === 0 && loanAssetOptions.map(o => (
-                      <option key={o.address} value={o.address}>
-                        {o.symbol}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedOption && (
-                    <div className="text-xs text-gray-500">
-                      Your supplied:
-                      {' '}
-                      {fmtToken(ctx.derived.totalSuppliedAssets ?? 0n, selectedOption.decimals)}
-                      {' '}
-                      {selectedOption.symbol}
-                    </div>
-                  )}
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <label className="block text-sm font-medium text-gray-200">
-                      Minimum move size
-                    </label>
+                <div className="flex flex-col gap-1.5 md:gap-2">
+                  <div className="h-5 flex items-center gap-2">
+                    <Label>Minimum move size</Label>
                     <InfoTooltip
                       ariaLabel="Minimum move size info"
                       content={(
@@ -732,53 +759,54 @@ export function SupplyAprOptimizer() {
                     />
                   </div>
                   <div className="relative">
-                    <input
+                    <Input
                       type="text"
                       inputMode="decimal"
                       value={ctx.inputs.minMoveSize ?? ''}
                       onChange={e => ctx.setMinMoveSize(e.target.value)}
                       placeholder="Auto"
-                      className="w-full px-3 py-2 pr-16 border border-gray-700 bg-gray-900 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full h-10 pr-16 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
                     />
-                    <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
+                    <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400 pointer-events-none">
                       {symbol}
                     </span>
                   </div>
+                  <div className="h-0 md:h-4" />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-200">
-                    Additional amount to supply
-                  </label>
+                <div className="flex flex-col gap-1.5 md:gap-2">
+                  <div className="h-5 flex items-center">
+                    <Label>Additional amount to supply</Label>
+                  </div>
                   <div className="relative">
-                    <input
+                    <Input
                       type="text"
                       inputMode="decimal"
                       value={ctx.inputs.newDepositAmount ?? ''}
                       onChange={e => ctx.setNewDepositAmount(e.target.value)}
                       placeholder="0.0"
-                      className="w-full px-3 py-2 pr-16 border border-gray-700 bg-gray-900 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full h-10 pr-16 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
                     />
-                    <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
+                    <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400 pointer-events-none">
                       {symbol}
                     </span>
                   </div>
-                  {selectedOption && (
-                    <div className="text-xs text-gray-500">
-                      Wallet balance:
-                      {' '}
-                      {fmtToken(walletBalanceRaw ?? 0n, selectedOption.decimals)}
-                      {' '}
-                      {selectedOption.symbol}
-                    </div>
-                  )}
+                  <div className="text-xs text-gray-500 min-h-0 md:h-4">
+                    {selectedOption && (
+                      <>
+                        Wallet balance:
+                        {' '}
+                        {fmtToken(walletBalanceRaw ?? 0n, selectedOption.decimals)}
+                        {' '}
+                        {selectedOption.symbol}
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label className="block text-gray-200">
-                      Max markets
-                    </Label>
+                <div className="flex flex-col gap-1.5 md:gap-2">
+                  <div className="h-5 flex items-center gap-2">
+                    <Label>Max markets</Label>
                     <InfoTooltip
                       ariaLabel="Max markets info"
                       content={(
@@ -788,25 +816,62 @@ export function SupplyAprOptimizer() {
                       )}
                     />
                   </div>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    step={1}
-                    value={maxMarketsInput ?? ''}
-                    onChange={e => setMaxMarketsInput(e.target.value)}
-                    className="w-24 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
-                  />
+                  <div className="grid h-10 w-full grid-cols-[2.5rem_1fr_2.5rem] overflow-hidden rounded-md border border-gray-700 bg-gray-900">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-full rounded-none border-0 border-r border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
+                      onClick={() => {
+                        const current = parseMaxMarkets(maxMarketsInput ?? '')
+                        if (current > 1)
+                          setMaxMarketsInput(String(current - 1))
+                      }}
+                      disabled={parseMaxMarkets(maxMarketsInput ?? '') <= 1}
+                      aria-label="Decrease max markets"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={maxMarketsInput ?? ''}
+                      onChange={(e) => {
+                        const digitsOnly = e.target.value.replace(/\D+/g, '')
+                        setMaxMarketsInput(digitsOnly)
+                      }}
+                      className="h-full rounded-none border-0 px-0 text-center tabular-nums text-white placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset focus-visible:ring-offset-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      aria-label="Max markets"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-full rounded-none border-0 border-l border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
+                      onClick={() => {
+                        const current = parseMaxMarkets(maxMarketsInput ?? '')
+                        setMaxMarketsInput(String(current + 1))
+                      }}
+                      aria-label="Increase max markets"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="text-xs text-gray-500 leading-4">Use +/- or type a value (min 1)</div>
                 </div>
 
-                <div className="flex items-center">
+                <div className="flex flex-col gap-1.5 md:gap-2">
+                  <div className="h-0 md:h-5" />
                   <Button
-                    className="w-full"
+                    className="w-full h-10"
                     onClick={onOptimize}
                     disabled={!canOptimize}
+                    isLoading={ctx.run.isRunning}
                   >
-                    {ctx.run.isRunning ? 'Optimizing…' : 'Optimize'}
+                    Optimize
                   </Button>
+                  <div className="h-0 md:h-4" />
                 </div>
               </div>
             )}
