@@ -433,12 +433,7 @@ export function SupplyAprOptimizer() {
     if (!selectedOption || !userAddress || !chain?.id)
       return
 
-    // Avoid silently running with an incomplete market universe.
-    // If `topMarkets` isn't ready, show an explicit message instead of a dead "Optimize" button.
     if (topMarketsQuery.isLoading || topMarketsQuery.isFetching) {
-      const timestamp = BigInt(Math.floor(Date.now() / 1000))
-      const runId = beginRun({ timestamp })
-      finishRun(runId, undefined, 'Loading top markets… please retry in a moment.')
       return
     }
     if (topMarketsQuery.isError) {
@@ -866,10 +861,10 @@ export function SupplyAprOptimizer() {
                   <Button
                     className="w-full h-10"
                     onClick={onOptimize}
-                    disabled={!canOptimize}
-                    isLoading={ctx.run.isRunning}
+                    disabled={!canOptimize || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
+                    isLoading={ctx.run.isRunning || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
                   >
-                    Optimize
+                    {topMarketsQuery.isLoading || topMarketsQuery.isFetching ? 'Loading markets...' : 'Optimize'}
                   </Button>
                   <div className="h-0 md:h-4" />
                 </div>
