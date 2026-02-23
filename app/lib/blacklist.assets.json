@@ -7,6 +7,10 @@
     {
       "assetContract": "0x15700b564ca08d9439c58ca5053166e8317aa138",
       "comment": "deUSD: illiquid/depegged collateral reported as toxic."
+    },
+    {
+      "assetContract": "0x238a700ed6165261cf8b2e544ba797bc11e466ba",
+      "comment": "mF-ONE: temporary manual blacklist while market safety is under review."
     }
   ]
 }

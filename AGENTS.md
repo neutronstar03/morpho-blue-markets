@@ -32,6 +32,8 @@ If you are unsure where a bug lives, start from the relevant file in `app/pages/
 - If IRM data is missing, show "----" or an explicit error (do not fake a fallback).
 - All Morpho markets use IRM; do not mention or implement non-IRM fallbacks in market preview logic.
 - Supply optimizer outputs use APR (blendedAprWad/supplyAprAfterWad), not APY; keep labels and calculations on APR.
+- Keep `app/lib/blacklist.markets.json` generator-shaped (`{ chainId, uniqueKey }` only); do not add manual notes there.
+- For manual/shady entries with context, prefer `app/lib/blacklist.assets.json` and use the `comment` field.
 
 ## Boundaries (do not do)
 - Do not commit secrets or credentials.
