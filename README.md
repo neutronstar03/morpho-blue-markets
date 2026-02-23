@@ -24,9 +24,9 @@ To run this project locally, follow these steps:
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
-- `v1.1.22` (2026-02-09): compact mobile layouts, reusable select/badge controls, and immediate APR visible on mobile markets.
-- `v1.1.16` (2026-01-19): optimizer resets on network switch to prevent stale state.
-- `v1.1.15` (2026-01-18): APR-consistent market previews, reusable APY preview component, UI tests.
+- `v1.1.26` (2026-02-24): background "magic optimizer" scan, opportunity cards, and short-lived precomputed optimizer results for faster click-to-optimize flows.
+- `v1.1.25` (2026-02-24): moved shady/manual blacklist context from market list to asset list and documented policy in `AGENTS.md`.
+- `v1.1.23` (2026-02-22): optimizer now shows a proper loading spinner while reading market data.
 
 ## Live Version
 

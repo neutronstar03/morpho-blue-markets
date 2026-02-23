@@ -1,3 +1,4 @@
+import type { OptimizeSupplyWithPositionsResult } from '~/lib/optimizer/supply-optimizer'
 import { create } from 'zustand'
 
 export interface HomeMagicOpportunity {
@@ -18,6 +19,19 @@ export interface HomeMagicOptimizerPreset {
   loanAssetDecimals: number
   newDepositAmount: string
   maxMarketsUsed: number
+  usePrecomputedIfFresh?: boolean
+}
+
+interface HomeMagicPrecomputedResult {
+  id: string
+  chainId: number
+  userAddressLower: string
+  loanAssetAddressLower: string
+  maxMarketsUsed: number
+  newDepositAmount: string
+  computedAt: number
+  expiresAt: number
+  result: OptimizeSupplyWithPositionsResult
 }
 
 interface HomeMagicOptimizerState {
@@ -27,6 +41,7 @@ interface HomeMagicOptimizerState {
   scanCurrentIndex: number
   scanTotalAssets: number
   opportunities: HomeMagicOpportunity[]
+  precomputedResults: HomeMagicPrecomputedResult[]
   optimizerPreset?: HomeMagicOptimizerPreset
   startScan: (args: { chainId: number, totalAssets: number }) => void
   setScanProgress: (args: { assetSymbol: string, index: number }) => void
@@ -35,6 +50,15 @@ interface HomeMagicOptimizerState {
   addOpportunity: (opportunity: HomeMagicOpportunity) => void
   dismissOpportunity: (id: string) => void
   clearOpportunitiesForChain: (chainId: number) => void
+  upsertPrecomputedResult: (entry: HomeMagicPrecomputedResult) => void
+  consumeFreshPrecomputedResult: (args: {
+    chainId: number
+    userAddress: string
+    loanAssetAddress: string
+    maxMarketsUsed: number
+    newDepositAmount: string
+    nowMs?: number
+  }) => OptimizeSupplyWithPositionsResult | undefined
   setOptimizerPreset: (preset: HomeMagicOptimizerPreset) => void
   consumeOptimizerPreset: () => HomeMagicOptimizerPreset | undefined
 }
@@ -46,6 +70,7 @@ export const useHomeMagicOptimizerStore = create<HomeMagicOptimizerState>((set, 
   scanCurrentIndex: 0,
   scanTotalAssets: 0,
   opportunities: [],
+  precomputedResults: [],
   optimizerPreset: undefined,
   startScan: ({ chainId, totalAssets }) => {
     set({
@@ -91,6 +116,43 @@ export const useHomeMagicOptimizerStore = create<HomeMagicOptimizerState>((set, 
   },
   clearOpportunitiesForChain: (chainId) => {
     set(state => ({ opportunities: state.opportunities.filter(o => o.chainId !== chainId) }))
+  },
+  upsertPrecomputedResult: (entry) => {
+    set((state) => {
+      const now = Date.now()
+      const next = state.precomputedResults
+        .filter(item => item.id !== entry.id && item.expiresAt > now)
+      next.unshift(entry)
+      return { precomputedResults: next }
+    })
+  },
+  consumeFreshPrecomputedResult: (args) => {
+    const {
+      chainId,
+      userAddress,
+      loanAssetAddress,
+      maxMarketsUsed,
+      newDepositAmount,
+      nowMs = Date.now(),
+    } = args
+    const userAddressLower = userAddress.toLowerCase()
+    const loanAssetAddressLower = loanAssetAddress.toLowerCase()
+
+    const state = get()
+    const found = state.precomputedResults.find((item) => {
+      return item.chainId === chainId
+        && item.userAddressLower === userAddressLower
+        && item.loanAssetAddressLower === loanAssetAddressLower
+        && item.maxMarketsUsed === maxMarketsUsed
+        && item.newDepositAmount === newDepositAmount
+        && item.expiresAt >= nowMs
+    })
+
+    set(current => ({
+      precomputedResults: current.precomputedResults.filter(item => item.expiresAt >= nowMs && item.id !== found?.id),
+    }))
+
+    return found?.result
   },
   setOptimizerPreset: (preset) => {
     set({ optimizerPreset: preset })

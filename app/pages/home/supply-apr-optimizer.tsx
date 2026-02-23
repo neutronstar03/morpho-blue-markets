@@ -82,6 +82,7 @@ export function SupplyAprOptimizer() {
   )
   const optimizerPreset = useHomeMagicOptimizerStore(state => state.optimizerPreset)
   const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
+  const consumeFreshPrecomputedResult = useHomeMagicOptimizerStore(state => state.consumeFreshPrecomputedResult)
 
   const {
     data: livePositions,
@@ -646,6 +647,16 @@ export function SupplyAprOptimizer() {
     if (!chain?.id || optimizerPreset.chainId !== chain.id)
       return
 
+    const precomputedResult = optimizerPreset.usePrecomputedIfFresh && userAddress
+      ? consumeFreshPrecomputedResult({
+          chainId: optimizerPreset.chainId,
+          userAddress,
+          loanAssetAddress: optimizerPreset.loanAssetAddress,
+          maxMarketsUsed: optimizerPreset.maxMarketsUsed,
+          newDepositAmount: optimizerPreset.newDepositAmount,
+        })
+      : undefined
+
     if (!ctx.started)
       ctx.start()
 
@@ -658,8 +669,12 @@ export function SupplyAprOptimizer() {
     ctx.setMinMoveSize(undefined)
     ctx.setNewDepositAmount(optimizerPreset.newDepositAmount)
     setMaxMarketsInput(String(optimizerPreset.maxMarketsUsed))
+
+    if (precomputedResult)
+      ctx.applyPrefetchedResult(precomputedResult)
+
     consumeOptimizerPreset()
-  }, [chain?.id, consumeOptimizerPreset, ctx, optimizerPreset, setMaxMarketsInput])
+  }, [chain?.id, consumeFreshPrecomputedResult, consumeOptimizerPreset, ctx, optimizerPreset, setMaxMarketsInput, userAddress])
 
   return (
     <Card className="mb-8" data-testid="supply-apr-optimizer-card">

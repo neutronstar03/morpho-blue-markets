@@ -21,6 +21,7 @@ const MAX_OPTIMIZER_ITERATIONS = 1000
 const OPTIMIZER_READ_CHUNK_SIZE = 50
 const OPTIMIZER_READ_CACHE_TTL_MS = 60_000
 const ONE_HOUR_MS = 60 * 60 * 1000
+const PRECOMPUTED_RESULT_TTL_MS = 30_000
 
 export function useHomeMagicOptimizerScan() {
   const { isConnected, address: userAddress, chain } = useAccount()
@@ -37,6 +38,7 @@ export function useHomeMagicOptimizerScan() {
     finishScan,
     clearScan,
     addOpportunity,
+    upsertPrecomputedResult,
     clearOpportunitiesForChain,
   } = useHomeMagicOptimizerStore()
 
@@ -238,22 +240,41 @@ export function useHomeMagicOptimizerScan() {
     if (runResult.status === 'success' && runResult.result) {
       const aprGainWad = runResult.result.optimized.blendedAprWad - runResult.result.current.blendedAprWad
       if (aprGainWad > NO_BENEFIT_DELTA_APR_WAD) {
+        const nowMs = Date.now()
         const pct = Number(aprGainWad) / 1e16
+        const chainIdSafe = chainId ?? 0
+        const userAddressLower = userAddress?.toLowerCase()
+        const loanAssetAddressLower = activeAsset.address.toLowerCase()
+
+        if (userAddressLower) {
+          upsertPrecomputedResult({
+            id: `${chainIdSafe}:${userAddressLower}:${loanAssetAddressLower}:6:0`,
+            chainId: chainIdSafe,
+            userAddressLower,
+            loanAssetAddressLower,
+            maxMarketsUsed: MAX_MARKETS_USED,
+            newDepositAmount: '0',
+            computedAt: nowMs,
+            expiresAt: nowMs + PRECOMPUTED_RESULT_TTL_MS,
+            result: runResult.result,
+          })
+        }
+
         addOpportunity({
           id: `${chainId}:${activeAsset.address.toLowerCase()}`,
-          chainId: chainId ?? 0,
+          chainId: chainIdSafe,
           loanAssetAddress: activeAsset.address,
           loanAssetSymbol: activeAsset.symbol,
           loanAssetDecimals: activeAsset.decimals,
           aprGainWad,
           aprGainPct: Number.isFinite(pct) ? pct : 0,
-          createdAt: Date.now(),
+          createdAt: nowMs,
         })
       }
     }
 
     advanceQueue()
-  }, [activeAsset, addOpportunity, chainId, optimizeReadResult, request])
+  }, [activeAsset, addOpportunity, chainId, optimizeReadResult, request, upsertPrecomputedResult, userAddress])
 
   useEffect(() => {
     return () => {

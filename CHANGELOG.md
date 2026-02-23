@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.26 - 2026-02-24
+
+### Introduced
+- feat: background home "magic optimizer" scan that evaluates each supplied loan asset once per chain and surfaces opportunity cards.
+- feat: short-lived precomputed optimizer results (warm cache) for popup-driven open flows to avoid an immediate rerun.
+
+### Changed
+- ux: clicking an opportunity card now preconfigures the optimizer, scrolls to it, and dismisses the clicked card.
+- ui: top bar gets an animated "magic" background while scanning, with optional force-preview toggle for look-testing.
+
+## v1.1.25 - 2026-02-24
+
+### Changed
+- data: moved manual/shady blacklist context from `blacklist.markets.json` to `blacklist.assets.json`.
+- docs: updated `AGENTS.md` blacklist policy to keep market blacklist generator-shaped and store manual notes on assets.
+
+## v1.1.24 - 2026-02-24
+
+### Changed
+- data: blacklisted a shady market entry and bumped package version.
+
+## v1.1.23 - 2026-02-22
+
+### Changed
+- ux: optimizer now shows a loading spinner while candidate markets are loading instead of returning a premature error state.
+
 ## v1.1.22 - 2026-02-09
 
 ### Introduced
@@ -12,6 +38,36 @@ All notable changes to this project will be documented in this file.
 - ui: improved mobile density for optimizer, batch withdraw, and positions; made comparison `<`/`>` selector clearer.
 - ui: show immediate APR on mobile markets table and hide chain column when a single chain is selected.
 - ui: updated deposit/withdraw alert colors to match the app dark theme.
+
+## v1.1.21 - 2026-02-01
+
+### Introduced
+- feat: batch withdraw (beta) flow to withdraw from lower-APR positions first.
+
+### Changed
+- ux: documented beta status and algorithm limitations for the initial batch-withdraw strategy.
+
+## v1.1.20 - 2026-01-25
+
+### Changed
+- optimizer: updated greedy iteration strategy to converge faster and respect `maxMarketsUsed` more reliably.
+- perf: tuned optimizer loop target to keep runs bounded and more responsive.
+
+## v1.1.19 - 2026-01-20
+
+### Changed
+- rates: aligned live, preview, and optimizer displays on APR semantics and refreshed related labels/tests.
+
+## v1.1.18 - 2026-01-20
+
+### Fixed
+- fix: resolved an infinite hook loop introduced in the previous release.
+
+## v1.1.17 - 2026-01-20
+
+### Changed
+- ui: footer includes a "Wipe cache & reload" action.
+- fix: improved local-storage hook reliability.
 
 ## v1.1.16 - 2026-01-19
 

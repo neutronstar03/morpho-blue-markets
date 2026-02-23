@@ -50,6 +50,7 @@ export default function HomePage() {
       loanAssetDecimals: opportunity.loanAssetDecimals,
       newDepositAmount: '0',
       maxMarketsUsed: 6,
+      usePrecomputedIfFresh: true,
     })
 
     dismissOpportunity(opportunity.id)

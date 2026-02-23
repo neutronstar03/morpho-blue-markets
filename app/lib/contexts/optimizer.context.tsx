@@ -48,6 +48,7 @@ interface SupplyAprOptimizerContextValue extends SupplyAprOptimizerState {
   setDerived: (next: SupplyAprOptimizerDerived) => void
   beginRun: (meta?: { timestamp?: bigint }) => number
   finishRun: (runId: number, res?: OptimizeSupplyWithPositionsResult, err?: string) => void
+  applyPrefetchedResult: (res: OptimizeSupplyWithPositionsResult) => void
 }
 
 const SupplyAprOptimizerContext = createContext<SupplyAprOptimizerContextValue | null>(null)
@@ -118,6 +119,11 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
     }
   }, [])
 
+  const applyPrefetchedResult = useCallback((res: OptimizeSupplyWithPositionsResult) => {
+    setRun(prev => ({ ...prev, isRunning: false, error: undefined }))
+    setResult(res)
+  }, [])
+
   const value = useMemo<SupplyAprOptimizerContextValue>(() => {
     return {
       started,
@@ -134,8 +140,9 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
       setDerived,
       beginRun,
       finishRun,
+      applyPrefetchedResult,
     }
-  }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMinMoveSize, setNewDepositAmount, setDerived, beginRun, finishRun])
+  }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMinMoveSize, setNewDepositAmount, setDerived, beginRun, finishRun, applyPrefetchedResult])
 
   return (
     <SupplyAprOptimizerContext.Provider value={value}>
