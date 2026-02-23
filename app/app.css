@@ -84,3 +84,45 @@ body {
     color-scheme: dark;
   }
 }
+
+@keyframes magic-header-pan {
+  0% {
+    background-position: 0% 50%;
+    filter: hue-rotate(0deg) saturate(1.15);
+  }
+  20% {
+    background-position: 100% 30%;
+    filter: hue-rotate(22deg) saturate(1.35);
+  }
+  40% {
+    background-position: 20% 100%;
+    filter: hue-rotate(-12deg) saturate(1.2);
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: hue-rotate(30deg) saturate(1.4);
+  }
+  70% {
+    background-position: 0% 20%;
+    filter: hue-rotate(-18deg) saturate(1.25);
+  }
+  100% {
+    background-position: 0% 50%;
+    filter: hue-rotate(0deg) saturate(1.15);
+  }
+}
+
+.magic-header-bg {
+  border-bottom-color: rgba(148, 163, 184, 0.45);
+  background-image:
+    linear-gradient(rgba(7, 10, 18, 0.32), rgba(7, 10, 18, 0.32)),
+    linear-gradient(105deg, #06b6d4, #22d3ee, #60a5fa, #a78bfa, #f472b6, #fb7185, #f59e0b, #fde047, #06b6d4);
+  background-size: auto, 380% 380%;
+  animation: magic-header-pan 2.1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .magic-header-bg {
+    animation: none;
+  }
+}

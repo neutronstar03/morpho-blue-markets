@@ -37,6 +37,7 @@ import { dumpSupplyOptimizerFixtures, setSupplyOptimizerDebugState } from '~/lib
 import { runSupplyOptimizer } from '~/lib/optimizer/supply-optimizer-runner'
 import { buildMoveSizeCacheKey, fmtToken, pctFromWad, trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
+import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { BundleOptimizerResult } from '~/pages/home/bundle-optimizer-result'
 
 interface LoanAssetOption {
@@ -79,6 +80,8 @@ export function SupplyAprOptimizer() {
     'supply-apr-optimizer:max-markets',
     '5',
   )
+  const optimizerPreset = useHomeMagicOptimizerStore(state => state.optimizerPreset)
+  const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
 
   const {
     data: livePositions,
@@ -636,6 +639,27 @@ export function SupplyAprOptimizer() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!optimizerPreset)
+      return
+    if (!chain?.id || optimizerPreset.chainId !== chain.id)
+      return
+
+    if (!ctx.started)
+      ctx.start()
+
+    ctx.setSelection({
+      chainId: optimizerPreset.chainId,
+      loanAssetAddress: optimizerPreset.loanAssetAddress,
+      loanAssetSymbol: optimizerPreset.loanAssetSymbol,
+      loanAssetDecimals: optimizerPreset.loanAssetDecimals,
+    })
+    ctx.setMinMoveSize(undefined)
+    ctx.setNewDepositAmount(optimizerPreset.newDepositAmount)
+    setMaxMarketsInput(String(optimizerPreset.maxMarketsUsed))
+    consumeOptimizerPreset()
+  }, [chain?.id, consumeOptimizerPreset, ctx, optimizerPreset, setMaxMarketsInput])
 
   return (
     <Card className="mb-8" data-testid="supply-apr-optimizer-card">
