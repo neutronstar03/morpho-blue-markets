@@ -34,7 +34,13 @@ export interface SupplyMarketData {
   }
 }
 
-interface MarketFiltersWithChain { chainId_in?: number[] }
+interface MarketFiltersWithChain {
+  chainId_in?: number[]
+  loanAssetAddress_in?: string[]
+  netSupplyApy_gte?: number
+  netSupplyApy_lte?: number
+  borrowAssetsUsd_gte?: number
+}
 enum MarketOrderBy { NetSupplyApy = 'NetSupplyApy' }
 enum OrderDirection { Desc = 'Desc' }
 
@@ -89,11 +95,22 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
   }
 `
 
-export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
+export interface UseMarketsByChainOptions {
+  minNetSupplyApy?: number
+  maxNetSupplyApy?: number
+  minBorrowUsd?: number
+}
+
+export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, opts: UseMarketsByChainOptions = {}) {
   const loanAssetAddrLower = loanAssetAddress?.toLowerCase()
+  const {
+    minNetSupplyApy,
+    maxNetSupplyApy,
+    minBorrowUsd,
+  } = opts
 
   const query = useQuery<SupplyMarketData[]>({
-    queryKey: ['markets-by-chain', chainId, loanAssetAddrLower],
+    queryKey: ['markets-by-chain', chainId, loanAssetAddrLower, minNetSupplyApy, maxNetSupplyApy, minBorrowUsd],
     queryFn: async () => {
       if (!chainId)
         return []
@@ -101,9 +118,15 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
       const first = 200
       let skip = 0
 
-      const where: MarketFiltersWithChain & { loanAssetAddress_in?: string[] } = { chainId_in: [chainId] }
+      const where: MarketFiltersWithChain = { chainId_in: [chainId] }
       if (loanAssetAddrLower)
         where.loanAssetAddress_in = [loanAssetAddrLower]
+      if (Number.isFinite(minNetSupplyApy))
+        where.netSupplyApy_gte = minNetSupplyApy
+      if (Number.isFinite(maxNetSupplyApy))
+        where.netSupplyApy_lte = maxNetSupplyApy
+      if (Number.isFinite(minBorrowUsd))
+        where.borrowAssetsUsd_gte = minBorrowUsd
 
       const markets: SupplyMarketData[] = []
 

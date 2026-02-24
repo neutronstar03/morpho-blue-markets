@@ -24,12 +24,12 @@ To run this project locally, follow these steps:
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.1.30` (2026-02-25): added baseline all-chain optimizer candidate filters (`netSupplyApy >= 1%`, `netSupplyApy <= 600%`, `borrowAssetsUsd >= $5`) for faster optimizer and Home Magic scan runs.
 - `v1.1.29` (2026-02-24): magic scan now starts only from home, continues across route changes, records cooldown on completed scans, and keeps the magic header visible while background scanning is active.
 - `v1.1.28` (2026-02-24): moved optimizer runs to a dedicated web worker (including magic scan), added compact in-button run progress, and reused Clear as Cancel while running.
 - `v1.1.27` (2026-02-24): reduced magic optimizer cooldown to 30 minutes and added a periodic 60-second eligibility check so rescans can restart automatically after cooldown.
 - `v1.1.26` (2026-02-24): background "magic optimizer" scan, opportunity cards, and short-lived precomputed optimizer results for faster click-to-optimize flows.
 - `v1.1.25` (2026-02-24): moved shady/manual blacklist context from market list to asset list and documented policy in `AGENTS.md`.
-- `v1.1.23` (2026-02-22): optimizer now shows a proper loading spinner while reading market data.
 
 ## Live Version
 

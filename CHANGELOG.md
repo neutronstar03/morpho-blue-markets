@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.30 - 2026-02-25
+
+### Changed
+- perf: supply optimizer candidate-market fetch now applies baseline quality filters on all chains (`netSupplyApy >= 1%`, `netSupplyApy <= 600%`, `borrowAssetsUsd >= $5`) to avoid scanning low-signal and pathological markets.
+- perf: applied the same candidate filters to Home Magic background scans for consistent behavior and faster end-to-end runs.
+
 ## v1.1.29 - 2026-02-24
 
 ### Changed

@@ -25,6 +25,9 @@ const OPTIMIZER_READ_CACHE_TTL_MS = 60_000
 const THIRTY_MINUTES_MS = 30 * 60 * 1000
 const PRECOMPUTED_RESULT_TTL_MS = 30_000
 const PERIODIC_RESCAN_CHECK_MS = 60 * 1000
+const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
+const MAX_CANDIDATE_NET_SUPPLY_APY = 6
+const MIN_CANDIDATE_BORROW_USD = 5
 
 export function useHomeMagicOptimizerScan() {
   const { isConnected, address: userAddress, chain } = useAccount()
@@ -98,7 +101,11 @@ export function useHomeMagicOptimizerScan() {
     return out
   }, [selectedUserMarkets])
 
-  const topMarketsQuery = useMarketsByChain(activeAsset ? chainId : undefined, activeAsset?.address)
+  const topMarketsQuery = useMarketsByChain(activeAsset ? chainId : undefined, activeAsset?.address, {
+    minNetSupplyApy: MIN_CANDIDATE_NET_SUPPLY_APY,
+    maxNetSupplyApy: MAX_CANDIDATE_NET_SUPPLY_APY,
+    minBorrowUsd: MIN_CANDIDATE_BORROW_USD,
+  })
   const topMarkets = topMarketsQuery.data
 
   const optimizeReadResult = useSupplyOptimizerReads({

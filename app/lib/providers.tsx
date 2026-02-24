@@ -5,10 +5,10 @@ import { darkTheme, RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { WagmiProvider } from 'wagmi'
-import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
 import { BatchWithdrawProvider } from './contexts/batch-withdraw.context'
 import { NetworkProvider } from './contexts/network'
 import { SupplyAprOptimizerProvider } from './contexts/optimizer.context'
+import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
 import { config } from './wagmi'
 
 function HomeMagicOptimizerEffects() {

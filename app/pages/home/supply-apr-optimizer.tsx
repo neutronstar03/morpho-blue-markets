@@ -63,6 +63,9 @@ export function SupplyAprOptimizer() {
   const MAX_OPTIMIZER_ITERATIONS = 1000
   const OPTIMIZER_READ_CHUNK_SIZE = 50
   const OPTIMIZER_READ_CACHE_TTL_MS = 60_000
+  const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
+  const MAX_CANDIDATE_NET_SUPPLY_APY = 6
+  const MIN_CANDIDATE_BORROW_USD = 5
 
   const ctx = useSupplyAprOptimizer()
   const { address: userAddress, chain } = useAccount()
@@ -168,7 +171,15 @@ export function SupplyAprOptimizer() {
   }, [selectedUserMarkets])
 
   // Fetch top candidate markets (max 200) for the selected loan asset on this chain.
-  const topMarketsQuery = useMarketsByChain(selectedLoanAddr ? chain?.id : undefined, selectedLoanAddr)
+  const topMarketsQuery = useMarketsByChain(
+    selectedLoanAddr ? chain?.id : undefined,
+    selectedLoanAddr,
+    {
+      minNetSupplyApy: MIN_CANDIDATE_NET_SUPPLY_APY,
+      maxNetSupplyApy: MAX_CANDIDATE_NET_SUPPLY_APY,
+      minBorrowUsd: MIN_CANDIDATE_BORROW_USD,
+    },
+  )
   const topMarkets = topMarketsQuery.data
 
   const { data: walletBalanceRaw } = useTokenBalance(
