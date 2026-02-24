@@ -47,6 +47,7 @@ interface SupplyAprOptimizerContextValue extends SupplyAprOptimizerState {
   setNewDepositAmount: (v: string | undefined) => void
   setDerived: (next: SupplyAprOptimizerDerived) => void
   beginRun: (meta?: { timestamp?: bigint }) => number
+  cancelRun: (runId: number) => void
   finishRun: (runId: number, res?: OptimizeSupplyWithPositionsResult, err?: string) => void
   applyPrefetchedResult: (res: OptimizeSupplyWithPositionsResult) => void
 }
@@ -106,6 +107,16 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
     return nextRunId
   }, [])
 
+  const cancelRun = useCallback((runId: number) => {
+    if (runIdRef.current !== runId)
+      return
+    setRun((prev) => {
+      if (prev.runId !== runId)
+        return prev
+      return { ...prev, isRunning: false, error: undefined }
+    })
+  }, [])
+
   const finishRun = useCallback((runId: number, res?: OptimizeSupplyWithPositionsResult, err?: string) => {
     if (runIdRef.current !== runId)
       return // stale (cleared or new run started)
@@ -139,10 +150,11 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
       setNewDepositAmount,
       setDerived,
       beginRun,
+      cancelRun,
       finishRun,
       applyPrefetchedResult,
     }
-  }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMinMoveSize, setNewDepositAmount, setDerived, beginRun, finishRun, applyPrefetchedResult])
+  }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMinMoveSize, setNewDepositAmount, setDerived, beginRun, cancelRun, finishRun, applyPrefetchedResult])
 
   return (
     <SupplyAprOptimizerContext.Provider value={value}>

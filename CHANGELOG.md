@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.28 - 2026-02-24
+
+### Changed
+- perf: moved supply optimizer compute to a dedicated web worker to avoid blocking the main thread during optimization runs.
+- perf: switched home magic optimizer scan runs to the same worker-backed path for non-blocking background evaluations.
+- ux: optimizer action now shows compact in-button progress while running; cancel is exposed through the existing header Clear control.
+
 ## v1.1.27 - 2026-02-24
 
 ### Changed

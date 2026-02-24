@@ -1,8 +1,9 @@
 import type { SupplyOptimizerDebugRequest } from '~/lib/optimizer/supply-apr-optimizer-debugger'
 import type { UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
+import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
 import type { OptimizerReadResult } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { Coins, Minus, Plus, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createSearchParams, Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
 import { useAccount, usePublicClient, useReadContracts } from 'wagmi'
@@ -34,8 +35,8 @@ import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 import { dumpSupplyOptimizerFixtures, setSupplyOptimizerDebugState } from '~/lib/optimizer/supply-apr-optimizer-debugger'
-import { runSupplyOptimizer } from '~/lib/optimizer/supply-optimizer-runner'
 import { buildMoveSizeCacheKey, fmtToken, pctFromWad, trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
+import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { BundleOptimizerResult } from '~/pages/home/bundle-optimizer-result'
@@ -69,10 +70,14 @@ export function SupplyAprOptimizer() {
   const setDerived = ctx.setDerived
   const setNewDepositAmount = ctx.setNewDepositAmount
   const beginRun = ctx.beginRun
+  const cancelRun = ctx.cancelRun
   const finishRun = ctx.finishRun
 
   const heuristicCacheRef = useRef(new Map<string, { stepAssets: bigint }>())
+  const optimizerWorkerRef = useRef<Worker | null>(null)
   const [autoStepInfo, setAutoStepInfo] = useState<AutoStepInfo | null>(null)
+  const [runProgressLabel, setRunProgressLabel] = useState<string | null>(null)
+  const [runProgressPercent, setRunProgressPercent] = useState<number | null>(null)
   const lastOptimizerRequestRef = useRef<SupplyOptimizerDebugRequest | null>(null)
   const lastOptimizerReadRef = useRef<OptimizerReadResult | null>(null)
 
@@ -265,6 +270,23 @@ export function SupplyAprOptimizer() {
     autoCacheKey?: string
   }>(null)
 
+  const stopOptimizerWorker = useCallback(() => {
+    if (optimizerWorkerRef.current) {
+      optimizerWorkerRef.current.terminate()
+      optimizerWorkerRef.current = null
+    }
+  }, [])
+
+  const onCancelOptimize = useCallback(() => {
+    if (!ctx.run.isRunning)
+      return
+    stopOptimizerWorker()
+    setOptimizeRequest(null)
+    setRunProgressLabel(null)
+    setRunProgressPercent(null)
+    cancelRun(ctx.run.runId)
+  }, [cancelRun, ctx.run.isRunning, ctx.run.runId, stopOptimizerWorker])
+
   // Note: some wallets transiently report `chainId = undefined` during network switching.
   // Track the last *non-null* chain id to ensure we still clear state on real chain changes.
   const lastNonNullChainIdRef = useRef<number | undefined>(chain?.id)
@@ -282,11 +304,20 @@ export function SupplyAprOptimizer() {
     if (previousNonNull === currentChainId)
       return
 
+    stopOptimizerWorker()
     ctx.clear()
     setOptimizeRequest(null)
     setAutoStepInfo(null)
+    setRunProgressLabel(null)
+    setRunProgressPercent(null)
     heuristicCacheRef.current.clear()
-  }, [chain?.id, ctx])
+  }, [chain?.id, ctx, stopOptimizerWorker])
+
+  useEffect(() => {
+    return () => {
+      stopOptimizerWorker()
+    }
+  }, [stopOptimizerWorker])
 
   const publicClient = usePublicClient()
   const optimizeReadResult = useSupplyOptimizerReads({
@@ -319,6 +350,8 @@ export function SupplyAprOptimizer() {
     if (missingRequired.length > 0) {
       finishRun(optimizeRequest.runId, undefined, `Missing onchain data for ${missingRequired.length} of your markets; cannot optimize.`)
       setOptimizeRequest(null)
+      setRunProgressLabel(null)
+      setRunProgressPercent(null)
       return
     }
 
@@ -335,63 +368,108 @@ export function SupplyAprOptimizer() {
         }
       }
 
-      const runResult = runSupplyOptimizer({
-        markets: snapshots,
-        positions: optimizeRequest.positions,
-        newDepositAssets: optimizeRequest.newDepositAssets,
-        timestamp: optimizeRequest.timestamp,
-        constraints: {
-          maxMarketsUsed: optimizeRequest.maxMarketsUsed,
-        },
-        maxIterations: MAX_OPTIMIZER_ITERATIONS,
-        stepAssets,
-        auto: optimizeRequest.autoStep,
-      })
+      stopOptimizerWorker()
+      const worker = new SupplyOptimizerWorker()
+      optimizerWorkerRef.current = worker
 
-      if (runResult.status !== 'success' || !runResult.result) {
-        finishRun(
-          optimizeRequest.runId,
-          undefined,
-          runResult.error ?? 'Optimizer failed',
-        )
-        setOptimizeRequest(null)
-        return
-      }
-
-      if (optimizeRequest.autoStep) {
-        if (runResult.autoInfo) {
-          setAutoStepInfo({
-            stepAssets: runResult.autoInfo.stepAssets,
-            stepRatioWad: runResult.autoInfo.stepRatioWad,
-            attempts: runResult.autoInfo.attempts,
-            fromCache: usedCachedStep && !runResult.autoInfo.fromHeuristic,
-          })
+      const handleDone = (runResult: Extract<SupplyOptimizerWorkerResponse, { type: 'done' }>['result']) => {
+        if (optimizeRequest.autoStep) {
+          if (runResult.autoInfo) {
+            setAutoStepInfo({
+              stepAssets: runResult.autoInfo.stepAssets,
+              stepRatioWad: runResult.autoInfo.stepRatioWad,
+              attempts: runResult.autoInfo.attempts,
+              fromCache: usedCachedStep && !runResult.autoInfo.fromHeuristic,
+            })
+          }
+          if (cacheKey && runResult.stepAssets != null && (!usedCachedStep || runResult.autoInfo?.fromHeuristic))
+            heuristicCacheRef.current.set(cacheKey, { stepAssets: runResult.stepAssets })
         }
-        if (cacheKey && runResult.stepAssets != null && (!usedCachedStep || runResult.autoInfo?.fromHeuristic))
-          heuristicCacheRef.current.set(cacheKey, { stepAssets: runResult.stepAssets })
-      }
-      else {
-        setAutoStepInfo(null)
-      }
+        else {
+          setAutoStepInfo(null)
+        }
 
-      if (runResult.result.iterations >= MAX_OPTIMIZER_ITERATIONS) {
-        finishRun(
-          optimizeRequest.runId,
-          undefined,
-          'Optimizer stopped early (maximum iterations reached). Try increasing “Minimum move size”.',
-        )
-      }
-      else {
+        if (runResult.status !== 'success' || !runResult.result) {
+          finishRun(
+            optimizeRequest.runId,
+            undefined,
+            runResult.error ?? 'Optimizer failed',
+          )
+          return
+        }
+
+        if (runResult.result.iterations >= MAX_OPTIMIZER_ITERATIONS) {
+          finishRun(
+            optimizeRequest.runId,
+            undefined,
+            'Optimizer stopped early (maximum iterations reached). Try increasing “Minimum move size”.',
+          )
+          return
+        }
+
         finishRun(optimizeRequest.runId, runResult.result, undefined)
       }
+
+      worker.onmessage = (event: MessageEvent<SupplyOptimizerWorkerResponse>) => {
+        const message = event.data
+        if (!message || message.runId !== optimizeRequest.runId)
+          return
+
+        if (message.type === 'progress') {
+          setRunProgressLabel(message.progress.label)
+          setRunProgressPercent(message.progress.percent ?? null)
+          return
+        }
+
+        if (message.type === 'error') {
+          finishRun(optimizeRequest.runId, undefined, message.error)
+          setOptimizeRequest(null)
+          setRunProgressLabel(null)
+          setRunProgressPercent(null)
+          stopOptimizerWorker()
+          return
+        }
+
+        handleDone(message.result)
+        setOptimizeRequest(null)
+        setRunProgressLabel(null)
+        setRunProgressPercent(null)
+        stopOptimizerWorker()
+      }
+
+      worker.onerror = () => {
+        finishRun(optimizeRequest.runId, undefined, 'Optimizer worker failed')
+        setOptimizeRequest(null)
+        setRunProgressLabel(null)
+        setRunProgressPercent(null)
+        stopOptimizerWorker()
+      }
+
+      worker.postMessage({
+        type: 'run',
+        runId: optimizeRequest.runId,
+        args: {
+          markets: snapshots,
+          positions: optimizeRequest.positions,
+          newDepositAssets: optimizeRequest.newDepositAssets,
+          timestamp: optimizeRequest.timestamp,
+          constraints: {
+            maxMarketsUsed: optimizeRequest.maxMarketsUsed,
+          },
+          maxIterations: MAX_OPTIMIZER_ITERATIONS,
+          stepAssets,
+          auto: optimizeRequest.autoStep,
+        },
+      })
     }
     catch (e: any) {
       finishRun(optimizeRequest.runId, undefined, e?.message ?? 'Optimizer failed')
-    }
-    finally {
       setOptimizeRequest(null)
+      setRunProgressLabel(null)
+      setRunProgressPercent(null)
+      stopOptimizerWorker()
     }
-  }, [finishRun, optimizeReadResult, optimizeRequest])
+  }, [finishRun, optimizeReadResult, optimizeRequest, stopOptimizerWorker])
 
   const canStart = !isLoadingPositions
   const canPick = ctx.started && loanAssetOptions.length > 0
@@ -424,7 +502,6 @@ export function SupplyAprOptimizer() {
       const parsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
       return Number.isFinite(parsed) && parsed >= 1
     })()
-    && !ctx.run.isRunning
     && !!userAddress
     && !!chain?.id
 
@@ -458,6 +535,8 @@ export function SupplyAprOptimizer() {
     const runId = beginRun({ timestamp })
 
     setAutoStepInfo(null)
+    setRunProgressLabel('Loading data')
+    setRunProgressPercent(null)
 
     const minMoveSizeRaw = (ctx.inputs.minMoveSize ?? '').trim()
     const useAutoMoveSize = minMoveSizeRaw.length === 0
@@ -467,6 +546,8 @@ export function SupplyAprOptimizer() {
       stepAssets = parseTokenAmount(minMoveSizeRaw, selectedOption.decimals)
       if (stepAssets <= 0n) {
         finishRun(runId, undefined, 'Minimum move size must be > 0')
+        setRunProgressLabel(null)
+        setRunProgressPercent(null)
         return
       }
     }
@@ -474,12 +555,16 @@ export function SupplyAprOptimizer() {
     const maxMarketsUsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
     if (!Number.isFinite(maxMarketsUsed) || maxMarketsUsed < 1) {
       finishRun(runId, undefined, 'Max markets must be >= 1')
+      setRunProgressLabel(null)
+      setRunProgressPercent(null)
       return
     }
 
     const newDepositAssets = parseTokenAmount(ctx.inputs.newDepositAmount ?? '', selectedOption.decimals)
     if (positions.length === 0 && newDepositAssets <= 0n) {
       finishRun(runId, undefined, 'Deposit amount must be > 0')
+      setRunProgressLabel(null)
+      setRunProgressPercent(null)
       return
     }
 
@@ -690,12 +775,12 @@ export function SupplyAprOptimizer() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => ctx.clear()}
-            className="ml-auto h-8 px-2.5 text-xs"
-            title="Clear"
+            onClick={ctx.run.isRunning ? onCancelOptimize : () => ctx.clear()}
+            className={`ml-auto h-8 px-2.5 text-xs ${ctx.run.isRunning ? 'border-red-500/60 text-red-200 hover:bg-red-500/10 hover:text-red-100' : ''}`}
+            title={ctx.run.isRunning ? 'Cancel' : 'Clear'}
           >
             <X className="h-3.5 w-3.5" />
-            Clear
+            {ctx.run.isRunning ? 'Cancel' : 'Clear'}
           </Button>
         )}
       </div>
@@ -900,10 +985,14 @@ export function SupplyAprOptimizer() {
                   <Button
                     className="w-full h-10"
                     onClick={onOptimize}
-                    disabled={!canOptimize || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
+                    disabled={ctx.run.isRunning || !canOptimize || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
                     isLoading={ctx.run.isRunning || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
                   >
-                    {topMarketsQuery.isLoading || topMarketsQuery.isFetching ? 'Loading markets...' : 'Optimize'}
+                    {topMarketsQuery.isLoading || topMarketsQuery.isFetching
+                      ? 'Loading markets...'
+                      : ctx.run.isRunning
+                        ? `${runProgressLabel ?? 'Optimizing'}${runProgressPercent != null ? ` ${runProgressPercent}%` : ''}`
+                        : 'Optimize'}
                   </Button>
                   <div className="h-0 md:h-4" />
                 </div>

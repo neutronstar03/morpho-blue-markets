@@ -1,9 +1,10 @@
 import type { UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
+import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress } from '~/lib/hooks/rpc/use-morpho'
-import { runSupplyOptimizer } from '~/lib/optimizer/supply-optimizer-runner'
+import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { getHomeMagicLastRunMs, setHomeMagicLastRunMs } from '../stores/home-magic-last-run'
 import { useHomeMagicOptimizerStore } from '../stores/home-magic-optimizer.store'
@@ -240,55 +241,87 @@ export function useHomeMagicOptimizerScan() {
       return
     }
 
-    const runResult = runSupplyOptimizer({
-      markets: snapshots,
-      positions: request.positions,
-      newDepositAssets: 0n,
-      timestamp: request.timestamp,
-      constraints: {
-        maxMarketsUsed: MAX_MARKETS_USED,
-      },
-      maxIterations: MAX_OPTIMIZER_ITERATIONS,
-      auto: true,
-    })
+    let active = true
+    const worker = new SupplyOptimizerWorker()
 
-    if (runResult.status === 'success' && runResult.result) {
-      const aprGainWad = runResult.result.optimized.blendedAprWad - runResult.result.current.blendedAprWad
-      if (aprGainWad > NO_BENEFIT_DELTA_APR_WAD) {
-        const nowMs = Date.now()
-        const pct = Number(aprGainWad) / 1e16
-        const chainIdSafe = chainId ?? 0
-        const userAddressLower = userAddress?.toLowerCase()
-        const loanAssetAddressLower = activeAsset.address.toLowerCase()
+    worker.onmessage = (event: MessageEvent<SupplyOptimizerWorkerResponse>) => {
+      if (!active)
+        return
 
-        if (userAddressLower) {
-          upsertPrecomputedResult({
-            id: `${chainIdSafe}:${userAddressLower}:${loanAssetAddressLower}:6:0`,
+      const message = event.data
+      if (!message || message.runId !== request.runId)
+        return
+      if (message.type !== 'done')
+        return
+
+      const runResult = message.result
+      if (runResult.status === 'success' && runResult.result) {
+        const aprGainWad = runResult.result.optimized.blendedAprWad - runResult.result.current.blendedAprWad
+        if (aprGainWad > NO_BENEFIT_DELTA_APR_WAD) {
+          const nowMs = Date.now()
+          const pct = Number(aprGainWad) / 1e16
+          const chainIdSafe = chainId ?? 0
+          const userAddressLower = userAddress?.toLowerCase()
+          const loanAssetAddressLower = activeAsset.address.toLowerCase()
+
+          if (userAddressLower) {
+            upsertPrecomputedResult({
+              id: `${chainIdSafe}:${userAddressLower}:${loanAssetAddressLower}:6:0`,
+              chainId: chainIdSafe,
+              userAddressLower,
+              loanAssetAddressLower,
+              maxMarketsUsed: MAX_MARKETS_USED,
+              newDepositAmount: '0',
+              computedAt: nowMs,
+              expiresAt: nowMs + PRECOMPUTED_RESULT_TTL_MS,
+              result: runResult.result,
+            })
+          }
+
+          addOpportunity({
+            id: `${chainId}:${activeAsset.address.toLowerCase()}`,
             chainId: chainIdSafe,
-            userAddressLower,
-            loanAssetAddressLower,
-            maxMarketsUsed: MAX_MARKETS_USED,
-            newDepositAmount: '0',
-            computedAt: nowMs,
-            expiresAt: nowMs + PRECOMPUTED_RESULT_TTL_MS,
-            result: runResult.result,
+            loanAssetAddress: activeAsset.address,
+            loanAssetSymbol: activeAsset.symbol,
+            loanAssetDecimals: activeAsset.decimals,
+            aprGainWad,
+            aprGainPct: Number.isFinite(pct) ? pct : 0,
+            createdAt: nowMs,
           })
         }
-
-        addOpportunity({
-          id: `${chainId}:${activeAsset.address.toLowerCase()}`,
-          chainId: chainIdSafe,
-          loanAssetAddress: activeAsset.address,
-          loanAssetSymbol: activeAsset.symbol,
-          loanAssetDecimals: activeAsset.decimals,
-          aprGainWad,
-          aprGainPct: Number.isFinite(pct) ? pct : 0,
-          createdAt: nowMs,
-        })
       }
+
+      advanceQueue()
+      worker.terminate()
     }
 
-    advanceQueue()
+    worker.onerror = () => {
+      if (!active)
+        return
+      advanceQueue()
+      worker.terminate()
+    }
+
+    worker.postMessage({
+      type: 'run',
+      runId: request.runId,
+      args: {
+        markets: snapshots,
+        positions: request.positions,
+        newDepositAssets: 0n,
+        timestamp: request.timestamp,
+        constraints: {
+          maxMarketsUsed: MAX_MARKETS_USED,
+        },
+        maxIterations: MAX_OPTIMIZER_ITERATIONS,
+        auto: true,
+      },
+    })
+
+    return () => {
+      active = false
+      worker.terminate()
+    }
   }, [activeAsset, addOpportunity, chainId, optimizeReadResult, request, upsertPrecomputedResult, userAddress])
 
   useEffect(() => {

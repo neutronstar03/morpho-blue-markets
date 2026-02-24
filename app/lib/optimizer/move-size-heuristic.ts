@@ -30,6 +30,15 @@ export interface MoveSizeHeuristicResult {
   error?: string
 }
 
+export interface MoveSizeHeuristicProgress {
+  phase: 'probe' | 'refine'
+  attempts: number
+  maxAttempts: number
+  stepAssets: bigint
+  iterations: number
+  targetIterations: number
+}
+
 function minBigint(a: bigint, b: bigint): bigint {
   return a <= b ? a : b
 }
@@ -67,8 +76,9 @@ export function optimizeSupplyWithMoveSizeHeuristic(args: Omit<OptimizeSupplyWit
   maxIterations: number
   config?: MoveSizeHeuristicConfig
   baseTotalAssets?: bigint
+  onProgress?: (progress: MoveSizeHeuristicProgress) => void
 }): MoveSizeHeuristicResult {
-  const { maxIterations, config, baseTotalAssets: baseTotalOverride, ...optimizerArgs } = args
+  const { maxIterations, config, baseTotalAssets: baseTotalOverride, onProgress, ...optimizerArgs } = args
   const maxAttempts = config?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS
   const targetIterations = Math.max(1, Math.min(config?.targetIterations ?? DEFAULT_TARGET_ITERATIONS, maxIterations))
 
@@ -105,6 +115,14 @@ export function optimizeSupplyWithMoveSizeHeuristic(args: Omit<OptimizeSupplyWit
       maxIterations,
     })
     attempts++
+    onProgress?.({
+      phase: 'probe',
+      attempts,
+      maxAttempts,
+      stepAssets,
+      iterations: result.iterations,
+      targetIterations,
+    })
 
     if (result.iterations <= targetIterations) {
       bestStep = stepAssets
@@ -150,6 +168,14 @@ export function optimizeSupplyWithMoveSizeHeuristic(args: Omit<OptimizeSupplyWit
         maxIterations,
       })
       attempts++
+      onProgress?.({
+        phase: 'refine',
+        attempts,
+        maxAttempts,
+        stepAssets: mid,
+        iterations: result.iterations,
+        targetIterations,
+      })
 
       if (result.iterations <= targetIterations) {
         bestStep = mid

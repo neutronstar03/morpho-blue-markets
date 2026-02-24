@@ -118,6 +118,13 @@ export interface OptimizeSupplyWithPositionsArgs {
   allowRebalance?: boolean
   /** Hard cap on greedy iterations. */
   maxIterations?: number
+  /** Optional callback for long-running iteration progress updates. */
+  onIterationProgress?: (progress: {
+    iterations: number
+    maxIterations: number
+    remainingAssets: bigint
+    targetTotalAssets: bigint
+  }) => void
 }
 
 export interface OptimizedPositionDelta extends OptimizedMarketAllocation {
@@ -610,6 +617,7 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
     constraints,
     allowRebalance = true,
     maxIterations = 500,
+    onIterationProgress,
   } = args
 
   if (stepAssets <= 0n)
@@ -824,6 +832,12 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
       used.add(chosenIdx)
     remaining -= chosenStep
     iterations++
+    onIterationProgress?.({
+      iterations,
+      maxIterations,
+      remainingAssets: remaining,
+      targetTotalAssets: targetTotal,
+    })
   }
 
   const currentRates = blendedRatesFromFinalAllocations({

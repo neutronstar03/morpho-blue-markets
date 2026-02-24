@@ -22,6 +22,13 @@ export interface SupplyOptimizerRunArgs extends Omit<OptimizeSupplyWithPositions
   stepAssets?: bigint
   maxIterations: number
   auto: boolean
+  onProgress?: (progress: SupplyOptimizerProgress) => void
+}
+
+export interface SupplyOptimizerProgress {
+  phase: 'sizing-step' | 'optimizing' | 'finalizing'
+  label: string
+  percent?: number
 }
 
 export interface SupplyOptimizerRunResult {
@@ -47,7 +54,15 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
       ?? (args.newDepositAssets > 0n ? 0n : DEFAULT_REBALANCE_NEW_MARKET_HYSTERESIS_APR_WAD),
   }
 
-  const runManual = (manualStepAssets: bigint): OptimizeSupplyWithPositionsResult => {
+  const runManual = (manualStepAssets: bigint, withIterationProgress: boolean): OptimizeSupplyWithPositionsResult => {
+    if (withIterationProgress) {
+      args.onProgress?.({
+        phase: 'optimizing',
+        label: 'Optimizing',
+        percent: 10,
+      })
+    }
+
     return optimizeSupplyAllocationWithPositions({
       markets: args.markets,
       positions: args.positions,
@@ -58,12 +73,22 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
         ...baseConstraints,
       },
       maxIterations: args.maxIterations,
+      onIterationProgress: withIterationProgress
+        ? ({ iterations, maxIterations }) => {
+            const pct = Math.min(95, Math.max(10, Math.floor((iterations * 100) / Math.max(1, maxIterations))))
+            args.onProgress?.({
+              phase: 'optimizing',
+              label: 'Optimizing',
+              percent: pct,
+            })
+          }
+        : undefined,
     })
   }
 
   if (args.auto) {
     if (stepAssets != null && stepAssets > 0n) {
-      const cachedResult = runManual(stepAssets)
+      const cachedResult = runManual(stepAssets, true)
       if (cachedResult.iterations < args.maxIterations) {
         result = cachedResult
         autoInfo = {
@@ -79,6 +104,11 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
     }
 
     if (stepAssets == null) {
+      args.onProgress?.({
+        phase: 'sizing-step',
+        label: 'Sizing step',
+        percent: 5,
+      })
       const heuristicResult = optimizeSupplyWithMoveSizeHeuristic({
         markets: args.markets,
         positions: args.positions,
@@ -86,6 +116,14 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
         timestamp: args.timestamp,
         constraints: baseConstraints,
         maxIterations: args.maxIterations,
+        onProgress: ({ attempts, maxAttempts }) => {
+          const pct = Math.min(80, Math.max(5, Math.floor((attempts * 100) / Math.max(1, maxAttempts))))
+          args.onProgress?.({
+            phase: 'sizing-step',
+            label: 'Sizing step',
+            percent: pct,
+          })
+        },
       })
       if (heuristicResult.status !== 'success' || !heuristicResult.result) {
         return {
@@ -112,8 +150,14 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
   }
 
   if (!result) {
-    result = runManual(stepAssets)
+    result = runManual(stepAssets, true)
   }
+
+  args.onProgress?.({
+    phase: 'finalizing',
+    label: 'Finalizing',
+    percent: 100,
+  })
 
   return {
     status: 'success',
