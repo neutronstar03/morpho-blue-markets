@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.27 - 2026-02-24
+
+### Changed
+- ux: home magic optimizer cooldown reduced from 60 minutes to 30 minutes for faster follow-up scans.
+- perf: added a 60-second periodic background eligibility check so magic scan can restart when cooldown expires even without manual refresh.
+
 ## v1.1.26 - 2026-02-24
 
 ### Introduced

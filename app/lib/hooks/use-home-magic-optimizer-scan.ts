@@ -20,8 +20,9 @@ const MAX_MARKETS_USED = 6
 const MAX_OPTIMIZER_ITERATIONS = 1000
 const OPTIMIZER_READ_CHUNK_SIZE = 50
 const OPTIMIZER_READ_CACHE_TTL_MS = 60_000
-const ONE_HOUR_MS = 60 * 60 * 1000
+const THIRTY_MINUTES_MS = 30 * 60 * 1000
 const PRECOMPUTED_RESULT_TTL_MS = 30_000
+const PERIODIC_RESCAN_CHECK_MS = 60 * 1000
 
 export function useHomeMagicOptimizerScan() {
   const { isConnected, address: userAddress, chain } = useAccount()
@@ -44,6 +45,7 @@ export function useHomeMagicOptimizerScan() {
 
   const [queue, setQueue] = useState<ScanAsset[]>([])
   const [queueIndex, setQueueIndex] = useState(0)
+  const [rescanCheckTick, setRescanCheckTick] = useState(0)
   const [request, setRequest] = useState<null | {
     runId: number
     timestamp: bigint
@@ -129,6 +131,19 @@ export function useHomeMagicOptimizerScan() {
   }, [chainId, clearScan, isConnected, userAddress])
 
   useEffect(() => {
+    if (!isConnected || !userAddress || !chainId)
+      return
+
+    const intervalId = window.setInterval(() => {
+      setRescanCheckTick(prev => prev + 1)
+    }, PERIODIC_RESCAN_CHECK_MS)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [chainId, isConnected, userAddress])
+
+  useEffect(() => {
     if (!isConnected || !userAddress || !chainId || isLoadingPositions)
       return
     if (isScanning)
@@ -154,7 +169,7 @@ export function useHomeMagicOptimizerScan() {
 
     const now = Date.now()
     const lastRun = getHomeMagicLastRunMs(chainId)
-    if (lastRun != null && now - lastRun < ONE_HOUR_MS)
+    if (lastRun != null && now - lastRun < THIRTY_MINUTES_MS)
       return
 
     setHomeMagicLastRunMs(chainId, now)
@@ -162,7 +177,7 @@ export function useHomeMagicOptimizerScan() {
     setQueue(assets)
     setQueueIndex(0)
     startScan({ chainId, totalAssets: assets.length })
-  }, [chainId, clearOpportunitiesForChain, isConnected, isLoadingPositions, isScanning, livePositions, startScan, userAddress])
+  }, [chainId, clearOpportunitiesForChain, isConnected, isLoadingPositions, isScanning, livePositions, rescanCheckTick, startScan, userAddress])
 
   useEffect(() => {
     if (!isScanning)
