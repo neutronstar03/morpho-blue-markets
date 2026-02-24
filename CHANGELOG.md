@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.29 - 2026-02-24
+
+### Changed
+- ux: home magic scan now starts only when the user is on the home route, but keeps running if navigation happens mid-scan.
+- fix: magic scan cooldown is now recorded when a scan actually completes, so interrupted scans do not block follow-up runs for 30 minutes.
+- ui: kept the magic header visual active while scanning across routes so users can see background optimizer activity.
+
 ## v1.1.28 - 2026-02-24
 
 ### Changed

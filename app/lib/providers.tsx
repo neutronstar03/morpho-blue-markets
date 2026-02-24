@@ -5,10 +5,18 @@ import { darkTheme, RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { WagmiProvider } from 'wagmi'
+import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
 import { BatchWithdrawProvider } from './contexts/batch-withdraw.context'
 import { NetworkProvider } from './contexts/network'
 import { SupplyAprOptimizerProvider } from './contexts/optimizer.context'
 import { config } from './wagmi'
+
+function HomeMagicOptimizerEffects() {
+  // Runs background magic scan side effects from inside provider context.
+  // This component intentionally renders nothing.
+  useHomeMagicOptimizerScan()
+  return null
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -29,6 +37,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <NetworkProvider>
           <SupplyAprOptimizerProvider>
             <BatchWithdrawProvider>
+              <HomeMagicOptimizerEffects />
               <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
             </BatchWithdrawProvider>
           </SupplyAprOptimizerProvider>

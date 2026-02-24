@@ -1,6 +1,7 @@
 import type { UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAccount, usePublicClient } from 'wagmi'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress } from '~/lib/hooks/rpc/use-morpho'
@@ -35,6 +36,7 @@ export function useHomeMagicOptimizerScan() {
 
   const {
     isScanning,
+    scanChainId,
     startScan,
     setScanProgress,
     finishScan,
@@ -55,6 +57,8 @@ export function useHomeMagicOptimizerScan() {
   }>(null)
 
   const runIdRef = useRef(1)
+  const location = useLocation()
+  const isHomeRoute = location.pathname === '/'
 
   const activeAsset = queue[queueIndex]
   const chainId = chain?.id
@@ -113,6 +117,8 @@ export function useHomeMagicOptimizerScan() {
     setQueueIndex((prev) => {
       const next = prev + 1
       if (next >= queue.length) {
+        if (scanChainId != null)
+          setHomeMagicLastRunMs(scanChainId, Date.now())
         finishScan()
         setQueue([])
         return prev
@@ -147,6 +153,8 @@ export function useHomeMagicOptimizerScan() {
   useEffect(() => {
     if (!isConnected || !userAddress || !chainId || isLoadingPositions)
       return
+    if (!isHomeRoute)
+      return
     if (isScanning)
       return
 
@@ -173,12 +181,11 @@ export function useHomeMagicOptimizerScan() {
     if (lastRun != null && now - lastRun < THIRTY_MINUTES_MS)
       return
 
-    setHomeMagicLastRunMs(chainId, now)
     clearOpportunitiesForChain(chainId)
     setQueue(assets)
     setQueueIndex(0)
     startScan({ chainId, totalAssets: assets.length })
-  }, [chainId, clearOpportunitiesForChain, isConnected, isLoadingPositions, isScanning, livePositions, rescanCheckTick, startScan, userAddress])
+  }, [chainId, clearOpportunitiesForChain, isConnected, isHomeRoute, isLoadingPositions, isScanning, livePositions, rescanCheckTick, startScan, userAddress])
 
   useEffect(() => {
     if (!isScanning)
