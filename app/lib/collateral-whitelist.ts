@@ -78,7 +78,10 @@ export function ensureCollateralWhitelistLoaded() {
   setState({ ...whitelistState, status: 'loading' })
   loadPromise = (async () => {
     try {
-      const res = await fetch('/whitelist.collaterals.json', {
+      const base = (import.meta as any).env?.BASE_URL as string | undefined
+      const url = `${base && typeof base === 'string' ? base : '/'}whitelist.collaterals.json`
+
+      const res = await fetch(url, {
         headers: { accept: 'application/json' },
       })
 
