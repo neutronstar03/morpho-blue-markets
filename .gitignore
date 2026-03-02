@@ -17,3 +17,6 @@ UNRELEASED.md
 
 # Local precompute outputs (do not commit)
 scripts/.cache/
+
+# Local clone of artifacts repo
+artifacts/

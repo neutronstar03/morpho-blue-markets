@@ -20,6 +20,38 @@ To run this project locally, follow these steps:
     ```
     The application will be available at `http://localhost:5173`.
 
+### Collateral Whitelist (Optional)
+
+This app can run without any precomputed whitelist.
+
+If a market's collateral is unknown, it is highlighted in `yellow` and you can approve/ban it directly on the Market page.
+
+In production, the app will try to load a precomputed whitelist from (in order):
+
+1) a local static file: `public/whitelist.collaterals.json`
+2) the artifacts repo: `https://neutronstar03.github.io/mbm-artifacts/v1/whitelist.collaterals.json`
+3) a local browser cache (if previously fetched)
+
+If none are available, the whitelist is treated as empty.
+
+#### Pull Once (Recommended)
+
+To download the current whitelist from the artifacts repo into your local `public/` folder:
+
+```bash
+bun run artifacts:pull
+```
+
+This is a one-time step; after that, `bun dev` can run fully offline.
+
+#### Generate Locally
+
+To generate a whitelist locally (DefiLlama price validation + backoff):
+
+```bash
+bun run gen:whitelist:collaterals:reset
+```
+
 ## Changelog
 
 See `CHANGELOG.md` for the full release history. Recent updates:

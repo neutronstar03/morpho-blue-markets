@@ -15,6 +15,11 @@ interface WhitelistState {
 
 const CHANGE_EVENT = 'collateral-whitelist:changed'
 
+const LOCAL_URL_PATH = 'whitelist.collaterals.json'
+const ARTIFACTS_URL = '/mbm-artifacts/v1/whitelist.collaterals.json'
+
+const LS_CACHE_KEY = 'collateral-whitelist-cache:v1'
+
 let whitelistVersion = 0
 let whitelistState: WhitelistState = {
   status: 'uninitialized',
@@ -67,6 +72,47 @@ function buildByChain(entries: unknown) {
 
 let loadPromise: Promise<void> | null = null
 
+function safeReadCache(): unknown | undefined {
+  if (typeof window === 'undefined')
+    return undefined
+  try {
+    const raw = window.localStorage.getItem(LS_CACHE_KEY)
+    if (!raw)
+      return undefined
+    const parsed = JSON.parse(raw) as any
+    return parsed?.entries
+  }
+  catch {
+    return undefined
+  }
+}
+
+function safeWriteCache(entries: unknown) {
+  if (typeof window === 'undefined')
+    return
+  try {
+    window.localStorage.setItem(LS_CACHE_KEY, JSON.stringify({
+      cachedAtMs: Date.now(),
+      entries,
+    }))
+  }
+  catch {
+    // ignore
+  }
+}
+
+function baseUrlPrefix() {
+  const base = (import.meta as any).env?.BASE_URL as string | undefined
+  return base && typeof base === 'string' ? base : '/'
+}
+
+async function fetchWhitelist(url: string) {
+  const res = await fetch(url, {
+    headers: { accept: 'application/json' },
+  })
+  return res
+}
+
 export function ensureCollateralWhitelistLoaded() {
   if (typeof window === 'undefined')
     return
@@ -78,27 +124,49 @@ export function ensureCollateralWhitelistLoaded() {
   setState({ ...whitelistState, status: 'loading' })
   loadPromise = (async () => {
     try {
-      const base = (import.meta as any).env?.BASE_URL as string | undefined
-      const url = `${base && typeof base === 'string' ? base : '/'}whitelist.collaterals.json`
+      // First try local static file (supports dev "pull-once").
+      const localUrl = `${baseUrlPrefix()}${LOCAL_URL_PATH}`
+      const localRes = await fetchWhitelist(localUrl)
 
-      const res = await fetch(url, {
-        headers: { accept: 'application/json' },
-      })
-
-      if (!res.ok) {
-        // Tolerate missing file on static hosting.
-        if (res.status === 404) {
-          setState({ status: 'loaded', byChain: {} })
-          return
-        }
-        setState({ status: 'failed', byChain: {} })
+      if (localRes.ok) {
+        const json = await localRes.json()
+        safeWriteCache(json)
+        setState({ status: 'loaded', byChain: buildByChain(json) })
         return
       }
 
-      const json = await res.json()
-      setState({ status: 'loaded', byChain: buildByChain(json) })
+      // If local file is missing, try the artifacts repo (same-origin on GitHub Pages).
+      if (localRes.status === 404) {
+        const artifactsRes = await fetchWhitelist(ARTIFACTS_URL)
+        if (artifactsRes.ok) {
+          const json = await artifactsRes.json()
+          safeWriteCache(json)
+          setState({ status: 'loaded', byChain: buildByChain(json) })
+          return
+        }
+
+        // Artifacts can be missing during rollout. Treat as empty.
+        if (artifactsRes.status === 404) {
+          setState({ status: 'loaded', byChain: {} })
+          return
+        }
+      }
+
+      // Last resort: use cached data if present, otherwise fall back to empty.
+      const cached = safeReadCache()
+      if (cached) {
+        setState({ status: 'loaded', byChain: buildByChain(cached) })
+        return
+      }
+
+      setState({ status: 'failed', byChain: {} })
     }
     catch {
+      const cached = safeReadCache()
+      if (cached) {
+        setState({ status: 'loaded', byChain: buildByChain(cached) })
+        return
+      }
       setState({ status: 'failed', byChain: {} })
     }
   })().finally(() => {
