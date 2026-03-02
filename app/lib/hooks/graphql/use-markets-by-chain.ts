@@ -1,38 +1,11 @@
+import type { QueryMarketsByChainResult, SupplyMarketData } from '~/lib/graphql/queries/markets-by-chain'
 import { useQuery } from '@tanstack/react-query'
-import { gql } from 'graphql-request'
 import { useMemo } from 'react'
+import { MarketOrderBy, OrderDirection, QUERY_MARKETS_BY_CHAIN } from '~/lib/graphql/queries/markets-by-chain'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
 import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
+import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
-// A specific, isolated type for this hook, containing only the fields required
-// for the supply-side of the `useLiveMarketPositions` hook.
-export interface SupplyMarketData {
-  uniqueKey: string
-  irmAddress: string
-  loanAsset: {
-    address: string
-    symbol: string
-    name?: string | null
-    decimals?: number | null
-    chain?: {
-      id: number
-      network?: string | null
-    }
-  }
-  collateralAsset: {
-    address: string
-    symbol: string
-    name?: string | null
-    decimals?: number | null
-  }
-  state: {
-    netSupplyApy: number
-    supplyApy: number
-    supplyAssets: string
-    supplyShares: string
-    supplyAssetsUsd?: number
-  }
-}
 
 interface MarketFiltersWithChain {
   chainId_in?: number[]
@@ -41,59 +14,6 @@ interface MarketFiltersWithChain {
   netSupplyApy_lte?: number
   borrowAssetsUsd_gte?: number
 }
-enum MarketOrderBy { NetSupplyApy = 'NetSupplyApy' }
-enum OrderDirection { Desc = 'Desc' }
-
-interface QueryMarketsByChainResult {
-  markets: {
-    items: SupplyMarketData[]
-  }
-}
-
-// This query is self-contained and fetches only the minimal fields required
-// for the supply-side of the `useLiveMarketPositions` hook.
-export const QUERY_MARKETS_BY_CHAIN = gql`
-  query GetMarketsByChain(
-    $first: Int!
-    $skip: Int!
-    $where: MarketFilters
-    $orderBy: MarketOrderBy
-    $orderDirection: OrderDirection
-  ) {
-    markets(
-      first: $first
-      skip: $skip
-      orderBy: $orderBy
-      orderDirection: $orderDirection
-      where: $where
-    ) {
-      items {
-        uniqueKey
-        irmAddress
-        loanAsset {
-          address
-          symbol
-          name
-          decimals
-          chain { id network }
-        }
-        collateralAsset {
-          address
-          symbol
-          name
-          decimals
-        }
-        state {
-          netSupplyApy
-          supplyApy
-          supplyAssets
-          supplyShares
-          supplyAssetsUsd
-        }
-      }
-    }
-  }
-`
 
 export interface UseMarketsByChainOptions {
   minNetSupplyApy?: number
@@ -157,7 +77,7 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
         loanAssetSymbol: market.loanAsset?.symbol,
         collateralAssetSymbol: market.collateralAsset?.symbol,
         chainId,
-      }))
+      })).filter(m => !isOracleMisconfiguredWarning(m.warnings))
     },
     enabled: !!chainId,
     staleTime: STALE_TIME_LONG_MS,

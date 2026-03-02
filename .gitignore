@@ -14,3 +14,6 @@ morpho.full.schema.graphql
 
 # Unreleased notes
 UNRELEASED.md
+
+# Local precompute outputs (do not commit)
+scripts/.cache/

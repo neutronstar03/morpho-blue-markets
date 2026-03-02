@@ -13,6 +13,7 @@ import { Card } from '~/components/ui/card'
 import { InfoTooltip } from '~/components/ui/info-tooltip'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { MarketRiskText } from '~/components/ui/market-risk-text'
 import {
   Select,
   SelectContent,
@@ -24,6 +25,7 @@ import {
 } from '~/components/ui/select'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
+import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
 import { formatBigintShort } from '~/lib/formatters'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
@@ -31,6 +33,8 @@ import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loa
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
+import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
+import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
@@ -153,7 +157,7 @@ export function SupplyAprOptimizer() {
     return loanAssetOptions.find(o => o.address.toLowerCase() === selectedLoanAddr)
   }, [loanAssetOptions, selectedLoanAddr])
 
-  const selectedUserMarkets = useMemo(() => {
+  const selectedUserMarketsAll = useMemo(() => {
     if (!selectedLoanAddr)
       return []
     return (livePositions ?? []).filter((p) => {
@@ -161,6 +165,27 @@ export function SupplyAprOptimizer() {
         && p.market.loanAsset.address.toLowerCase() === selectedLoanAddr
     })
   }, [livePositions, selectedLoanAddr])
+
+  const decisionsVersion = useCollateralDecisionsVersion()
+  const whitelistVersion = useCollateralWhitelistVersion()
+  const selectedUserMarkets = useMemo(() => {
+    void decisionsVersion
+    void whitelistVersion
+    if (!chain?.id)
+      return selectedUserMarketsAll
+    return selectedUserMarketsAll.filter((p) => {
+      const status = getMarketRisk({
+        chainId: chain.id,
+        uniqueKey: p.market.uniqueKey,
+        loanAssetAddress: p.market.loanAsset.address,
+        collateralAssetAddress: p.market.collateralAsset.address,
+        loanAssetSymbol: p.market.loanAsset.symbol,
+        collateralAssetSymbol: p.market.collateralAsset.symbol,
+        warnings: p.market.warnings,
+      }).status
+      return status !== 'black'
+    })
+  }, [chain?.id, decisionsVersion, selectedUserMarketsAll, whitelistVersion])
 
   const userSupplySharesByMarketId = useMemo(() => {
     const map = new Map<string, bigint>()
@@ -598,10 +623,36 @@ export function SupplyAprOptimizer() {
 
     for (const m of (topMarkets ?? [])) {
       const id = m.uniqueKey.toLowerCase()
+      const status = chain?.id
+        ? getMarketRisk({
+          chainId: chain.id,
+          uniqueKey: m.uniqueKey,
+          loanAssetAddress: m.loanAsset?.address,
+          collateralAssetAddress: m.collateralAsset?.address,
+          loanAssetSymbol: m.loanAsset?.symbol,
+          collateralAssetSymbol: m.collateralAsset?.symbol,
+          warnings: m.warnings,
+        }).status
+        : undefined
+      if (status === 'black')
+        continue
       universe.set(id, { uniqueKey: m.uniqueKey as `0x${string}`, irmAddress: m.irmAddress as `0x${string}` })
     }
     for (const p of selectedUserMarkets) {
       const id = p.market.uniqueKey.toLowerCase()
+      const status = chain?.id
+        ? getMarketRisk({
+          chainId: chain.id,
+          uniqueKey: p.market.uniqueKey,
+          loanAssetAddress: p.market.loanAsset?.address,
+          collateralAssetAddress: p.market.collateralAsset?.address,
+          loanAssetSymbol: p.market.loanAsset?.symbol,
+          collateralAssetSymbol: p.market.collateralAsset?.symbol,
+          warnings: p.market.warnings,
+        }).status
+        : undefined
+      if (status === 'black')
+        continue
       universe.set(id, { uniqueKey: p.market.uniqueKey as `0x${string}`, irmAddress: p.market.irmAddress as `0x${string}` })
     }
 
@@ -673,15 +724,41 @@ export function SupplyAprOptimizer() {
   const chainNameForLinks = chainIdForLinks ? getSupportedChainName(chainIdForLinks) : undefined
 
   const marketMetaById = useMemo(() => {
-    const map = new Map<string, { collateralSymbol?: string }>()
+    const map = new Map<string, { collateralSymbol?: string, status?: 'white' | 'blue' | 'yellow' | 'purple' | 'black' }>()
     for (const m of (topMarkets ?? [])) {
-      map.set(m.uniqueKey.toLowerCase(), { collateralSymbol: m.collateralAsset?.symbol })
+      map.set(m.uniqueKey.toLowerCase(), {
+        collateralSymbol: m.collateralAsset?.symbol,
+        status: chain?.id
+          ? getMarketRisk({
+            chainId: chain.id,
+            uniqueKey: m.uniqueKey,
+            loanAssetAddress: m.loanAsset?.address,
+            collateralAssetAddress: m.collateralAsset?.address,
+            loanAssetSymbol: m.loanAsset?.symbol,
+            collateralAssetSymbol: m.collateralAsset?.symbol,
+            warnings: m.warnings,
+          }).status
+          : undefined,
+      })
     }
     for (const p of selectedUserMarkets) {
-      map.set(p.market.uniqueKey.toLowerCase(), { collateralSymbol: p.market.collateralAsset?.symbol })
+      map.set(p.market.uniqueKey.toLowerCase(), {
+        collateralSymbol: p.market.collateralAsset?.symbol,
+        status: chain?.id
+          ? getMarketRisk({
+            chainId: chain.id,
+            uniqueKey: p.market.uniqueKey,
+            loanAssetAddress: p.market.loanAsset?.address,
+            collateralAssetAddress: p.market.collateralAsset?.address,
+            loanAssetSymbol: p.market.loanAsset?.symbol,
+            collateralAssetSymbol: p.market.collateralAsset?.symbol,
+            warnings: p.market.warnings,
+          }).status
+          : undefined,
+      })
     }
     return map
-  }, [topMarkets, selectedUserMarkets])
+  }, [chain?.id, topMarkets, selectedUserMarkets])
 
   useEffect(() => {
     if (import.meta.env.PROD)
@@ -1049,6 +1126,7 @@ export function SupplyAprOptimizer() {
                       {displayResult.positions.map((p) => {
                         const deltaSign = p.deltaAssets >= 0n ? '+' : ''
                         const meta = marketMetaById.get(p.marketId.toLowerCase())
+                        const riskStatus = meta?.status
                         const marketLabel = meta?.collateralSymbol ? `${meta.collateralSymbol} / ${symbol}` : `${p.marketId.slice(0, 10)}…${p.marketId.slice(-6)}`
                         const absDeltaAssets = p.deltaAssets < 0n ? -p.deltaAssets : p.deltaAssets
                         const deepLinkTab = p.deltaAssets < 0n ? 'withdraw' : 'deposit'
@@ -1065,7 +1143,9 @@ export function SupplyAprOptimizer() {
                         const yearlyReturnAssets = (p.amountAssets * p.supplyAprAfterWad) / WAD
 
                         return (
-                          <tr key={p.marketId}>
+                          <tr
+                            key={p.marketId}
+                          >
                             <td className="px-3 sm:px-4 py-2 text-sm text-white">
                               <div className="flex items-center gap-2">
                                 {chainIdForLinks
@@ -1075,13 +1155,13 @@ export function SupplyAprOptimizer() {
                                           pathname: `/market/${p.marketId}/${chainIdForLinks}`,
                                           search: deepLinkSearch ? `?${deepLinkSearch}` : '',
                                         }}
-                                        className="hover:text-blue-400 transition-colors"
+                                        className="hover:opacity-90 transition-opacity"
                                       >
-                                        {marketLabel}
+                                        <MarketRiskText status={riskStatus}>{marketLabel}</MarketRiskText>
                                       </Link>
                                     )
                                   : (
-                                      <span>{marketLabel}</span>
+                                      <MarketRiskText status={riskStatus}>{marketLabel}</MarketRiskText>
                                     )}
                                 {chainNameForLinks && (
                                   <a

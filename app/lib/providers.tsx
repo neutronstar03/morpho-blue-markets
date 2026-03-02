@@ -5,6 +5,7 @@ import { darkTheme, RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { WagmiProvider } from 'wagmi'
+import { useCollateralWhitelistPreload } from './collateral-whitelist'
 import { BatchWithdrawProvider } from './contexts/batch-withdraw.context'
 import { NetworkProvider } from './contexts/network'
 import { SupplyAprOptimizerProvider } from './contexts/optimizer.context'
@@ -14,6 +15,7 @@ import { config } from './wagmi'
 function HomeMagicOptimizerEffects() {
   // Runs background magic scan side effects from inside provider context.
   // This component intentionally renders nothing.
+  useCollateralWhitelistPreload()
   useHomeMagicOptimizerScan()
   return null
 }

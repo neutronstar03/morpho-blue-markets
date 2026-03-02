@@ -14,6 +14,10 @@ export interface LiveMarketPosition {
     irmAddress: string
     oracleAddress?: string
     lltv?: string
+    warnings?: Array<{
+      type: string
+      level: 'YELLOW' | 'RED'
+    }>
     loanAsset: {
       symbol: string
       decimals: number | null
@@ -125,6 +129,7 @@ export function useLiveMarketPositions() {
           irmAddress: gp.market.irmAddress,
           oracleAddress: gp.market.oracle?.address ?? undefined,
           lltv: gp.market.lltv ?? undefined,
+          warnings: gp.market.warnings,
           loanAsset: gp.market.loanAsset,
           collateralAsset: gp.market.collateralAsset,
           state: {
@@ -176,6 +181,7 @@ export function useLiveMarketPositions() {
             irmAddress: gp.market.irmAddress,
             oracleAddress: gp.market.oracle?.address ?? undefined,
             lltv: gp.market.lltv ?? undefined,
+            warnings: gp.market.warnings,
             loanAsset: gp.market.loanAsset,
             collateralAsset: gp.market.collateralAsset,
             state: {

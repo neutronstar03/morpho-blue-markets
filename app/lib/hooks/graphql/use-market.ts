@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { gql, request } from 'graphql-request'
 import { STALE_TIME_SHORT_MS } from '~/lib/hooks/query-stale-times'
 import { isMarketBlacklisted } from '~/lib/market-blacklist'
+import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 
 const MORPHO_API_URL = 'https://blue-api.morpho.org/graphql'
 
@@ -19,6 +20,7 @@ const GetMarketDocument = gql`
       morphoBlue { chain { id } }
       badDebt { usd }
       realizedBadDebt { usd }
+      warnings { type level }
 
       state {
         supplyAssetsUsd
@@ -82,6 +84,10 @@ export interface SingleMorphoMarket {
   realizedBadDebt: {
     usd: number
   }
+  warnings?: Array<{
+    type: string
+    level: 'YELLOW' | 'RED'
+  }>
   state: {
     supplyAssetsUsd: number
     borrowAssetsUsd: number
@@ -130,6 +136,8 @@ export function useMarketQuery(uniqueKey?: string, chainId?: number) {
       })) {
         return null
       }
+      if (isOracleMisconfiguredWarning(market.warnings))
+        return null
       return market
     },
     enabled: !!uniqueKey && !!chainId,

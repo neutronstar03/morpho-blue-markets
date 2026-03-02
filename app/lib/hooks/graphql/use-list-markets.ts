@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
 import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
+import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
 
 export interface MorphoMarket {
@@ -47,6 +48,10 @@ export interface MorphoMarket {
   }
   whitelisted: boolean
   creationTimestamp: string
+  warnings?: Array<{
+    type: string
+    level: 'YELLOW' | 'RED'
+  }>
 }
 
 export interface QueryMarketsResult {
@@ -105,6 +110,7 @@ export const QUERY_LIST_MARKETS = gql`
         }
         whitelisted
         creationTimestamp
+        warnings { type level }
       }
     }
   }
@@ -192,7 +198,7 @@ export function useMarkets({
             loanAssetSymbol: market.loanAsset?.symbol,
             collateralAssetSymbol: market.collateralAsset?.symbol,
             chainId: market.morphoBlue?.chain?.id,
-          })),
+          })).filter(market => !isOracleMisconfiguredWarning(market.warnings)),
         },
       }
     },
