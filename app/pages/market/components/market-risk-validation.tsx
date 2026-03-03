@@ -69,6 +69,9 @@ function getCoingeckoContractUrl(chainId: number, address: string) {
 export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
   const optimizer = useSupplyAprOptimizer()
 
+  const baseUrl = (import.meta as any).env?.BASE_URL as string | undefined
+  const logoSrc = (file: string) => `${baseUrl && typeof baseUrl === 'string' ? baseUrl : '/'}logos/${file}`
+
   const chainId = market.morphoBlue.chain.id
   const collateralAddress = market.collateralAsset.address
   const status = useMarketRiskStatus({
@@ -114,7 +117,7 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
                   title="Open in explorer"
                   aria-label="Open collateral in explorer"
                 >
-                  <img src="/logos/etherscan-48.png" alt="Explorer" className="h-5 w-5 rounded-[4px] bg-white/70 p-[1px]" />
+                  <img src={logoSrc('etherscan-48.png')} alt="Explorer" className="h-5 w-5 rounded-[4px] bg-white/70 p-[1px]" />
                 </a>
               )}
               {geckoTerminalUrl && (
@@ -126,7 +129,7 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
                   title="Open on GeckoTerminal"
                   aria-label="Open collateral on GeckoTerminal"
                 >
-                  <img src="/logos/geckoterminal-48.png" alt="GeckoTerminal" className="h-5 w-5 rounded-[4px]" />
+                  <img src={logoSrc('geckoterminal-48.png')} alt="GeckoTerminal" className="h-5 w-5 rounded-[4px]" />
                 </a>
               )}
               {definedUrl && (
@@ -138,7 +141,7 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
                   title="Open on Defined.fi"
                   aria-label="Open collateral on Defined.fi"
                 >
-                  <img src="/logos/definedfi-48.png" alt="Defined.fi" className="h-5 w-5 rounded-[4px]" />
+                  <img src={logoSrc('definedfi-48.png')} alt="Defined.fi" className="h-5 w-5 rounded-[4px]" />
                 </a>
               )}
               {coingeckoUrl && (
@@ -150,7 +153,7 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
                   title="Open on CoinGecko"
                   aria-label="Open collateral on CoinGecko"
                 >
-                  <img src="/logos/coingecko-48.png" alt="CoinGecko" className="h-5 w-5 rounded-[4px]" />
+                  <img src={logoSrc('coingecko-48.png')} alt="CoinGecko" className="h-5 w-5 rounded-[4px]" />
                 </a>
               )}
             </div>
