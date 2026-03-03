@@ -19,6 +19,7 @@ import {
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
+import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
 
@@ -143,9 +144,11 @@ function PositionClient() {
 
   const decisionsVersion = useCollateralDecisionsVersion()
   const whitelistVersion = useCollateralWhitelistVersion()
+  const blacklistVersion = useMarketBlacklistVersion()
   const riskStatusByKey = useMemo(() => {
     void decisionsVersion
     void whitelistVersion
+    void blacklistVersion
     const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
     if (!chain?.id)
       return out
@@ -162,7 +165,7 @@ function PositionClient() {
       }).status
     }
     return out
-  }, [chain?.id, decisionsVersion, positions, whitelistVersion])
+  }, [blacklistVersion, chain?.id, decisionsVersion, positions, whitelistVersion])
 
   const visiblePositions = useMemo(() => {
     if (!chain?.id)

@@ -1,16 +1,187 @@
+import { useEffect, useSyncExternalStore } from 'react'
 import blacklistAssets from './blacklist.assets.json'
-import blacklistMarkets from './blacklist.markets.json'
 
-const BLACKLISTED_MARKET_IDS_BY_CHAIN: Record<number, Set<string>> = blacklistMarkets.reduce(
-  (acc, entry) => {
-    const chainId = entry.chainId
-    if (!acc[chainId])
-      acc[chainId] = new Set()
-    acc[chainId].add(entry.uniqueKey.toLowerCase())
-    return acc
-  },
-  {} as Record<number, Set<string>>,
-)
+interface BlacklistMarketEntry {
+  chainId: number
+  uniqueKey: string
+}
+
+type BlacklistStatus = 'uninitialized' | 'loading' | 'loaded' | 'failed'
+
+interface BlacklistState {
+  status: BlacklistStatus
+  marketIdsByChain: Record<number, Set<string>>
+}
+
+const CHANGE_EVENT = 'market-blacklist:changed'
+
+const LOCAL_URL_PATH = 'blacklist.markets.json'
+const ARTIFACTS_URL = '/mbm-artifacts/v1/blacklist.markets.json'
+
+const LS_CACHE_KEY = 'market-blacklist-cache:v1'
+
+let blacklistVersion = 0
+let blacklistState: BlacklistState = {
+  status: 'uninitialized',
+  marketIdsByChain: {},
+}
+
+function emitChange() {
+  if (typeof window === 'undefined')
+    return
+  blacklistVersion++
+  window.dispatchEvent(new Event(CHANGE_EVENT))
+}
+
+function setState(next: BlacklistState) {
+  blacklistState = next
+  emitChange()
+}
+
+function normalizeMarketId(value?: string | null) {
+  return value?.toLowerCase() ?? undefined
+}
+
+function buildMarketIdsByChain(entries: unknown) {
+  const out: Record<number, Set<string>> = {}
+  const arr = Array.isArray(entries) ? entries : []
+  for (const item of arr) {
+    if (!item || typeof item !== 'object')
+      continue
+    const e = item as Partial<BlacklistMarketEntry>
+    const chainId = Number(e.chainId)
+    const uniqueKey = normalizeMarketId(e.uniqueKey)
+    if (!Number.isFinite(chainId) || chainId <= 0 || !uniqueKey)
+      continue
+    if (!out[chainId])
+      out[chainId] = new Set<string>()
+    out[chainId].add(uniqueKey)
+  }
+  return out
+}
+
+function safeReadCache(): unknown | undefined {
+  if (typeof window === 'undefined')
+    return undefined
+  try {
+    const raw = window.localStorage.getItem(LS_CACHE_KEY)
+    if (!raw)
+      return undefined
+    const parsed = JSON.parse(raw) as any
+    return parsed?.entries
+  }
+  catch {
+    return undefined
+  }
+}
+
+function safeWriteCache(entries: unknown) {
+  if (typeof window === 'undefined')
+    return
+  try {
+    window.localStorage.setItem(LS_CACHE_KEY, JSON.stringify({
+      cachedAtMs: Date.now(),
+      entries,
+    }))
+  }
+  catch {
+    // ignore
+  }
+}
+
+function baseUrlPrefix() {
+  const base = (import.meta as any).env?.BASE_URL as string | undefined
+  return base && typeof base === 'string' ? base : '/'
+}
+
+async function fetchJson(url: string) {
+  const res = await fetch(url, { headers: { accept: 'application/json' } })
+  return res
+}
+
+let loadPromise: Promise<void> | null = null
+
+export function ensureMarketBlacklistLoaded() {
+  if (typeof window === 'undefined')
+    return
+  if (blacklistState.status === 'loaded' || blacklistState.status === 'failed')
+    return
+  if (loadPromise)
+    return
+
+  setState({ ...blacklistState, status: 'loading' })
+  loadPromise = (async () => {
+    try {
+      const localUrl = `${baseUrlPrefix()}${LOCAL_URL_PATH}`
+      const localRes = await fetchJson(localUrl)
+      if (localRes.ok) {
+        const json = await localRes.json()
+        safeWriteCache(json)
+        setState({ status: 'loaded', marketIdsByChain: buildMarketIdsByChain(json) })
+        return
+      }
+
+      if (localRes.status === 404) {
+        const artifactsRes = await fetchJson(ARTIFACTS_URL)
+        if (artifactsRes.ok) {
+          const json = await artifactsRes.json()
+          safeWriteCache(json)
+          setState({ status: 'loaded', marketIdsByChain: buildMarketIdsByChain(json) })
+          return
+        }
+
+        if (artifactsRes.status === 404) {
+          setState({ status: 'loaded', marketIdsByChain: {} })
+          return
+        }
+      }
+
+      const cached = safeReadCache()
+      if (cached) {
+        setState({ status: 'loaded', marketIdsByChain: buildMarketIdsByChain(cached) })
+        return
+      }
+
+      setState({ status: 'failed', marketIdsByChain: {} })
+    }
+    catch {
+      const cached = safeReadCache()
+      if (cached) {
+        setState({ status: 'loaded', marketIdsByChain: buildMarketIdsByChain(cached) })
+        return
+      }
+      setState({ status: 'failed', marketIdsByChain: {} })
+    }
+  })().finally(() => {
+    loadPromise = null
+  })
+}
+
+export function getMarketBlacklistVersion() {
+  return blacklistVersion
+}
+
+export function subscribeMarketBlacklist(listener: () => void) {
+  if (typeof window === 'undefined')
+    return () => {}
+  const onEvent = () => listener()
+  window.addEventListener(CHANGE_EVENT, onEvent)
+  return () => window.removeEventListener(CHANGE_EVENT, onEvent)
+}
+
+export function useMarketBlacklistVersion() {
+  return useSyncExternalStore(
+    subscribeMarketBlacklist,
+    () => getMarketBlacklistVersion(),
+    () => 0,
+  )
+}
+
+export function useMarketBlacklistPreload() {
+  useEffect(() => {
+    ensureMarketBlacklistLoaded()
+  }, [])
+}
 
 const BLACKLISTED_ASSET_ADDRESSES_BY_CHAIN: Record<number, Set<string>> = Object.fromEntries(
   Object.entries(blacklistAssets as Record<string, Array<{ assetContract: string }>>).map(
@@ -39,6 +210,10 @@ const PENDLE_MONTHS: Record<string, string> = {
 function normalizeId(value?: string | null) {
   return value?.toLowerCase() ?? undefined
 }
+
+// Kick off best-effort load early in the client.
+if (typeof window !== 'undefined')
+  ensureMarketBlacklistLoaded()
 
 function formatTodayPendleSortable() {
   const now = new Date()
@@ -96,7 +271,7 @@ export function isAssetBlacklisted(address?: string | null, chainId?: number) {
 }
 
 export function isMarketIdBlacklisted(uniqueKey?: string | null, chainId?: number) {
-  return hasValueInChainMap(BLACKLISTED_MARKET_IDS_BY_CHAIN, uniqueKey, chainId)
+  return hasValueInChainMap(blacklistState.marketIdsByChain, uniqueKey, chainId)
 }
 
 export function isMarketBlacklisted(args: {

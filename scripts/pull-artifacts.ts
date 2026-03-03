@@ -35,8 +35,8 @@ async function main() {
   if (pullBlacklist) {
     const url = `${baseUrl}/blacklist.markets.json`
     const json = await fetchJson(url)
-    await Bun.write('app/lib/blacklist.markets.json', `${JSON.stringify(json, null, 2)}\n`)
-    console.log(`Wrote app/lib/blacklist.markets.json from ${url}`)
+    await Bun.write('public/blacklist.markets.json', `${JSON.stringify(json, null, 2)}\n`)
+    console.log(`Wrote public/blacklist.markets.json from ${url}`)
   }
 }
 

@@ -44,6 +44,12 @@ bun run artifacts:pull
 
 This is a one-time step; after that, `bun dev` can run fully offline.
 
+To also pull the latest market blacklist dataset (optional):
+
+```bash
+bun run artifacts:pull:all
+```
+
 #### Generate Locally
 
 To generate a whitelist locally (DefiLlama price validation + backoff):

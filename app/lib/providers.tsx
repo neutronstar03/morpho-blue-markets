@@ -10,12 +10,14 @@ import { BatchWithdrawProvider } from './contexts/batch-withdraw.context'
 import { NetworkProvider } from './contexts/network'
 import { SupplyAprOptimizerProvider } from './contexts/optimizer.context'
 import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
+import { useMarketBlacklistPreload } from './market-blacklist'
 import { config } from './wagmi'
 
 function HomeMagicOptimizerEffects() {
   // Runs background magic scan side effects from inside provider context.
   // This component intentionally renders nothing.
   useCollateralWhitelistPreload()
+  useMarketBlacklistPreload()
   useHomeMagicOptimizerScan()
   return null
 }

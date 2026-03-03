@@ -26,6 +26,7 @@ import {
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
+import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
@@ -445,10 +446,12 @@ export function AdvancedList() {
 
   const decisionsVersion = useCollateralDecisionsVersion()
   const whitelistVersion = useCollateralWhitelistVersion()
+  const blacklistVersion = useMarketBlacklistVersion()
 
   const riskStatusByKey = useMemo(() => {
     void decisionsVersion
     void whitelistVersion
+    void blacklistVersion
     const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
     for (const m of markets) {
       const key = `${m.chainId}:${m.id.toLowerCase()}`
@@ -463,7 +466,7 @@ export function AdvancedList() {
       }).status
     }
     return out
-  }, [decisionsVersion, markets, whitelistVersion])
+  }, [blacklistVersion, decisionsVersion, markets, whitelistVersion])
 
   const visibleMarkets = useMemo(() => {
     return markets.filter((m) => {

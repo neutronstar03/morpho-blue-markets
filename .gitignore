@@ -20,3 +20,6 @@ scripts/.cache/
 
 # Local clone of artifacts repo
 artifacts/
+
+# Optional pull-once datasets (do not commit)
+public/blacklist.markets.json

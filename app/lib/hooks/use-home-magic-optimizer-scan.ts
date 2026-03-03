@@ -6,6 +6,7 @@ import { useAccount, usePublicClient } from 'wagmi'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress } from '~/lib/hooks/rpc/use-morpho'
+import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
@@ -84,9 +85,11 @@ export function useHomeMagicOptimizerScan() {
 
   const decisionsVersion = useCollateralDecisionsVersion()
   const whitelistVersion = useCollateralWhitelistVersion()
+  const blacklistVersion = useMarketBlacklistVersion()
   const selectedUserMarketsSafe = useMemo(() => {
     void decisionsVersion
     void whitelistVersion
+    void blacklistVersion
     if (!chainId)
       return selectedUserMarkets
     return selectedUserMarkets.filter((p) => {
@@ -101,7 +104,7 @@ export function useHomeMagicOptimizerScan() {
       }).status
       return status !== 'black'
     })
-  }, [chainId, decisionsVersion, selectedUserMarkets, whitelistVersion])
+  }, [blacklistVersion, chainId, decisionsVersion, selectedUserMarkets, whitelistVersion])
 
   const positions = useMemo<UserSupplyPosition[]>(() => {
     const out: UserSupplyPosition[] = []
