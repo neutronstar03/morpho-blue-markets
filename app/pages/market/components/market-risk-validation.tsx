@@ -21,15 +21,17 @@ const GECKOTERMINAL_NETWORK_BY_CHAIN: Record<number, string> = {
   747474: 'katana',
 }
 
-const DEXSCREENER_CHAIN_BY_ID: Record<number, string> = {
-  1: 'ethereum',
+const DEFINED_CHAIN_BY_ID: Record<number, string> = {
+  1: 'eth',
   42161: 'arbitrum',
   8453: 'base',
-  10: 'optimism',
+  10: 'op',
   137: 'polygon',
   130: 'unichain',
   999: 'hyperevm',
   747474: 'katana',
+  143: 'monad',
+  988: 'stable',
 }
 
 const COINGECKO_PLATFORM_BY_CHAIN: Record<number, string> = {
@@ -51,10 +53,16 @@ function getGeckoTerminalTokenUrl(chainId: number, address: string) {
 }
 
 function getDexscreenerTokenUrl(chainId: number, address: string) {
-  const chain = DEXSCREENER_CHAIN_BY_ID[chainId]
+  void chainId
+  // Dexscreener deep links are pool/pair based; search reliably finds pools for a token.
+  return `https://dexscreener.com/search?q=${address.toLowerCase()}`
+}
+
+function getDefinedTokenUrl(chainId: number, address: string) {
+  const chain = DEFINED_CHAIN_BY_ID[chainId]
   if (!chain)
     return ''
-  return `https://dexscreener.com/${chain}/${address.toLowerCase()}`
+  return `https://www.defined.fi/${chain}/${address.toLowerCase()}`
 }
 
 function getCoingeckoContractUrl(chainId: number, address: string) {
@@ -93,6 +101,7 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
   const geckoTerminalUrl = getGeckoTerminalTokenUrl(chainId, collateralAddress)
   const dexscreenerUrl = getDexscreenerTokenUrl(chainId, collateralAddress)
   const coingeckoUrl = getCoingeckoContractUrl(chainId, collateralAddress)
+  const definedUrl = getDefinedTokenUrl(chainId, collateralAddress)
 
   return (
     <div className="mb-4 rounded-xl border border-orange-500/30 bg-orange-500/5 p-3 sm:p-4 shadow-[0_0_15px_rgba(249,115,22,0.05)]">
@@ -137,6 +146,18 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
                   aria-label="Open collateral on Dexscreener"
                 >
                   <img src="/logos/dexscreener-48.png" alt="Dexscreener" className="h-5 w-5 rounded-[4px]" />
+                </a>
+              )}
+              {definedUrl && (
+                <a
+                  href={definedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/10 hover:bg-white/15 transition-colors"
+                  title="Open on Defined.fi"
+                  aria-label="Open collateral on Defined.fi"
+                >
+                  <span className="text-[11px] font-semibold text-white/90 tracking-wide">DF</span>
                 </a>
               )}
               {coingeckoUrl && (
