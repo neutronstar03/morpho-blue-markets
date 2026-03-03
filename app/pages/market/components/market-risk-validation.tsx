@@ -52,12 +52,6 @@ function getGeckoTerminalTokenUrl(chainId: number, address: string) {
   return `https://www.geckoterminal.com/${network}/tokens/${address.toLowerCase()}`
 }
 
-function getDexscreenerTokenUrl(chainId: number, address: string) {
-  void chainId
-  // Dexscreener deep links are pool/pair based; search reliably finds pools for a token.
-  return `https://dexscreener.com/search?q=${address.toLowerCase()}`
-}
-
 function getDefinedTokenUrl(chainId: number, address: string) {
   const chain = DEFINED_CHAIN_BY_ID[chainId]
   if (!chain)
@@ -99,7 +93,6 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
 
   const explorerUrl = getExplorerUrl(chainId, collateralAddress as `0x${string}`)
   const geckoTerminalUrl = getGeckoTerminalTokenUrl(chainId, collateralAddress)
-  const dexscreenerUrl = getDexscreenerTokenUrl(chainId, collateralAddress)
   const coingeckoUrl = getCoingeckoContractUrl(chainId, collateralAddress)
   const definedUrl = getDefinedTokenUrl(chainId, collateralAddress)
 
@@ -136,18 +129,6 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
                   <img src="/logos/geckoterminal-48.png" alt="GeckoTerminal" className="h-5 w-5 rounded-[4px]" />
                 </a>
               )}
-              {dexscreenerUrl && (
-                <a
-                  href={dexscreenerUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/10 hover:bg-white/15 transition-colors"
-                  title="Open on Dexscreener"
-                  aria-label="Open collateral on Dexscreener"
-                >
-                  <img src="/logos/dexscreener-48.png" alt="Dexscreener" className="h-5 w-5 rounded-[4px]" />
-                </a>
-              )}
               {definedUrl && (
                 <a
                   href={definedUrl}
@@ -157,7 +138,7 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
                   title="Open on Defined.fi"
                   aria-label="Open collateral on Defined.fi"
                 >
-                  <span className="text-[11px] font-semibold text-white/90 tracking-wide">DF</span>
+                  <img src="/logos/definedfi-48.png" alt="Defined.fi" className="h-5 w-5 rounded-[4px]" />
                 </a>
               )}
               {coingeckoUrl && (
