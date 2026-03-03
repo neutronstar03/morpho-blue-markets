@@ -15,13 +15,18 @@ export function MarketDisplay({ market }: MarketDisplayProps) {
   return (
     <div className="sm:bg-gray-800 sm:rounded-lg sm:shadow-lg sm:border sm:border-gray-700 overflow-hidden">
       <MarketHeader market={market} />
-      <div className="px-4 sm:px-6 pt-4">
+      <div className="px-4 sm:px-6 pt-4 md:hidden">
         <MarketRiskValidation market={market} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2">
         <MarketDetails market={market} />
 
-        <MarketActions market={market} />
+        <div className="flex flex-col">
+          <div className="hidden md:block p-6 pb-0">
+            <MarketRiskValidation market={market} />
+          </div>
+          <MarketActions market={market} />
+        </div>
       </div>
     </div>
   )
