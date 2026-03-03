@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.0 - 2026-03-03
+
+### Introduced
+- feat: collateral whitelist + market blacklist can be loaded at runtime (local `public/*.json`, artifacts repo fallback, and browser cache).
+- feat: unknown collateral review on Market page with manual approve/ban decisions.
+- feat: scripts to generate datasets locally (`gen:*`) and to pull artifacts once for offline dev (`artifacts:pull`).
+
+### Changed
+- ui: highlight unknown collaterals as `yellow` while keeping optimizer execution enabled.
+- ui: market unknown-collateral panel is constrained to the right column on desktop.
+- ui: prefer Defined.fi token deep links for collateral review.
+- ci: GitHub Pages deploy is tag-only (`v*`) with manual dispatch support.
+
 ## v1.1.30 - 2026-02-25
 
 ### Changed

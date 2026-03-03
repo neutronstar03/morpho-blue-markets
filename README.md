@@ -71,6 +71,6 @@ See `CHANGELOG.md` for the full release history. Recent updates:
 
 ## Live Version
 
-A live version of this project is automatically built and deployed via GitHub Actions. You can access it on GitHub Pages:
+A live version of this project can be deployed via GitHub Actions to GitHub Pages (tag-driven releases). You can access it here:
 
 [https://neutronstar03.github.io/morpho-blue-markets/](https://neutronstar03.github.io/morpho-blue-markets/)
