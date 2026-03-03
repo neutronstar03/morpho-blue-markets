@@ -15,6 +15,11 @@ All notable changes to this project will be documented in this file.
 - ui: prefer Defined.fi token deep links for collateral review.
 - ci: GitHub Pages deploy is tag-only (`v*`) with manual dispatch support.
 
+## v1.2.1 - 2026-03-03
+
+### Fixed
+- fix: market unknown-collateral panel icons now resolve correctly on GitHub Pages subpaths (BASE_URL-aware).
+
 ## v1.1.30 - 2026-02-25
 
 ### Changed
