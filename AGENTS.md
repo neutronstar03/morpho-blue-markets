@@ -96,4 +96,4 @@ Notes/pitfalls seen in practice:
 - Keep tasks actionable; move long-lived knowledge to docs/.
 
 ## House rules
-- Quote rule: use plain ASCII quotes only: 'single quotes' and "double quotes". Do not use "smart quotes".
+- Quote rule: use plain ASCII quotes in code/docs ('single quotes' and "double quotes"); avoid "smart quotes".
