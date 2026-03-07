@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.0 - 2026-03-03
+
+### Introduced
+- feat: collateral whitelist + market blacklist can be loaded at runtime (local `public/*.json`, artifacts repo fallback, and browser cache).
+- feat: unknown collateral review on Market page with manual approve/ban decisions.
+- feat: scripts to generate datasets locally (`gen:*`) and to pull artifacts once for offline dev (`artifacts:pull`).
+
+### Changed
+- ui: highlight unknown collaterals as `yellow` while keeping optimizer execution enabled.
+- ui: market unknown-collateral panel is constrained to the right column on desktop.
+- ui: prefer Defined.fi token deep links for collateral review.
+- ci: GitHub Pages deploy is tag-only (`v*`) with manual dispatch support.
+
+## v1.2.1 - 2026-03-03
+
+### Fixed
+- fix: market unknown-collateral panel icons now resolve correctly on GitHub Pages subpaths (BASE_URL-aware).
+
+## v1.1.30 - 2026-02-25
+
+### Changed
+- perf: supply optimizer candidate-market fetch now applies baseline quality filters on all chains (`netSupplyApy >= 1%`, `netSupplyApy <= 600%`, `borrowAssetsUsd >= $5`) to avoid scanning low-signal and pathological markets.
+- perf: applied the same candidate filters to Home Magic background scans for consistent behavior and faster end-to-end runs.
+
+## v1.1.29 - 2026-02-24
+
+### Changed
+- ux: home magic scan now starts only when the user is on the home route, but keeps running if navigation happens mid-scan.
+- fix: magic scan cooldown is now recorded when a scan actually completes, so interrupted scans do not block follow-up runs for 30 minutes.
+- ui: kept the magic header visual active while scanning across routes so users can see background optimizer activity.
+
 ## v1.1.28 - 2026-02-24
 
 ### Changed

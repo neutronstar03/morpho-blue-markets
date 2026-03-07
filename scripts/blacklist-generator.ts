@@ -2,7 +2,7 @@ import process from 'node:process'
 
 const MORPHO_GRAPHQL_URL = 'https://blue-api.morpho.org/graphql'
 
-const OUTPUT_PATH = 'app/lib/blacklist.markets.json'
+const OUTPUT_PATH = 'public/blacklist.markets.json'
 const PAGE_SIZE = 200
 
 interface MarketCandidate {

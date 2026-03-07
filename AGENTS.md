@@ -32,7 +32,7 @@ If you are unsure where a bug lives, start from the relevant file in `app/pages/
 - If IRM data is missing, show "----" or an explicit error (do not fake a fallback).
 - All Morpho markets use IRM; do not mention or implement non-IRM fallbacks in market preview logic.
 - Supply optimizer outputs use APR (blendedAprWad/supplyAprAfterWad), not APY; keep labels and calculations on APR.
-- Keep `app/lib/blacklist.markets.json` generator-shaped (`{ chainId, uniqueKey }` only); do not add manual notes there.
+- Keep `public/blacklist.markets.json` generator-shaped (`{ chainId, uniqueKey }` only); do not add manual notes there.
 - For manual/shady entries with context, prefer `app/lib/blacklist.assets.json` and use the `comment` field.
 
 ## Boundaries (do not do)
@@ -96,4 +96,4 @@ Notes/pitfalls seen in practice:
 - Keep tasks actionable; move long-lived knowledge to docs/.
 
 ## House rules
-- Quote rule: use plain ASCII quotes only: 'single quotes' and "double quotes". Do not use "smart quotes".
+- Quote rule: use plain ASCII quotes in code/docs ('single quotes' and "double quotes"); avoid "smart quotes".

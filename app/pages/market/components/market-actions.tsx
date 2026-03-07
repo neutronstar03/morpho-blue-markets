@@ -86,7 +86,7 @@ export function MarketActions({ market }: MarketActionsProps) {
       <div className="mb-6">
         <MarketPosition market={market} />
       </div>
-      <div className="pt-6 border-t border-gray-700">
+      <div className="pt-6">
         <div className="mb-4 grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
           <StatPill
             className="flex-1"

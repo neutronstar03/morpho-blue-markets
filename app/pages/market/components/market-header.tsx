@@ -27,10 +27,10 @@ export function MarketHeader({ market }: MarketHeaderProps) {
   const morphoMarketUrl = morphoAppMarketUrl(chainName, market.uniqueKey)
 
   return (
-    <div className="p-6 border-b border-gray-700">
-      <div className="flex justify-between items-start mb-4">
+    <div className="p-4 sm:p-6 border-b border-gray-700">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-x-2">
+          <h2 className="text-2xl font-bold text-white mb-2 flex flex-wrap items-center gap-x-2">
             <a
               className="flex items-center gap-x-2 hover:text-blue-400 transition-colors"
               href={collateralAssetExplorerUrl}
@@ -40,7 +40,7 @@ export function MarketHeader({ market }: MarketHeaderProps) {
               {market.collateralAsset.symbol}
               <LinkNewWindow className="w-4 h-4" />
             </a>
-            /
+            <span className="text-gray-500 mx-1">/</span>
             <a
               className="flex items-center gap-x-2 hover:text-blue-400 transition-colors"
               href={loanAssetExplorerUrl}
@@ -53,13 +53,13 @@ export function MarketHeader({ market }: MarketHeaderProps) {
           </h2>
           <p className="text-sm text-gray-400 mt-1">{chainName}</p>
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right">
           <p className="text-sm text-gray-400">Market ID</p>
           <a
             href={morphoMarketUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-mono text-sm text-gray-300 hover:text-blue-400 transition-colors inline-flex items-center gap-x-2"
+            className="font-mono text-sm text-gray-300 hover:text-blue-400 transition-colors inline-flex items-center gap-x-2 mt-1"
             title="Open in Morpho official UI"
           >
             {formatAddress(market.uniqueKey)}

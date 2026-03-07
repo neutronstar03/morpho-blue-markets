@@ -1,9 +1,14 @@
 import type { UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAccount, usePublicClient } from 'wagmi'
+import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress } from '~/lib/hooks/rpc/use-morpho'
+import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
+import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { getHomeMagicLastRunMs, setHomeMagicLastRunMs } from '../stores/home-magic-last-run'
@@ -24,6 +29,9 @@ const OPTIMIZER_READ_CACHE_TTL_MS = 60_000
 const THIRTY_MINUTES_MS = 30 * 60 * 1000
 const PRECOMPUTED_RESULT_TTL_MS = 30_000
 const PERIODIC_RESCAN_CHECK_MS = 60 * 1000
+const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
+const MAX_CANDIDATE_NET_SUPPLY_APY = 6
+const MIN_CANDIDATE_BORROW_USD = 5
 
 export function useHomeMagicOptimizerScan() {
   const { isConnected, address: userAddress, chain } = useAccount()
@@ -35,6 +43,7 @@ export function useHomeMagicOptimizerScan() {
 
   const {
     isScanning,
+    scanChainId,
     startScan,
     setScanProgress,
     finishScan,
@@ -55,6 +64,9 @@ export function useHomeMagicOptimizerScan() {
   }>(null)
 
   const runIdRef = useRef(1)
+  const queueLengthRef = useRef(0)
+  const location = useLocation()
+  const isHomeRoute = location.pathname === '/'
 
   const activeAsset = queue[queueIndex]
   const chainId = chain?.id
@@ -71,10 +83,33 @@ export function useHomeMagicOptimizerScan() {
     })
   }, [activeAsset, livePositions])
 
+  const decisionsVersion = useCollateralDecisionsVersion()
+  const whitelistVersion = useCollateralWhitelistVersion()
+  const blacklistVersion = useMarketBlacklistVersion()
+  const selectedUserMarketsSafe = useMemo(() => {
+    void decisionsVersion
+    void whitelistVersion
+    void blacklistVersion
+    if (!chainId)
+      return selectedUserMarkets
+    return selectedUserMarkets.filter((p) => {
+      const status = getMarketRisk({
+        chainId,
+        uniqueKey: p.market.uniqueKey,
+        loanAssetAddress: p.market.loanAsset.address,
+        collateralAssetAddress: p.market.collateralAsset.address,
+        loanAssetSymbol: p.market.loanAsset.symbol,
+        collateralAssetSymbol: p.market.collateralAsset.symbol,
+        warnings: p.market.warnings,
+      }).status
+      return status !== 'black'
+    })
+  }, [blacklistVersion, chainId, decisionsVersion, selectedUserMarkets, whitelistVersion])
+
   const positions = useMemo<UserSupplyPosition[]>(() => {
     const out: UserSupplyPosition[] = []
 
-    for (const p of selectedUserMarkets) {
+    for (const p of selectedUserMarketsSafe) {
       const marketSupplyAssets = BigInt(p.market.state.supplyAssets)
       const marketSupplyShares = BigInt(p.market.state.supplyShares)
       const userSupplyShares = BigInt(p.userState.supplyShares)
@@ -92,9 +127,13 @@ export function useHomeMagicOptimizerScan() {
     }
 
     return out
-  }, [selectedUserMarkets])
+  }, [selectedUserMarketsSafe])
 
-  const topMarketsQuery = useMarketsByChain(activeAsset ? chainId : undefined, activeAsset?.address)
+  const topMarketsQuery = useMarketsByChain(activeAsset ? chainId : undefined, activeAsset?.address, {
+    minNetSupplyApy: MIN_CANDIDATE_NET_SUPPLY_APY,
+    maxNetSupplyApy: MAX_CANDIDATE_NET_SUPPLY_APY,
+    minBorrowUsd: MIN_CANDIDATE_BORROW_USD,
+  })
   const topMarkets = topMarketsQuery.data
 
   const optimizeReadResult = useSupplyOptimizerReads({
@@ -108,18 +147,24 @@ export function useHomeMagicOptimizerScan() {
     },
   })
 
-  const advanceQueue = () => {
+  useEffect(() => {
+    queueLengthRef.current = queue.length
+  }, [queue.length])
+
+  const advanceQueue = useCallback(() => {
     setRequest(null)
     setQueueIndex((prev) => {
       const next = prev + 1
-      if (next >= queue.length) {
+      if (next >= queueLengthRef.current) {
+        if (scanChainId != null)
+          setHomeMagicLastRunMs(scanChainId, Date.now())
         finishScan()
         setQueue([])
         return prev
       }
       return next
     })
-  }
+  }, [finishScan, scanChainId])
 
   useEffect(() => {
     if (isConnected && userAddress && chainId)
@@ -144,12 +189,7 @@ export function useHomeMagicOptimizerScan() {
     }
   }, [chainId, isConnected, userAddress])
 
-  useEffect(() => {
-    if (!isConnected || !userAddress || !chainId || isLoadingPositions)
-      return
-    if (isScanning)
-      return
-
+  const scanAssets = useMemo(() => {
     const assetsMap = new Map<string, ScanAsset>()
     for (const p of (livePositions ?? [])) {
       if (p.userState.supplyShares <= 0n)
@@ -164,8 +204,24 @@ export function useHomeMagicOptimizerScan() {
       }
     }
 
-    const assets = [...assetsMap.values()].sort((a, b) => a.symbol.localeCompare(b.symbol))
-    if (assets.length === 0)
+    return [...assetsMap.values()].sort((a, b) => a.symbol.localeCompare(b.symbol))
+  }, [livePositions])
+
+  const canInitializeScan = useMemo(() => {
+    return isConnected
+      && !!userAddress
+      && !!chainId
+      && !isLoadingPositions
+      && isHomeRoute
+      && !isScanning
+  }, [chainId, isConnected, isHomeRoute, isLoadingPositions, isScanning, userAddress])
+
+  useEffect(() => {
+    if (!canInitializeScan)
+      return
+    if (!chainId)
+      return
+    if (scanAssets.length === 0)
       return
 
     const now = Date.now()
@@ -173,12 +229,11 @@ export function useHomeMagicOptimizerScan() {
     if (lastRun != null && now - lastRun < THIRTY_MINUTES_MS)
       return
 
-    setHomeMagicLastRunMs(chainId, now)
     clearOpportunitiesForChain(chainId)
-    setQueue(assets)
+    setQueue(scanAssets)
     setQueueIndex(0)
-    startScan({ chainId, totalAssets: assets.length })
-  }, [chainId, clearOpportunitiesForChain, isConnected, isLoadingPositions, isScanning, livePositions, rescanCheckTick, startScan, userAddress])
+    startScan({ chainId, totalAssets: scanAssets.length })
+  }, [canInitializeScan, chainId, clearOpportunitiesForChain, rescanCheckTick, scanAssets, startScan])
 
   useEffect(() => {
     if (!isScanning)
@@ -207,13 +262,35 @@ export function useHomeMagicOptimizerScan() {
 
     for (const m of topMarkets) {
       const id = m.uniqueKey.toLowerCase()
+      const status = getMarketRisk({
+        chainId,
+        uniqueKey: m.uniqueKey,
+        loanAssetAddress: m.loanAsset?.address,
+        collateralAssetAddress: m.collateralAsset?.address,
+        loanAssetSymbol: m.loanAsset?.symbol,
+        collateralAssetSymbol: m.collateralAsset?.symbol,
+        warnings: m.warnings,
+      }).status
+      if (status === 'black')
+        continue
       universe.set(id, {
         uniqueKey: m.uniqueKey as `0x${string}`,
         irmAddress: m.irmAddress as `0x${string}`,
       })
     }
-    for (const p of selectedUserMarkets) {
+    for (const p of selectedUserMarketsSafe) {
       const id = p.market.uniqueKey.toLowerCase()
+      const status = getMarketRisk({
+        chainId,
+        uniqueKey: p.market.uniqueKey,
+        loanAssetAddress: p.market.loanAsset.address,
+        collateralAssetAddress: p.market.collateralAsset.address,
+        loanAssetSymbol: p.market.loanAsset.symbol,
+        collateralAssetSymbol: p.market.collateralAsset.symbol,
+        warnings: p.market.warnings,
+      }).status
+      if (status === 'black')
+        continue
       universe.set(id, {
         uniqueKey: p.market.uniqueKey as `0x${string}`,
         irmAddress: p.market.irmAddress as `0x${string}`,
@@ -229,7 +306,7 @@ export function useHomeMagicOptimizerScan() {
       positions,
       markets: [...universe.values()],
     })
-  }, [activeAsset, isScanning, positions, request, selectedUserMarkets, topMarkets, topMarketsQuery.isError, topMarketsQuery.isFetching, topMarketsQuery.isLoading])
+  }, [activeAsset, chainId, isScanning, positions, request, selectedUserMarketsSafe, topMarkets, topMarketsQuery.isError, topMarketsQuery.isFetching, topMarketsQuery.isLoading])
 
   useEffect(() => {
     if (!request || !optimizeReadResult || !activeAsset)

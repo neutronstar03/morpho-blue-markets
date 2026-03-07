@@ -1,99 +1,36 @@
+import type { QueryMarketsByChainResult, SupplyMarketData } from '~/lib/graphql/queries/markets-by-chain'
 import { useQuery } from '@tanstack/react-query'
-import { gql } from 'graphql-request'
 import { useMemo } from 'react'
+import { MarketOrderBy, OrderDirection, QUERY_MARKETS_BY_CHAIN } from '~/lib/graphql/queries/markets-by-chain'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
 import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
+import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
-// A specific, isolated type for this hook, containing only the fields required
-// for the supply-side of the `useLiveMarketPositions` hook.
-export interface SupplyMarketData {
-  uniqueKey: string
-  irmAddress: string
-  loanAsset: {
-    address: string
-    symbol: string
-    name?: string | null
-    decimals?: number | null
-    chain?: {
-      id: number
-      network?: string | null
-    }
-  }
-  collateralAsset: {
-    address: string
-    symbol: string
-    name?: string | null
-    decimals?: number | null
-  }
-  state: {
-    netSupplyApy: number
-    supplyApy: number
-    supplyAssets: string
-    supplyShares: string
-    supplyAssetsUsd?: number
-  }
+
+interface MarketFiltersWithChain {
+  chainId_in?: number[]
+  loanAssetAddress_in?: string[]
+  netSupplyApy_gte?: number
+  netSupplyApy_lte?: number
+  borrowAssetsUsd_gte?: number
 }
 
-interface MarketFiltersWithChain { chainId_in?: number[] }
-enum MarketOrderBy { NetSupplyApy = 'NetSupplyApy' }
-enum OrderDirection { Desc = 'Desc' }
-
-interface QueryMarketsByChainResult {
-  markets: {
-    items: SupplyMarketData[]
-  }
+export interface UseMarketsByChainOptions {
+  minNetSupplyApy?: number
+  maxNetSupplyApy?: number
+  minBorrowUsd?: number
 }
 
-// This query is self-contained and fetches only the minimal fields required
-// for the supply-side of the `useLiveMarketPositions` hook.
-export const QUERY_MARKETS_BY_CHAIN = gql`
-  query GetMarketsByChain(
-    $first: Int!
-    $skip: Int!
-    $where: MarketFilters
-    $orderBy: MarketOrderBy
-    $orderDirection: OrderDirection
-  ) {
-    markets(
-      first: $first
-      skip: $skip
-      orderBy: $orderBy
-      orderDirection: $orderDirection
-      where: $where
-    ) {
-      items {
-        uniqueKey
-        irmAddress
-        loanAsset {
-          address
-          symbol
-          name
-          decimals
-          chain { id network }
-        }
-        collateralAsset {
-          address
-          symbol
-          name
-          decimals
-        }
-        state {
-          netSupplyApy
-          supplyApy
-          supplyAssets
-          supplyShares
-          supplyAssetsUsd
-        }
-      }
-    }
-  }
-`
-
-export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
+export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, opts: UseMarketsByChainOptions = {}) {
   const loanAssetAddrLower = loanAssetAddress?.toLowerCase()
+  const {
+    minNetSupplyApy,
+    maxNetSupplyApy,
+    minBorrowUsd,
+  } = opts
 
   const query = useQuery<SupplyMarketData[]>({
-    queryKey: ['markets-by-chain', chainId, loanAssetAddrLower],
+    queryKey: ['markets-by-chain', chainId, loanAssetAddrLower, minNetSupplyApy, maxNetSupplyApy, minBorrowUsd],
     queryFn: async () => {
       if (!chainId)
         return []
@@ -101,9 +38,15 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
       const first = 200
       let skip = 0
 
-      const where: MarketFiltersWithChain & { loanAssetAddress_in?: string[] } = { chainId_in: [chainId] }
+      const where: MarketFiltersWithChain = { chainId_in: [chainId] }
       if (loanAssetAddrLower)
         where.loanAssetAddress_in = [loanAssetAddrLower]
+      if (Number.isFinite(minNetSupplyApy))
+        where.netSupplyApy_gte = minNetSupplyApy
+      if (Number.isFinite(maxNetSupplyApy))
+        where.netSupplyApy_lte = maxNetSupplyApy
+      if (Number.isFinite(minBorrowUsd))
+        where.borrowAssetsUsd_gte = minBorrowUsd
 
       const markets: SupplyMarketData[] = []
 
@@ -134,7 +77,7 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string) {
         loanAssetSymbol: market.loanAsset?.symbol,
         collateralAssetSymbol: market.collateralAsset?.symbol,
         chainId,
-      }))
+      })).filter(m => !isOracleMisconfiguredWarning(m.warnings))
     },
     enabled: !!chainId,
     staleTime: STALE_TIME_LONG_MS,

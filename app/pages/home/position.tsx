@@ -8,7 +8,9 @@ import { useAccount } from 'wagmi'
 import { Badge, BadgeLabel } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
+import { MarketRiskText } from '~/components/ui/market-risk-text'
 import { getSupportedChainName } from '~/lib/addresses'
+import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import {
@@ -17,6 +19,9 @@ import {
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
+import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
+import { getMarketRisk } from '~/lib/market-risk/market-risk'
 
 // This component is the general position in the homepage
 
@@ -35,11 +40,13 @@ function PositionListItem({
   chainId,
   liveApr,
   totalYearlyUsd,
+  riskStatus,
 }: {
   position: LiveMarketPosition
   chainId: number
   liveApr?: number
   totalYearlyUsd?: number
+  riskStatus?: 'white' | 'blue' | 'yellow' | 'purple' | 'black'
 }) {
   const marketSupplyAssets = BigInt(position.market.state.supplyAssets)
   const marketSupplyShares = BigInt(position.market.state.supplyShares)
@@ -86,9 +93,9 @@ function PositionListItem({
         <div className="flex flex-row justify-between items-center">
           <div className="space-y-0.5 sm:space-y-1">
             <div>
-              <p className="text-base sm:text-lg font-semibold text-white">
+              <MarketRiskText status={riskStatus} size="xl" className="font-semibold">
                 {`${position.market.collateralAsset.symbol} / ${position.market.loanAsset.symbol}`}
-              </p>
+              </MarketRiskText>
               <p className="text-xs text-gray-500">
                 {getSupportedChainName(chainId)}
               </p>
@@ -134,6 +141,40 @@ function PositionClient() {
 
   const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
   const { aprByMarketKey } = useLiveMarketApr(markets)
+
+  const decisionsVersion = useCollateralDecisionsVersion()
+  const whitelistVersion = useCollateralWhitelistVersion()
+  const blacklistVersion = useMarketBlacklistVersion()
+  const riskStatusByKey = useMemo(() => {
+    void decisionsVersion
+    void whitelistVersion
+    void blacklistVersion
+    const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
+    if (!chain?.id)
+      return out
+    for (const p of (positions ?? [])) {
+      const key = `${chain.id}:${p.market.uniqueKey.toLowerCase()}`
+      out[key] = getMarketRisk({
+        chainId: chain.id,
+        uniqueKey: p.market.uniqueKey,
+        loanAssetAddress: p.market.loanAsset.address,
+        collateralAssetAddress: p.market.collateralAsset.address,
+        loanAssetSymbol: p.market.loanAsset.symbol,
+        collateralAssetSymbol: p.market.collateralAsset.symbol,
+        warnings: p.market.warnings,
+      }).status
+    }
+    return out
+  }, [blacklistVersion, chain?.id, decisionsVersion, positions, whitelistVersion])
+
+  const visiblePositions = useMemo(() => {
+    if (!chain?.id)
+      return positions ?? []
+    return (positions ?? []).filter((p) => {
+      const key = `${chain.id}:${p.market.uniqueKey.toLowerCase()}`
+      return riskStatusByKey[key] !== 'black'
+    })
+  }, [chain?.id, positions, riskStatusByKey])
 
   const [timeAgo, setTimeAgo] = useState('')
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
@@ -279,7 +320,7 @@ function PositionClient() {
           ? (
               <p className="text-gray-400">Loading your positions...</p>
             )
-          : positions && positions.length === 0
+          : visiblePositions && visiblePositions.length === 0
             ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mb-4">
@@ -291,17 +332,22 @@ function PositionClient() {
               )
             : (
                 <ul className="space-y-2 sm:space-y-3">
-                  {positions
+                  {visiblePositions
                     && chain?.id
-                    && positions.map((position: LiveMarketPosition) => (
-                      <PositionListItem
-                        key={position.market.uniqueKey}
-                        position={position}
-                        chainId={chain.id}
-                        liveApr={aprByMarketKey[position.market.uniqueKey]?.apr}
-                        totalYearlyUsd={portfolio.yearlyUsd}
-                      />
-                    ))}
+                    && visiblePositions.map((position: LiveMarketPosition) => {
+                      const key = `${chain.id}:${position.market.uniqueKey.toLowerCase()}`
+                      const riskStatus = riskStatusByKey[key]
+                      return (
+                        <PositionListItem
+                          key={position.market.uniqueKey}
+                          position={position}
+                          chainId={chain.id}
+                          liveApr={aprByMarketKey[position.market.uniqueKey]?.apr}
+                          totalYearlyUsd={portfolio.yearlyUsd}
+                          riskStatus={riskStatus}
+                        />
+                      )
+                    })}
                 </ul>
               )}
         {(portfolio.totalAssetsUsd != null || (portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null)) && (

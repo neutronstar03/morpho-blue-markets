@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
 import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
+import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
 
 // Data returned from the GraphQL query for each position
@@ -22,6 +23,10 @@ export interface UserPosition {
     } | null
     irmAddress: string
     lltv: string
+    warnings?: Array<{
+      type: string
+      level: 'YELLOW' | 'RED'
+    }>
     state: {
       netSupplyApy: number
       supplyAssets: string
@@ -68,6 +73,7 @@ export const QUERY_USER_POSITIONS = gql`
           }
           irmAddress
           lltv
+          warnings { type level }
           state {
             netSupplyApy
             supplyAssets
@@ -111,7 +117,7 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
         loanAssetSymbol: position.market.loanAsset.symbol,
         collateralAssetSymbol: position.market.collateralAsset.symbol,
         chainId,
-      }))
+      })).filter(position => !isOracleMisconfiguredWarning(position.market.warnings))
     },
     enabled: !!userAddress && !!chainId,
     staleTime: 30 * 1000, // 30 seconds - positions don't change that often

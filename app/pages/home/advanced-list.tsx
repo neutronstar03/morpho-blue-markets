@@ -7,6 +7,7 @@ import { useAccount } from 'wagmi'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
+import { MarketRiskText } from '~/components/ui/market-risk-text'
 import {
   Select,
   SelectContent,
@@ -15,6 +16,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { getSupportedChainName, supportedChainIdMap } from '~/lib/addresses'
+import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
 import {
   MarketOrderBy,
@@ -24,6 +26,9 @@ import {
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
+import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
+import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 
 const CONFIG = {
@@ -116,6 +121,7 @@ interface MarketData {
   oracleAddress?: string
   irmAddress: string
   lltv?: string
+  warnings?: Array<{ type: string, level: 'YELLOW' | 'RED' }>
 }
 
 interface MarketFiltersProps {
@@ -242,6 +248,7 @@ interface MarketTableProps {
   canComputeLiveApr: boolean
   liveChainId?: number
   hideChainColumn: boolean
+  riskStatusByKey: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined>
 }
 
 function MarketTable({
@@ -252,6 +259,7 @@ function MarketTable({
   canComputeLiveApr,
   liveChainId,
   hideChainColumn,
+  riskStatusByKey,
 }: MarketTableProps) {
   if (isLoading) {
     return (
@@ -291,9 +299,11 @@ function MarketTable({
                 <div className="flex items-center gap-2">
                   <Link
                     to={`/market/${market.id}/${market.chainId}`}
-                    className="hover:text-blue-400 transition-colors"
+                    className="hover:opacity-90 transition-opacity"
                   >
-                    {market.marketLabel}
+                    <MarketRiskText status={riskStatusByKey[`${market.chainId}:${market.id.toLowerCase()}`]}>
+                      {market.marketLabel}
+                    </MarketRiskText>
                   </Link>
                   <a
                     href={morphoAppMarketUrl(market.chainName, market.id)}
@@ -430,8 +440,40 @@ export function AdvancedList() {
       oracleAddress: market.oracleAddress || undefined,
       irmAddress: market.irmAddress,
       lltv: market.lltv || undefined,
+      warnings: market.warnings,
     }))
   }, [marketsData, displayRateType])
+
+  const decisionsVersion = useCollateralDecisionsVersion()
+  const whitelistVersion = useCollateralWhitelistVersion()
+  const blacklistVersion = useMarketBlacklistVersion()
+
+  const riskStatusByKey = useMemo(() => {
+    void decisionsVersion
+    void whitelistVersion
+    void blacklistVersion
+    const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
+    for (const m of markets) {
+      const key = `${m.chainId}:${m.id.toLowerCase()}`
+      out[key] = getMarketRisk({
+        chainId: m.chainId,
+        uniqueKey: m.id,
+        loanAssetAddress: m.loanAddress,
+        collateralAssetAddress: m.collateralAddress,
+        loanAssetSymbol: m.marketLabel.split('/')[1]?.trim(),
+        collateralAssetSymbol: m.marketLabel.split('/')[0]?.trim(),
+        warnings: m.warnings,
+      }).status
+    }
+    return out
+  }, [blacklistVersion, decisionsVersion, markets, whitelistVersion])
+
+  const visibleMarkets = useMemo(() => {
+    return markets.filter((m) => {
+      const key = `${m.chainId}:${m.id.toLowerCase()}`
+      return riskStatusByKey[key] !== 'black'
+    })
+  }, [markets, riskStatusByKey])
 
   const { chainId: walletChainId } = useAccount()
   const selectedChainId = useMemo(() => {
@@ -514,13 +556,14 @@ export function AdvancedList() {
       />
 
       <MarketTable
-        markets={markets}
+        markets={visibleMarkets}
         isLoading={isLoading}
         rateType={displayRateType}
         immediateAprByMarketKey={aprByMarketKey}
         canComputeLiveApr={canComputeLiveApr}
         liveChainId={liveChainId}
         hideChainColumn={chainFilter !== 'ALL'}
+        riskStatusByKey={riskStatusByKey}
       />
     </Card>
   )

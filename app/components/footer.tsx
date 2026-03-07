@@ -81,7 +81,6 @@ export function Footer() {
     catch {} // Ignore storage errors and still refresh.
     window.location.reload()
   }
-
   return (
     <footer className="border-t border-gray-800 text-gray-400 text-xs">
       <Container className="py-4">

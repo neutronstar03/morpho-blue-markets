@@ -1,7 +1,6 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { useState } from 'react'
-import { Card } from '~/components/ui/card'
 import { formatLltv, formatPercent, formatUsd } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
@@ -61,7 +60,7 @@ export function MarketDetails({ market }: MarketDetailsProps) {
   const safuTip = 'SAFUNESS = usable liquidity / total supply (aggregated across all markets that share this collateral on this chain). 1.0x means usable liquidity equals total supply; liquidation may incur significant price impact. Assumes ~50% in collateral. ≥3.0x safer, <1.0x risky.'
 
   return (
-    <Card className="p-6 bg-gray-800/50">
+    <div className="p-6">
       <h2 className="text-xl font-semibold text-white mb-4">Market Details</h2>
 
       <DetailRow
@@ -214,6 +213,6 @@ export function MarketDetails({ market }: MarketDetailsProps) {
         value={formatPercent(market.state.avgSupplyApy ?? market.state.avgNetSupplyApy)}
       />
 
-    </Card>
+    </div>
   )
 }

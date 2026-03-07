@@ -7,7 +7,6 @@ import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
-import { useHomeMagicOptimizerScan } from '~/lib/hooks/use-home-magic-optimizer-scan'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { AdvancedList } from '~/pages/home/advanced-list'
 import { BatchWithdraw } from '~/pages/home/batch-withdraw'
@@ -22,8 +21,6 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export default function HomePage() {
-  useHomeMagicOptimizerScan()
-
   const { setRequiredChainId } = useNetworkContext()
   const { chain } = useAccount()
   const opportunities = useHomeMagicOptimizerStore(state => state.opportunities)

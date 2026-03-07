@@ -1,4 +1,5 @@
 import type { Address, Hex } from 'viem'
+import type { ExecutionGuard } from '~/lib/market-risk/types'
 import type { OptimizeSupplyWithPositionsResult } from '~/lib/optimizer/supply-optimizer'
 import { useEffect, useMemo, useState } from 'react'
 import { erc20Abi, formatUnits } from 'viem'
@@ -31,10 +32,11 @@ export interface BundleOptimizerResultProps {
   userAddress: Address
   userSupplySharesByMarketId: Map<string, bigint>
   loanToken: { address: Address, symbol: string, decimals: number }
+  executionGuard?: ExecutionGuard
 }
 
 export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
-  const { chainId, morphoAddress, userAddress, userSupplySharesByMarketId, displayResult, loanToken } = props
+  const { chainId, morphoAddress, userAddress, userSupplySharesByMarketId, displayResult, loanToken, executionGuard } = props
   const { chain } = useAccount()
 
   const bundlerCfg = useMemo(() => getBundler3Config(chainId), [chainId])
@@ -376,7 +378,7 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
         <Button
           onClick={onExecuteBundle}
           disabled={
-            !multicallSim.data?.request
+            executionGuard?.canExecute === false || !multicallSim.data?.request
             || !bundleBuild
             || !bundleBuild.ok
             || !isMorphoAuthorized

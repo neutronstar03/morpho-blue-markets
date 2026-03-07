@@ -44,7 +44,7 @@ export default function MarketPage() {
       <Header>
         <Link
           to="/"
-          className="text-xl font-semibold text-white"
+          className="text-lg sm:text-xl font-semibold text-white hover:text-gray-200 transition-colors"
         >
           <span className="sm:hidden">&larr; Back</span>
           <span className="hidden sm:inline">&larr; Back to Markets</span>
