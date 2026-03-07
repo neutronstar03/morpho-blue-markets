@@ -20,7 +20,7 @@ import { RouterLink } from 'vue-router'
         <span class="pill">Vue 3 + Vite</span>
         <span class="pill">Pinia</span>
         <span class="pill">Vue Query</span>
-        <span class="pill">@wagmi/vue</span>
+        <span class="pill">wagmi core</span>
       </div>
     </div>
 

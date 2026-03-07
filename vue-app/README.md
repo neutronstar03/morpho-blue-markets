@@ -14,7 +14,7 @@ Milestone 0 validates the Vue-native wallet stack before any route or optimizer 
 
 - Vite + Vue 3 + TypeScript app scaffold
 - Vue Router, Pinia, and Vue Query providers
-- Wagmi Vue wallet baseline with injected connector
+- Pinia-first wallet baseline backed by wagmi core
 - `/wallet-spike` route for connect, disconnect, required-chain, and switch-chain checks
 
 ## Manual QA
@@ -30,4 +30,4 @@ Open `http://localhost:5173/wallet-spike` and verify:
 ## Notes
 
 - RPC ordering is intentionally copied from the React app baseline in `app/lib/wagmi.ts`
-- The current wallet abstraction is intentionally thin for the spike; if the stack survives Milestone 0, the next pass should move page-facing wallet behavior behind a Pinia-first adapter
+- The wallet page reads from a Pinia store; wagmi stays behind the store boundary so page components do not depend on wagmi composables directly

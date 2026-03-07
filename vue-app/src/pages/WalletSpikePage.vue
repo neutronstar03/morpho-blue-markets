@@ -1,37 +1,33 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
-import { useWallet } from '../composables/useWallet'
-import { getSupportedChainName } from '../lib/wagmi'
+import { wagmiConfig } from '../lib/wagmi'
 import { useNetworkStore } from '../stores/network'
+import { useWalletStore } from '../stores/wallet'
 
 const networkStore = useNetworkStore()
 const { requiredChainId } = storeToRefs(networkStore)
+
+const walletStore = useWalletStore()
 
 const {
   address,
   availableConnectors,
   chainId,
-  connect,
   connectError,
-  disconnect,
+  connectorName,
+  currentChainName,
   disconnectError,
   isConnected,
   isConnecting,
   isDisconnecting,
+  isInitializing,
+  isWrongNetwork,
   isSwitchingChain,
-  supportedChains,
-  switchChain,
+  reconnectError,
+  requiredChainName,
+  status,
   switchChainError,
-} = useWallet()
-
-const isWrongNetwork = computed(() => {
-  return Boolean(isConnected.value && requiredChainId.value && chainId.value !== requiredChainId.value)
-})
-
-const requiredChainLabel = computed(() => getSupportedChainName(requiredChainId.value))
-
-const currentChainLabel = computed(() => getSupportedChainName(chainId.value))
+} = storeToRefs(walletStore)
 
 function onRequiredChainInput(event: Event) {
   const target = event.target as HTMLSelectElement
@@ -55,6 +51,10 @@ function onRequiredChainInput(event: Event) {
       </p>
 
       <div class="pill-row">
+        <span class="pill" :class="isInitializing ? '' : 'is-success'">
+          <span class="status-dot" />
+          {{ isInitializing ? 'Initializing' : 'Ready' }}
+        </span>
         <span class="pill" :class="isConnected ? 'is-success' : 'is-danger'">
           <span class="status-dot" />
           {{ isConnected ? 'Connected' : 'Disconnected' }}
@@ -108,16 +108,16 @@ function onRequiredChainInput(event: Event) {
           v-for="connector in availableConnectors"
           :key="connector.id"
           class="button"
-          :disabled="isConnecting"
-          @click="connect(connector.id)"
+          :disabled="isConnecting || !connector.isReady"
+          @click="walletStore.connectWallet(wagmiConfig, connector.id)"
         >
-          {{ isConnecting ? 'Connecting...' : `Connect ${connector.name}` }}
+          {{ isConnecting ? 'Connecting...' : connector.isReady ? `Connect ${connector.name}` : `${connector.name} unavailable` }}
         </button>
 
         <button
           class="button-danger"
           :disabled="!isConnected || isDisconnecting"
-          @click="disconnect"
+          @click="walletStore.disconnectWallet(wagmiConfig)"
         >
           {{ isDisconnecting ? 'Disconnecting...' : 'Disconnect' }}
         </button>
@@ -132,6 +132,9 @@ function onRequiredChainInput(event: Event) {
       <p v-if="disconnectError" class="error-line">
         Disconnect error: {{ disconnectError }}
       </p>
+      <p v-if="reconnectError" class="error-line">
+        Reconnect note: {{ reconnectError }}
+      </p>
     </div>
 
     <div class="panel hero-panel network-card">
@@ -145,7 +148,7 @@ function onRequiredChainInput(event: Event) {
           <option value="">
             No required chain
           </option>
-          <option v-for="chain in supportedChains" :key="chain.id" :value="chain.id">
+          <option v-for="chain in wagmiConfig.chains" :key="chain.id" :value="chain.id">
             {{ chain.name }} ({{ chain.id }})
           </option>
         </select>
@@ -155,9 +158,9 @@ function onRequiredChainInput(event: Event) {
         <button
           class="button-ghost"
           :disabled="!requiredChainId || !isConnected || !isWrongNetwork || isSwitchingChain"
-          @click="requiredChainId && switchChain(requiredChainId)"
+          @click="requiredChainId && walletStore.switchWalletChain(wagmiConfig, requiredChainId)"
         >
-          {{ isSwitchingChain ? 'Switching...' : `Switch to ${requiredChainLabel}` }}
+          {{ isSwitchingChain ? 'Switching...' : `Switch to ${requiredChainName}` }}
         </button>
         <button class="button-ghost" @click="networkStore.setRequiredChainId(null)">
           Clear required chain
@@ -165,7 +168,7 @@ function onRequiredChainInput(event: Event) {
       </div>
 
       <p class="helper">
-        Current chain: {{ currentChainLabel }} | Required chain: {{ requiredChainLabel }}
+        Current chain: {{ currentChainName }} | Required chain: {{ requiredChainName }}
       </p>
       <p v-if="switchChainError" class="error-line">
         Switch error: {{ switchChainError }}
@@ -173,6 +176,12 @@ function onRequiredChainInput(event: Event) {
     </div>
 
     <div class="panel hero-panel status-grid">
+      <div class="status-card">
+        <span class="status-label">status</span>
+        <p class="status-value mono">
+          {{ status }}
+        </p>
+      </div>
       <div class="status-card">
         <span class="status-label">isConnected</span>
         <p class="status-value">
@@ -183,6 +192,12 @@ function onRequiredChainInput(event: Event) {
         <span class="status-label">address</span>
         <p class="status-value mono">
           {{ address ?? 'Not connected' }}
+        </p>
+      </div>
+      <div class="status-card">
+        <span class="status-label">connector</span>
+        <p class="status-value mono">
+          {{ connectorName ?? 'None' }}
         </p>
       </div>
       <div class="status-card">
