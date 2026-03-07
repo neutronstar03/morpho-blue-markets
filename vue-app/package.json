@@ -1,0 +1,33 @@
+{
+  "name": "vue-app",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint .",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/vue-query": "^5.92.9",
+    "@wagmi/connectors": "^7.2.1",
+    "@wagmi/vue": "^0.5.0",
+    "pinia": "^3.0.4",
+    "viem": "^2.47.0",
+    "vue": "^3.5.25",
+    "vue-router": "^5.0.3",
+    "wagmi": "^3.5.0"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^7.7.0",
+    "@types/node": "^24.10.1",
+    "@vitejs/plugin-vue": "^6.0.2",
+    "@vue/tsconfig": "^0.8.1",
+    "eslint": "^10.0.3",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vue-tsc": "^3.1.5"
+  }
+}
