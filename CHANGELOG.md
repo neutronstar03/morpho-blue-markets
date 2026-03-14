@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.2 - 2026-03-15
+
+### Introduced
+- feat: Markets view now includes an optional Opportunity Recap that summarizes conservative chain-level deployable size from the current supply filters.
+
+### Changed
+- ui: recap toggle lives in the Markets header and the recap hides low-signal chains below a hardcoded minimum deployable threshold.
+- refactor: split Home Markets, Batch Withdraw, and Supply APR Optimizer into page-local submodules to keep feature-specific UI close to each tool.
+- refactor: deposit and withdraw forms now share local market-action form primitives for submit buttons, notices, and unit toggles.
+
 ## v1.2.0 - 2026-03-03
 
 ### Introduced
