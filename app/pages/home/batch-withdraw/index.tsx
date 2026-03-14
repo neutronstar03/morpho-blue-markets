@@ -1,9 +1,8 @@
 import type { Address } from 'viem'
+import type { BatchWithdrawExecutionState, BatchWithdrawPlanState, LoanAssetOption, MarketPlanItem } from './shared'
 import type { SupplyOptimizerMarketSnapshot } from '~/lib/optimizer/supply-optimizer'
-import { Maximize2, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { createSearchParams, Link } from 'react-router-dom'
-import { formatUnits } from 'viem'
 import {
   useAccount,
   useReadContract,
@@ -12,19 +11,8 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from 'wagmi'
-import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
-import { InfoTooltip } from '~/components/ui/info-tooltip'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 import { MORPHO_AUTH_ABI } from '~/lib/abis/bundler3'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
@@ -32,44 +20,14 @@ import { getBundler3Config } from '~/lib/bundler3/addresses'
 import { encodeGeneralAdapterMorphoWithdraw } from '~/lib/bundler3/encode'
 import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
 import { useBatchWithdraw } from '~/lib/contexts/batch-withdraw.context'
-import { formatBigintShort } from '~/lib/formatters'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
-import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
-import { pctFromWad, trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
-
-interface LoanAssetOption {
-  address: string
-  symbol: string
-  decimals: number
-}
-
-interface MarketPlanItem {
-  marketId: `0x${string}`
-  collateralSymbol: string
-  userSupplyShares: bigint
-  suppliedAssets: bigint
-  marketTotalSupplyAssets: bigint
-  marketTotalSupplyShares: bigint
-  liquidityAssets: bigint
-  liquidityShares: bigint
-  maxWithdrawShares: bigint
-  maxWithdrawAssets: bigint
-  supplyAprWad: bigint
-  plannedWithdrawAssets: bigint
-  plannedWithdrawShares: bigint
-  fullExit: boolean
-}
-
-function max0(x: bigint): bigint {
-  return x > 0n ? x : 0n
-}
-
-function minBigint(a: bigint, b: bigint): bigint {
-  return a < b ? a : b
-}
+import { BatchWithdrawExecutionPanel } from './execution-panel'
+import { BatchWithdrawForm } from './form'
+import { BatchWithdrawResults } from './results'
+import { max0, minBigint } from './shared'
 
 export function BatchWithdraw() {
   const ctx = useBatchWithdraw()
@@ -115,11 +73,7 @@ export function BatchWithdraw() {
   }, [loanAssetOptions, selectedLoanAssetAddress])
 
   const onChangeLoanAsset = (addr: string) => {
-    ctx.setSelection({
-      chainId,
-      loanAssetAddress: addr,
-    })
-    // Clear amount when switching assets to avoid accidental cross-token parses.
+    ctx.setSelection({ chainId, loanAssetAddress: addr })
     ctx.setWithdrawAmount(undefined)
     setExecuteError(undefined)
   }
@@ -229,12 +183,9 @@ export function BatchWithdraw() {
       const liquidityShares = totalSupplyAssets > 0n
         ? (liquidityAssets * totalSupplyShares) / totalSupplyAssets
         : 0n
-      // Safety margin (match WithdrawForm percent-mode Max): derive a percent from shares,
-      // round DOWN, then back off by 0.01% to avoid boundary reverts.
       const maxWithdrawSharesRaw = minBigint(userSupplyShares, liquidityShares)
       let maxWithdrawShares = maxWithdrawSharesRaw
       if (maxWithdrawSharesRaw > 0n && maxWithdrawSharesRaw < userSupplyShares) {
-        // 0..10000 (hundredths of percent)
         let percentHundredths = (maxWithdrawSharesRaw * 10_000n) / userSupplyShares
         if (percentHundredths > 10_000n)
           percentHundredths = 10_000n
@@ -245,7 +196,6 @@ export function BatchWithdraw() {
         maxWithdrawShares = minBigint(maxWithdrawSharesRaw, safeShares)
       }
 
-      // Final tiny backoff if we're still exactly at the liquidity edge.
       if (maxWithdrawShares > 0n && maxWithdrawShares === liquidityShares && maxWithdrawShares < userSupplyShares)
         maxWithdrawShares -= 1n
       const maxWithdrawAssets = totalSupplyShares > 0n && maxWithdrawShares > 0n
@@ -288,18 +238,18 @@ export function BatchWithdraw() {
     return { ok: true as const, error: undefined, items }
   }, [marketStatesRead.data, nowSec, rateAtTargetRead.data, selectedOption, selectedUserMarkets])
 
-  const plan = useMemo(() => {
+  const plan = useMemo<BatchWithdrawPlanState>(() => {
     if (!computedMarkets.ok)
-      return { ok: false as const, error: computedMarkets.error, items: [] as MarketPlanItem[], remaining: 0n, overWithdrawAssets: 0n, totalSupplied: 0n, totalWithdrawable: 0n }
+      return { ok: false, error: computedMarkets.error, items: [], remaining: 0n, overWithdrawAssets: 0n, totalSupplied: 0n, totalWithdrawable: 0n }
     const base = computedMarkets.items
 
     const totalSupplied = base.reduce((sum, x) => sum + x.suppliedAssets, 0n)
     const totalWithdrawable = base.reduce((sum, x) => sum + x.maxWithdrawAssets, 0n)
 
     if (!selectedOption)
-      return { ok: false as const, error: undefined, items: [], remaining: 0n, overWithdrawAssets: 0n, totalSupplied, totalWithdrawable }
+      return { ok: false, error: undefined, items: [], remaining: 0n, overWithdrawAssets: 0n, totalSupplied, totalWithdrawable }
     if (parsedWithdrawAssets <= 0n)
-      return { ok: false as const, error: undefined, items: [], remaining: 0n, overWithdrawAssets: 0n, totalSupplied, totalWithdrawable }
+      return { ok: false, error: undefined, items: [], remaining: 0n, overWithdrawAssets: 0n, totalSupplied, totalWithdrawable }
 
     const sorted = [...base].sort((a, b) => {
       if (a.supplyAprWad === b.supplyAprWad)
@@ -307,7 +257,6 @@ export function BatchWithdraw() {
       return a.supplyAprWad < b.supplyAprWad ? -1 : 1
     })
 
-    // If user requests >= total withdrawable, just withdraw max shares in each market.
     if (parsedWithdrawAssets >= totalWithdrawable) {
       const out = sorted
         .filter(m => m.maxWithdrawShares > 0n)
@@ -317,29 +266,17 @@ export function BatchWithdraw() {
           plannedWithdrawAssets: m.maxWithdrawAssets,
           fullExit: m.maxWithdrawShares === m.userSupplyShares,
         }))
-      return {
-        ok: true as const,
-        error: undefined,
-        items: out,
-        remaining: 0n,
-        overWithdrawAssets: 0n,
-        totalSupplied,
-        totalWithdrawable,
-      }
+      return { ok: true, error: undefined, items: out, remaining: 0n, overWithdrawAssets: 0n, totalSupplied, totalWithdrawable }
     }
 
     const assetsFromShares = (m: MarketPlanItem, shares: bigint): bigint => {
-      if (shares <= 0n)
-        return 0n
-      if (m.marketTotalSupplyShares <= 0n)
+      if (shares <= 0n || m.marketTotalSupplyShares <= 0n)
         return 0n
       return (shares * m.marketTotalSupplyAssets) / m.marketTotalSupplyShares
     }
 
     const ceilDiv = (a: bigint, b: bigint): bigint => {
-      if (b <= 0n)
-        return 0n
-      if (a <= 0n)
+      if (b <= 0n || a <= 0n)
         return 0n
       return (a + (b - 1n)) / b
     }
@@ -353,8 +290,6 @@ export function BatchWithdraw() {
       if (m.maxWithdrawShares <= 0n)
         continue
 
-      // Convert the remaining desired assets into shares for this market, rounding DOWN.
-      // Then cap by liquidity-capped shares.
       const desiredShares = m.marketTotalSupplyAssets > 0n
         ? (remainingAssets * m.marketTotalSupplyShares) / m.marketTotalSupplyAssets
         : 0n
@@ -367,10 +302,6 @@ export function BatchWithdraw() {
       remainingAssets -= assetsFromShares(m, sharesToWithdraw)
     }
 
-    // Dust sweep (withdraw at least requested): because assetsFromShares floors,
-    // small remainders (e.g. 1 micro-USDC) may not be representable by a +1 share step.
-    // Instead, jump to the minimum shares required to increase the floored assets
-    // by at least the remaining amount.
     let dustPass = 0
     while (remainingAssets > 0n && dustPass < 5) {
       dustPass++
@@ -425,7 +356,7 @@ export function BatchWithdraw() {
     const overWithdrawAssets = remainingAssets < 0n ? -remainingAssets : 0n
 
     return {
-      ok: true as const,
+      ok: true,
       error: undefined,
       items: out,
       remaining: remainingAssets > 0n ? remainingAssets : 0n,
@@ -442,7 +373,6 @@ export function BatchWithdraw() {
     return plan.items.reduce((sum, x) => sum + x.plannedWithdrawAssets, 0n)
   }, [hasPlan, plan.items])
 
-  // --- Bundle execution (Bundler3) ---
   const bundlerCfg = useMemo(() => (chainId ? getBundler3Config(chainId) : undefined), [chainId])
 
   const executeMarketIds = useMemo(() => {
@@ -525,9 +455,7 @@ export function BatchWithdraw() {
   }, [receipt.isSuccess])
 
   const bundle = useMemo(() => {
-    if (!bundlerCfg || !userAddress)
-      return undefined
-    if (!hasPlan)
+    if (!bundlerCfg || !userAddress || !hasPlan)
       return undefined
 
     const calls = [] as ReturnType<typeof encodeGeneralAdapterMorphoWithdraw>[]
@@ -552,10 +480,7 @@ export function BatchWithdraw() {
   const multicallRequest = useMemo(() => {
     if (!bundlerCfg || !bundle || bundle.length === 0)
       return undefined
-    return makeBundler3MulticallRequest({
-      bundler3: bundlerCfg.bundler3,
-      bundle,
-    })
+    return makeBundler3MulticallRequest({ bundler3: bundlerCfg.bundler3, bundle })
   }, [bundle, bundlerCfg])
 
   const multicallSim = useSimulateContract({
@@ -579,14 +504,26 @@ export function BatchWithdraw() {
     writeContract(multicallSim.data.request)
   }
 
-  const canExecute = !!multicallSim.data?.request
-    && !!bundle
-    && bundle.length > 0
-    && !!bundlerCfg
-    && !!userAddress
-    && isMorphoAuthorized
-    && !isWriting
-    && !receipt.isLoading
+  const execution: BatchWithdrawExecutionState = {
+    bundlerCfg,
+    morphoAddress,
+    isMorphoAuthorized,
+    authorizeAvailable: !!authorizeSim.data?.request,
+    multicallError: (multicallSim.error as any)?.shortMessage ?? (multicallSim.error as any)?.message,
+    executeError,
+    canExecute: !!multicallSim.data?.request
+      && !!bundle
+      && bundle.length > 0
+      && !!bundlerCfg
+      && !!userAddress
+      && isMorphoAuthorized
+      && !isWriting
+      && !receipt.isLoading,
+    isWriting,
+    isConfirming: receipt.isLoading,
+    onAuthorizeAdapter,
+    onExecuteBundle,
+  }
 
   return (
     <Card className="mb-8" data-testid="batch-withdraw-card">
@@ -596,9 +533,7 @@ export function BatchWithdraw() {
             Batch withdraw
             <span className="text-xs text-gray-400"> (beta)</span>
           </h2>
-          <p className="text-sm text-gray-400">
-            Withdraws from your lowest-APR markets first.
-          </p>
+          <p className="text-sm text-gray-400">Withdraws from your lowest-APR markets first.</p>
         </div>
 
         {(selectedLoanAssetAddress || withdrawAmount || executeError) && (
@@ -618,111 +553,23 @@ export function BatchWithdraw() {
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
         {!userAddress && (
-          <div className="text-sm text-gray-300">
-            Connect your wallet to plan a batch withdraw.
-          </div>
+          <div className="text-sm text-gray-300">Connect your wallet to plan a batch withdraw.</div>
         )}
 
         {userAddress && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 items-start" data-testid="batch-withdraw-form">
-              <div className="flex flex-col gap-1.5 md:gap-2 md:col-span-2">
-                <div className="h-5 flex items-center">
-                  <Label className="text-gray-200">Asset</Label>
-                </div>
-                <Select
-                  value={selectedLoanAssetAddress || undefined}
-                  onValueChange={onChangeLoanAsset}
-                  disabled={isLoadingPositions || loanAssetOptions.length === 0}
-                >
-                  <SelectTrigger className="w-full h-10 bg-gray-900 border-gray-700 text-white text-sm">
-                    <SelectValue placeholder={isLoadingPositions ? 'Loading…' : 'Select an asset'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loanAssetOptions.map(o => (
-                      <SelectItem key={o.address} value={o.address}>
-                        {o.symbol}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="h-0 md:h-4" />
-              </div>
-
-              <div className="flex flex-col gap-1.5 md:gap-2 md:col-span-2">
-                <div className="h-5 flex items-center">
-                  <Label className="text-gray-200" htmlFor="batch-withdraw-amount">Amount</Label>
-                </div>
-                <div className="relative">
-                  <Input
-                    id="batch-withdraw-amount"
-                    type="text"
-                    inputMode="decimal"
-                    value={withdrawAmount}
-                    onChange={e => ctx.setWithdrawAmount(e.target.value)}
-                    placeholder="0.0"
-                    className="w-full h-10 pr-20 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
-                    disabled={!selectedOption}
-                  />
-                  <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
-                    {symbol}
-                  </span>
-                </div>
-                <div className="h-0 md:h-4" />
-              </div>
-
-              <div className="flex flex-col gap-1.5 md:gap-2">
-                <div className="h-5 flex items-center gap-2">
-                  <Label className="text-gray-200">Quick action</Label>
-                  <InfoTooltip
-                    ariaLabel="Max amount info"
-                    content={(
-                      <span>
-                        Sets the amount to your maximum withdrawable balance across all markets for this asset (accounting for liquidity constraints).
-                      </span>
-                    )}
-                  />
-                </div>
-                <Button
-                  className="w-full h-10"
-                  onClick={() => {
-                    if (!selectedOption)
-                      return
-                    const s = trimTrailingZerosDecimalString(formatUnits(plan.totalWithdrawable, selectedOption.decimals))
-                    if (s)
-                      ctx.setWithdrawAmount(s)
-                  }}
-                  disabled={!selectedOption || !computedMarkets.ok}
-                >
-                  <Maximize2 className="w-4 h-4 mr-1" />
-                  Max
-                </Button>
-                <div className="h-0 md:h-4" />
-              </div>
-            </div>
-
-            {selectedOption && (
-              <div className="text-xs text-gray-500 flex flex-wrap gap-x-6 gap-y-1">
-                <span>
-                  Supplied:
-                  {' '}
-                  <span className="text-gray-300">
-                    {formatBigintShort(plan.totalSupplied, selectedOption.decimals)}
-                    {' '}
-                    {symbol}
-                  </span>
-                </span>
-                <span>
-                  Max withdrawable:
-                  {' '}
-                  <span className="text-gray-300">
-                    {formatBigintShort(plan.totalWithdrawable, selectedOption.decimals)}
-                    {' '}
-                    {symbol}
-                  </span>
-                </span>
-              </div>
-            )}
+            <BatchWithdrawForm
+              isLoadingPositions={isLoadingPositions}
+              loanAssetOptions={loanAssetOptions}
+              selectedLoanAssetAddress={selectedLoanAssetAddress}
+              selectedOption={selectedOption}
+              withdrawAmount={withdrawAmount}
+              symbol={symbol}
+              plan={plan}
+              computedMarketsOk={computedMarkets.ok}
+              onChangeLoanAsset={onChangeLoanAsset}
+              onChangeWithdrawAmount={value => ctx.setWithdrawAmount(value)}
+            />
 
             {plan.error && (
               <div className="text-sm text-red-300 border border-red-900/40 bg-red-950/20 rounded-md p-3">
@@ -732,149 +579,15 @@ export function BatchWithdraw() {
 
             {hasPlan && selectedOption && (
               <>
-                {plan.remaining > 0n && (
-                  <div className="text-sm text-orange-200 border border-orange-900/40 bg-orange-950/20 rounded-md p-3">
-                    Not enough available liquidity to withdraw the full amount. Planned:
-                    {' '}
-                    {formatBigintShort(plannedTotal, selectedOption.decimals)}
-                    {' '}
-                    {symbol}
-                    .
-                    {' '}
-                    Remaining:
-                    {' '}
-                    {formatBigintShort(plan.remaining, selectedOption.decimals)}
-                    {' '}
-                    {symbol}
-                    .
-                  </div>
-                )}
-
-                {plan.overWithdrawAssets > 0n && (
-                  <div className="text-xs text-gray-400">
-                    Due to rounding, the plan may withdraw slightly more than requested:
-                    {' '}
-                    {formatBigintShort(plan.overWithdrawAssets, selectedOption.decimals)}
-                    {' '}
-                    {symbol}
-                    .
-                  </div>
-                )}
-
-                <div className="overflow-x-auto border border-gray-700 rounded-md">
-                  <table className="min-w-full divide-y divide-gray-700" data-testid="batch-withdraw-result-table">
-                    <thead className="bg-gray-800/40">
-                      <tr>
-                        <th className="px-3 sm:px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">APR</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Supplied</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Max</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Planned</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700 bg-gray-900/20">
-                      {plan.items.map((p) => {
-                        const marketLabel = `${p.collateralSymbol} / ${symbol}`
-                        const deepLinkAmount = trimTrailingZerosDecimalString(formatUnits(p.plannedWithdrawAssets, selectedOption.decimals))
-                        const deepLinkSearch = p.plannedWithdrawAssets > 0n && deepLinkAmount
-                          ? createSearchParams({
-                              tab: 'withdraw',
-                              unit: 'asset',
-                              amount: deepLinkAmount,
-                            }).toString()
-                          : ''
-
-                        return (
-                          <tr key={p.marketId}>
-                            <td className="px-3 sm:px-4 py-2 text-sm text-white">
-                              <div className="flex items-center gap-2">
-                                {chainId
-                                  ? (
-                                      <Link
-                                        to={{
-                                          pathname: `/market/${p.marketId}/${chainId}`,
-                                          search: deepLinkSearch ? `?${deepLinkSearch}` : '',
-                                        }}
-                                        className="hover:text-blue-400 transition-colors"
-                                      >
-                                        {marketLabel}
-                                      </Link>
-                                    )
-                                  : (
-                                      <span>{marketLabel}</span>
-                                    )}
-                                {chainNameForLinks && (
-                                  <a
-                                    href={morphoAppMarketUrl(chainNameForLinks, p.marketId)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-white hover:text-blue-400 transition-colors flex items-center"
-                                    title="Open in Morpho official UI"
-                                  >
-                                    <LinkNewWindow className="w-5 h-5" />
-                                  </a>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
-                              {pctFromWad(p.supplyAprWad)}
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
-                              {formatBigintShort(p.suppliedAssets, selectedOption.decimals)}
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
-                              {formatBigintShort(p.maxWithdrawAssets, selectedOption.decimals)}
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-sm text-orange-200 text-right tabular-nums">
-                              {formatBigintShort(p.plannedWithdrawAssets, selectedOption.decimals)}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {bundlerCfg && morphoAddress && (
-                  <div className="mt-6 border border-gray-700 rounded-md p-3 bg-gray-900/30 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm text-gray-200 font-medium">Execute withdraw (1 tx)</div>
-                      <div className="text-xs text-gray-500">via Bundler3</div>
-                    </div>
-
-                    {!isMorphoAuthorized && (
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs text-gray-400">
-                          One-time setup: authorize the Bundler adapter on Morpho (required for withdraws).
-                        </div>
-                        <Button onClick={onAuthorizeAdapter} disabled={!authorizeSim.data?.request || isWriting}>
-                          Authorize
-                        </Button>
-                      </div>
-                    )}
-
-                    {multicallSim.error && (
-                      <div className="text-xs text-red-300">
-                        {((multicallSim.error as any)?.shortMessage ?? (multicallSim.error as any)?.message ?? 'Simulation failed')}
-                      </div>
-                    )}
-
-                    {executeError && (
-                      <div className="text-xs text-red-300">
-                        {executeError}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        onClick={onExecuteBundle}
-                        disabled={!canExecute}
-                      >
-                        {isWriting ? 'Sending…' : receipt.isLoading ? 'Confirming…' : 'Withdraw (1 tx)'}
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <BatchWithdrawResults
+                  plan={plan}
+                  selectedOption={selectedOption}
+                  symbol={symbol}
+                  plannedTotal={plannedTotal}
+                  chainId={chainId}
+                  chainNameForLinks={chainNameForLinks}
+                />
+                <BatchWithdrawExecutionPanel execution={execution} />
               </>
             )}
           </>
