@@ -14,6 +14,8 @@ import { Providers } from './lib/providers'
 import './app.css'
 import '@rainbow-me/rainbowkit/styles.css'
 
+const baseUrl = import.meta.env.BASE_URL
+
 export const links: Route.LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
   {
@@ -28,22 +30,22 @@ export const links: Route.LinksFunction = () => [
   {
     rel: 'apple-touch-icon',
     sizes: '180x180',
-    href: './apple-touch-icon.png',
+    href: `${baseUrl}apple-touch-icon.png`,
   },
   {
     rel: 'icon',
     type: 'image/png',
     sizes: '32x32',
-    href: './favicon-32x32.png',
+    href: `${baseUrl}favicon-32x32.png`,
   },
   {
     rel: 'icon',
     type: 'image/png',
     sizes: '16x16',
-    href: './favicon-16x16.png',
+    href: `${baseUrl}favicon-16x16.png`,
   },
-  { rel: 'manifest', href: './site.webmanifest' },
-  { rel: 'shortcut icon', href: './favicon.ico' },
+  { rel: 'manifest', href: `${baseUrl}site.webmanifest` },
+  { rel: 'shortcut icon', href: `${baseUrl}favicon.ico` },
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {
