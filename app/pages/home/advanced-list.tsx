@@ -17,7 +17,7 @@ import {
 } from '~/components/ui/select'
 import { getSupportedChainName, supportedChainIdMap } from '~/lib/addresses'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
-import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
+import { formatMarketSize, formatTimeAgo, formatUsd } from '~/lib/formatters'
 import {
   MarketOrderBy,
   OrderDirection,
@@ -30,6 +30,7 @@ import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
+import { OpportunityRecap } from '~/pages/home/opportunity-recap'
 
 const CONFIG = {
   minSupplyApy: 0.09, // 9% apy
@@ -352,6 +353,7 @@ export function AdvancedList() {
   const [orderBy, setOrderBy] = useLocalStorage<MarketOrderBy>('advanced-list:orderBy', MarketOrderBy.NetSupplyApy)
   const [orderDirection, setOrderDirection] = useLocalStorage<OrderDirection>('advanced-list:orderDirection', OrderDirection.Desc)
   const [chainFilter, setChainFilter] = useLocalStorage<MarketChainFilter>('advanced-list:chainFilter', 'ALL')
+  const [showOpportunityRecap, setShowOpportunityRecap] = useLocalStorage<boolean>('advanced-list:show-opportunity-recap', false)
 
   const where = useMemo(
     () => buildWhereClause(aprType, comparison, aprValue, chainFilter),
@@ -530,13 +532,24 @@ export function AdvancedList() {
             {timeAgo || '—'}
           </span>
         </div>
-        <Button
-          onClick={() => handleRefresh()}
-          disabled={isRefreshing || isCooldown}
-          className="ml-auto"
-        >
-          {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          {displayRateType === 'supply' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowOpportunityRecap(prev => !prev)}
+            >
+              {showOpportunityRecap ? 'Hide recap' : 'Show recap'}
+            </Button>
+          )}
+          <Button
+            onClick={() => handleRefresh()}
+            disabled={isRefreshing || isCooldown}
+          >
+            {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       <MarketFilters
@@ -554,6 +567,12 @@ export function AdvancedList() {
         setChainFilter={setChainFilter}
         rateType={displayRateType}
       />
+
+      {displayRateType === 'supply' && showOpportunityRecap && (
+        <div className={`border-b ${colors.border} p-4`}>
+          <OpportunityRecap markets={visibleMarkets} />
+        </div>
+      )}
 
       <MarketTable
         markets={visibleMarkets}
