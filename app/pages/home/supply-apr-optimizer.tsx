@@ -1,33 +1,18 @@
 import type { SupplyOptimizerDebugRequest } from '~/lib/optimizer/supply-apr-optimizer-debugger'
-import type { UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
+import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
 import type { OptimizerReadResult } from '~/lib/optimizer/use-supply-optimizer-reads'
-import { Coins, Minus, Plus, X } from 'lucide-react'
+import type { AutoStepInfo, LoanAssetOption, OptimizerMarketMeta } from '~/pages/home/supply-apr-optimizer/shared'
+import { Coins, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createSearchParams, Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
 import { useAccount, usePublicClient, useReadContracts } from 'wagmi'
-import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
-import { InfoTooltip } from '~/components/ui/info-tooltip'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
-import { MarketRiskText } from '~/components/ui/market-risk-text'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
-import { formatBigintShort } from '~/lib/formatters'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loan-assets-by-chain'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
@@ -38,30 +23,15 @@ import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
-import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 import { dumpSupplyOptimizerFixtures, setSupplyOptimizerDebugState } from '~/lib/optimizer/supply-apr-optimizer-debugger'
-import { buildMoveSizeCacheKey, fmtToken, pctFromWad, trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
+import { buildMoveSizeCacheKey, trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
-import { BundleOptimizerResult } from '~/pages/home/bundle-optimizer-result'
-
-interface LoanAssetOption {
-  address: string
-  symbol: string
-  decimals: number
-  oraclePriceUsd?: number | null
-}
-
-interface AutoStepInfo {
-  stepAssets: bigint
-  stepRatioWad: bigint
-  attempts: number
-  fromCache: boolean
-}
+import { SupplyAprOptimizerForm } from '~/pages/home/supply-apr-optimizer/optimizer-form'
+import { SupplyAprOptimizerResults } from '~/pages/home/supply-apr-optimizer/optimizer-results'
 
 export function SupplyAprOptimizer() {
-  const WAD = 10n ** 18n
   // If the blended APR improvement is <= this threshold, show a "no-op" plan.
   // 0.25% = 0.0025 in WAD terms (1e18 = 100%).
   const NO_BENEFIT_DELTA_APR_WAD = 2_500_000_000_000_000n
@@ -693,7 +663,7 @@ export function SupplyAprOptimizer() {
       return 0n
     return parseTokenAmount(ctx.inputs.newDepositAmount ?? '', selectedOption.decimals)
   }, [selectedOption, ctx.inputs.newDepositAmount])
-  const displayResult = useMemo(() => {
+  const displayResult = useMemo<OptimizeSupplyWithPositionsResult | undefined>(() => {
     if (ctx.run.error)
       return undefined
     if (!result)
@@ -726,8 +696,8 @@ export function SupplyAprOptimizer() {
   const chainIdForLinks = ctx.selection.chainId ?? chain?.id
   const chainNameForLinks = chainIdForLinks ? getSupportedChainName(chainIdForLinks) : undefined
 
-  const marketMetaById = useMemo(() => {
-    const map = new Map<string, { collateralSymbol?: string, status?: 'white' | 'blue' | 'yellow' | 'purple' | 'black' }>()
+  const marketMetaById = useMemo<Map<string, OptimizerMarketMeta>>(() => {
+    const map = new Map<string, OptimizerMarketMeta>()
     for (const m of (topMarkets ?? [])) {
       map.set(m.uniqueKey.toLowerCase(), {
         collateralSymbol: m.collateralAsset?.symbol,
@@ -901,193 +871,32 @@ export function SupplyAprOptimizer() {
             )}
 
             {canPick && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 md:gap-4 items-start" data-testid="supply-apr-optimizer-form">
-                <div className="flex flex-col gap-1.5 md:gap-2">
-                  <div className="h-5 flex items-center">
-                    <Label>Asset to optimize</Label>
-                  </div>
-                  <Select
-                    value={ctx.selection.loanAssetAddress ?? undefined}
-                    onValueChange={onChangeLoanAsset}
-                  >
-                    <SelectTrigger className="w-full h-10 bg-gray-900 border-gray-700 text-white text-sm">
-                      <SelectValue placeholder="Select an asset" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ownedLoanAssetOptions.length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel>Owned assets</SelectLabel>
-                          {ownedLoanAssetOptions.map(o => (
-                            <SelectItem key={o.address} value={o.address}>
-                              {o.symbol}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      )}
-                      {popularLoanAssetOptions.length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel>Popular assets</SelectLabel>
-                          {popularLoanAssetOptions
-                            .filter(o => !ownedLoanAssetOptions.some(x => x.address.toLowerCase() === o.address.toLowerCase()))
-                            .map(o => (
-                              <SelectItem key={o.address} value={o.address}>
-                                {o.symbol}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      )}
-                      {ownedLoanAssetOptions.length === 0 && popularLoanAssetOptions.length === 0 && loanAssetOptions.map(o => (
-                        <SelectItem key={o.address} value={o.address}>
-                          {o.symbol}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="text-xs text-gray-500 min-h-0 md:h-4">
-                    {selectedOption && (
-                      <>
-                        Your supplied:
-                        {' '}
-                        {fmtToken(ctx.derived.totalSuppliedAssets ?? 0n, selectedOption.decimals)}
-                        {' '}
-                        {selectedOption.symbol}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5 md:gap-2">
-                  <div className="h-5 flex items-center gap-2">
-                    <Label>Minimum move size</Label>
-                    <InfoTooltip
-                      ariaLabel="Minimum move size info"
-                      content={(
-                        <span>
-                          Leave blank for Auto (finds the smallest move size that converges).
-                        </span>
-                      )}
-                    />
-                  </div>
-                  <div className="relative">
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={ctx.inputs.minMoveSize ?? ''}
-                      onChange={e => ctx.setMinMoveSize(e.target.value)}
-                      placeholder="Auto"
-                      className="w-full h-10 pr-16 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
-                    />
-                    <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400 pointer-events-none">
-                      {symbol}
-                    </span>
-                  </div>
-                  <div className="h-0 md:h-4" />
-                </div>
-
-                <div className="flex flex-col gap-1.5 md:gap-2">
-                  <div className="h-5 flex items-center">
-                    <Label>Additional amount to supply</Label>
-                  </div>
-                  <div className="relative">
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={ctx.inputs.newDepositAmount ?? ''}
-                      onChange={e => ctx.setNewDepositAmount(e.target.value)}
-                      placeholder="0.0"
-                      className="w-full h-10 pr-16 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
-                    />
-                    <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400 pointer-events-none">
-                      {symbol}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500 min-h-0 md:h-4">
-                    {selectedOption && (
-                      <>
-                        Wallet balance:
-                        {' '}
-                        {fmtToken(walletBalanceRaw ?? 0n, selectedOption.decimals)}
-                        {' '}
-                        {selectedOption.symbol}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5 md:gap-2">
-                  <div className="h-5 flex items-center gap-2">
-                    <Label>Max markets</Label>
-                    <InfoTooltip
-                      ariaLabel="Max markets info"
-                      content={(
-                        <span>
-                          Limits the number of markets used in the optimized allocation.
-                        </span>
-                      )}
-                    />
-                  </div>
-                  <div className="grid h-10 w-full grid-cols-[2.5rem_1fr_2.5rem] overflow-hidden rounded-md border border-gray-700 bg-gray-900">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-full rounded-none border-0 border-r border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
-                      onClick={() => {
-                        const current = parseMaxMarkets(maxMarketsInput ?? '')
-                        if (current > 1)
-                          setMaxMarketsInput(String(current - 1))
-                      }}
-                      disabled={parseMaxMarkets(maxMarketsInput ?? '') <= 1}
-                      aria-label="Decrease max markets"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={maxMarketsInput ?? ''}
-                      onChange={(e) => {
-                        const digitsOnly = e.target.value.replace(/\D+/g, '')
-                        setMaxMarketsInput(digitsOnly)
-                      }}
-                      className="h-full rounded-none border-0 px-0 text-center tabular-nums text-white placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset focus-visible:ring-offset-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      aria-label="Max markets"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-full rounded-none border-0 border-l border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
-                      onClick={() => {
-                        const current = parseMaxMarkets(maxMarketsInput ?? '')
-                        setMaxMarketsInput(String(current + 1))
-                      }}
-                      aria-label="Increase max markets"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="text-xs text-gray-500 leading-4">Use +/- or type a value (min 1)</div>
-                </div>
-
-                <div className="flex flex-col gap-1.5 md:gap-2">
-                  <div className="h-0 md:h-5" />
-                  <Button
-                    className="w-full h-10"
-                    onClick={onOptimize}
-                    disabled={ctx.run.isRunning || !canOptimize || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
-                    isLoading={ctx.run.isRunning || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
-                  >
-                    {topMarketsQuery.isLoading || topMarketsQuery.isFetching
-                      ? 'Loading markets...'
-                      : ctx.run.isRunning
-                        ? `${runProgressLabel ?? 'Optimizing'}${runProgressPercent != null ? ` ${runProgressPercent}%` : ''}`
-                        : 'Optimize'}
-                  </Button>
-                  <div className="h-0 md:h-4" />
-                </div>
-              </div>
+              <SupplyAprOptimizerForm
+                selectedLoanAssetAddress={ctx.selection.loanAssetAddress}
+                onChangeLoanAsset={onChangeLoanAsset}
+                ownedLoanAssetOptions={ownedLoanAssetOptions}
+                popularLoanAssetOptions={popularLoanAssetOptions}
+                loanAssetOptions={loanAssetOptions}
+                selectedOption={selectedOption}
+                totalSuppliedAssets={ctx.derived.totalSuppliedAssets ?? 0n}
+                minMoveSize={ctx.inputs.minMoveSize}
+                onChangeMinMoveSize={value => ctx.setMinMoveSize(value)}
+                newDepositAmount={ctx.inputs.newDepositAmount}
+                onChangeNewDepositAmount={value => ctx.setNewDepositAmount(value)}
+                walletBalanceRaw={walletBalanceRaw}
+                symbol={symbol}
+                maxMarketsInput={maxMarketsInput ?? ''}
+                setMaxMarketsInput={setMaxMarketsInput}
+                parseMaxMarkets={parseMaxMarkets}
+                onOptimize={onOptimize}
+                optimizeDisabled={ctx.run.isRunning || !canOptimize || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
+                optimizeLoading={ctx.run.isRunning || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
+                optimizeLabel={topMarketsQuery.isLoading || topMarketsQuery.isFetching
+                  ? 'Loading markets...'
+                  : ctx.run.isRunning
+                    ? `${runProgressLabel ?? 'Optimizing'}${runProgressPercent != null ? ` ${runProgressPercent}%` : ''}`
+                    : 'Optimize'}
+              />
             )}
 
             {ctx.run.error && (
@@ -1097,185 +906,20 @@ export function SupplyAprOptimizer() {
             )}
 
             {displayResult && selectedOption && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="bg-gray-900 border border-gray-700 rounded-md p-3">
-                    <div className="text-xs text-gray-400">Current blended APR</div>
-                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.current.blendedAprWad)}</div>
-                  </div>
-                  <div className="bg-gray-900 border border-gray-700 rounded-md p-3">
-                    <div className="text-xs text-gray-400">Optimized blended APR</div>
-                    <div className="text-lg font-semibold text-white tabular-nums">{pctFromWad(displayResult.optimized.blendedAprWad)}</div>
-                  </div>
-                  <div className="bg-gray-900 border border-gray-700 rounded-md p-3">
-                    <div className="text-xs text-gray-400">Iterations</div>
-                    <div className="text-lg font-semibold text-white tabular-nums">{displayResult.iterations}</div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto border border-gray-700 rounded-md">
-                  <table className="min-w-full divide-y divide-gray-700" data-testid="supply-apr-optimizer-result-table">
-                    <thead className="bg-gray-800/40">
-                      <tr>
-                        <th className="px-3 sm:px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Current</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Target</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Delta</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">APR after</th>
-                        <th className="px-3 sm:px-4 py-2 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Yearly return</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700 bg-gray-900/20">
-                      {displayResult.positions.map((p) => {
-                        const deltaSign = p.deltaAssets >= 0n ? '+' : ''
-                        const meta = marketMetaById.get(p.marketId.toLowerCase())
-                        const riskStatus = meta?.status
-                        const marketLabel = meta?.collateralSymbol ? `${meta.collateralSymbol} / ${symbol}` : `${p.marketId.slice(0, 10)}…${p.marketId.slice(-6)}`
-                        const absDeltaAssets = p.deltaAssets < 0n ? -p.deltaAssets : p.deltaAssets
-                        const deepLinkTab = p.deltaAssets < 0n ? 'withdraw' : 'deposit'
-                        const deepLinkAmount = selectedOption
-                          ? trimTrailingZerosDecimalString(formatUnits(absDeltaAssets, selectedOption.decimals))
-                          : ''
-                        const deepLinkSearch = absDeltaAssets > 0n && deepLinkAmount
-                          ? createSearchParams({
-                              tab: deepLinkTab,
-                              unit: 'asset',
-                              amount: deepLinkAmount,
-                            }).toString()
-                          : ''
-                        const yearlyReturnAssets = (p.amountAssets * p.supplyAprAfterWad) / WAD
-
-                        return (
-                          <tr
-                            key={p.marketId}
-                          >
-                            <td className="px-3 sm:px-4 py-2 text-sm text-white">
-                              <div className="flex items-center gap-2">
-                                {chainIdForLinks
-                                  ? (
-                                      <Link
-                                        to={{
-                                          pathname: `/market/${p.marketId}/${chainIdForLinks}`,
-                                          search: deepLinkSearch ? `?${deepLinkSearch}` : '',
-                                        }}
-                                        className="hover:opacity-90 transition-opacity"
-                                      >
-                                        <MarketRiskText status={riskStatus}>{marketLabel}</MarketRiskText>
-                                      </Link>
-                                    )
-                                  : (
-                                      <MarketRiskText status={riskStatus}>{marketLabel}</MarketRiskText>
-                                    )}
-                                {chainNameForLinks && (
-                                  <a
-                                    href={morphoAppMarketUrl(chainNameForLinks, p.marketId)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-white hover:text-blue-400 transition-colors flex items-center"
-                                    title="Open in Morpho official UI"
-                                  >
-                                    <LinkNewWindow className="w-5 h-5" />
-                                  </a>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
-                              {fmtToken(p.currentUserAssets, selectedOption.decimals)}
-                              {' '}
-                              {symbol}
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
-                              {fmtToken(p.amountAssets, selectedOption.decimals)}
-                              {' '}
-                              {symbol}
-                            </td>
-                            <td className={`px-3 sm:px-4 py-2 text-sm text-right tabular-nums ${p.deltaAssets >= 0n ? 'text-green-300' : 'text-orange-300'}`}>
-                              {deltaSign}
-                              {fmtToken(p.deltaAssets, selectedOption.decimals)}
-                              {' '}
-                              {symbol}
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
-                              {pctFromWad(p.supplyAprAfterWad)}
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-200 text-right tabular-nums">
-                              {fmtToken(yearlyReturnAssets, selectedOption.decimals)}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="pt-2">
-                  <div className="flex flex-row items-center mx-4 gap-2">
-                    {autoStepInfo && (
-                      <div className="flex flex-wrap items-center gap-1 text-xs text-gray-400 whitespace-nowrap">
-                        <span>Auto step</span>
-                        <span className="text-sm text-white whitespace-nowrap">
-                          {formatBigintShort(autoStepInfo.stepAssets, selectedOption.decimals)}
-                          {' '}
-                          {symbol}
-                        </span>
-                        <span className="text-xs text-gray-400 whitespace-nowrap">
-                          (
-                          {pctFromWad(autoStepInfo.stepRatioWad)}
-                          )
-                        </span>
-                        {autoStepInfo.attempts > 0 && (
-                          <span className="hidden sm:inline text-xs text-gray-500 whitespace-nowrap">
-                            Auto step found in
-                            {' '}
-                            {autoStepInfo.attempts}
-                            {' '}
-                            tries
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <div className="ml-auto flex items-center gap-1 sm:gap-2">
-                      <p className="text-xs text-gray-400 whitespace-nowrap">Total allocated</p>
-                      <p className="text-sm text-white whitespace-nowrap">
-                        {formatBigintShort(totalAllocatedAssets, selectedOption.decimals)}
-                        {' '}
-                        {symbol}
-                      </p>
-                    </div>
-                  </div>
-                  {displayResult.unallocatedNewDepositAssets > 0n && (
-                    <div
-                      className="
-                        flex flex-row justify-center items-center mx-4 mt-1
-                        sm:justify-end
-                        gap-1 sm:gap-2
-                      "
-                    >
-                      <p className="text-xs text-gray-400 whitespace-nowrap">Unallocated deposit</p>
-                      <p className="text-sm text-white whitespace-nowrap">
-                        {formatBigintShort(displayResult.unallocatedNewDepositAssets, selectedOption.decimals)}
-                        {' '}
-                        {symbol}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {displayResult && selectedOption && userAddress && chain?.id && (
-                  <BundleOptimizerResult
-                    displayResult={displayResult}
-                    chainId={chain.id}
-                    morphoAddress={morphoAddress}
-                    userAddress={userAddress as `0x${string}`}
-                    userSupplySharesByMarketId={userSupplySharesByMarketId}
-                    loanToken={{
-                      address: selectedOption.address as `0x${string}`,
-                      symbol,
-                      decimals: selectedOption.decimals,
-                    }}
-                  />
-                )}
-              </div>
+              <SupplyAprOptimizerResults
+                displayResult={displayResult}
+                selectedOption={selectedOption}
+                symbol={symbol}
+                marketMetaById={marketMetaById}
+                chainIdForLinks={chainIdForLinks}
+                chainNameForLinks={chainNameForLinks}
+                autoStepInfo={autoStepInfo}
+                totalAllocatedAssets={totalAllocatedAssets}
+                userAddress={userAddress as `0x${string}` | undefined}
+                chainId={chain?.id}
+                morphoAddress={morphoAddress as `0x${string}` | undefined}
+                userSupplySharesByMarketId={userSupplySharesByMarketId}
+              />
             )}
           </>
         )}
