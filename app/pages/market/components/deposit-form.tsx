@@ -1,5 +1,4 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
-import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { useDebugValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits, parseUnits } from 'viem'
@@ -12,6 +11,9 @@ import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
+import { ModeToggleSuffix } from './market-action-form/mode-toggle-suffix'
+import { InlineNotice, SuccessMessage } from './market-action-form/status-message'
+import { SubmitButton } from './market-action-form/submit-button'
 
 interface DepositFormProps {
   market: SingleMorphoMarket
@@ -255,35 +257,29 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
   const beforeApr = preview.supplyAprBefore
   const afterApr = preview.supplyAprAfter
   const showAprEstimateLabel = afterApr != null
+  const submitDisabled = !amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount) || (!needsApproval && !hasSufficientBalance)
+  const submitLoadingLabel = (!isAllowanceReady && !!amount)
+    ? 'Checking allowance...'
+    : isSimulatingApproval
+      ? 'Preparing approval...'
+      : isApprovingToken || isApproveLoading
+        ? 'Approving...'
+        : isSimulatingSupply
+          ? 'Preparing deposit...'
+          : 'Depositing...'
+  const submitIdleLabel = needsApproval
+    ? `Approve ${loanTokenSymbol}`
+    : `Deposit ${displayAmountShort} ${loanTokenSymbol}`
 
   if (isSuccess && showSuccess) {
     return (
-      <div className="bg-green-950/30 border border-green-800/40 rounded-lg p-4">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">
-            <CheckCircleIcon className="h-5 w-5 text-green-400" aria-hidden="true" />
-          </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-green-300">
-              Deposit successful!
-            </p>
-          </div>
-          <div className="ml-auto pl-3">
-            <div className="-mx-1.5 -my-1.5">
-              <button
-                onClick={() => {
-                  setShowSuccess(false)
-                  onSuccess?.()
-                }}
-                className="inline-flex rounded-md p-1.5 text-green-400 hover:bg-green-900/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-950 focus:ring-green-600"
-              >
-                <span className="sr-only">Dismiss</span>
-                <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SuccessMessage
+        message="Deposit successful!"
+        onDismiss={() => {
+          setShowSuccess(false)
+          onSuccess?.()
+        }}
+      />
     )
   }
 
@@ -296,24 +292,12 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
         onMax={handleMaxClick}
         showSlider={mode === 'percent'}
         suffix={(
-          <span className="inline-flex items-center gap-1">
-            <button
-              type="button"
-              onClick={switchToPercent}
-              className={`px-1.5 py-0.5 rounded border border-white/10 text-xs ${mode === 'percent' ? 'bg-white/10 text-gray-100' : 'text-gray-300 hover:bg-white/10'}`}
-              aria-label="Switch to percentage"
-            >
-              %
-            </button>
-            <button
-              type="button"
-              onClick={switchToAsset}
-              className={`px-1.5 py-0.5 rounded border border-white/10 text-xs ${mode === 'asset' ? 'bg-white/10 text-gray-100' : 'text-gray-300 hover:bg-white/10'}`}
-              aria-label={`Switch to ${loanTokenSymbol} amount`}
-            >
-              {loanTokenSymbol}
-            </button>
-          </span>
+          <ModeToggleSuffix
+            mode={mode}
+            assetSymbol={loanTokenSymbol}
+            onPercentClick={switchToPercent}
+            onAssetClick={switchToAsset}
+          />
         )}
         leftHelper={address
           ? (
@@ -338,34 +322,12 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
             )
           : undefined}
         desktopCta={(
-          <Button
-            type="submit"
-            disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount) || (!needsApproval && !hasSufficientBalance)}
-            className="w-full"
-          >
-            {isLoading
-              ? (
-                  <>
-                    <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" aria-hidden="true" />
-                    {(!isAllowanceReady && !!amount)
-                      ? 'Checking allowance...'
-                      : isSimulatingApproval
-                        ? 'Preparing approval...'
-                        : isApprovingToken || isApproveLoading
-                          ? 'Approving...'
-                          : isSimulatingSupply
-                            ? 'Preparing deposit...'
-                            : 'Depositing...'}
-                  </>
-                )
-              : needsApproval
-                ? (
-                    `Approve ${loanTokenSymbol}`
-                  )
-                : (
-                    `Deposit ${displayAmountShort} ${loanTokenSymbol}`
-                  )}
-          </Button>
+          <SubmitButton
+            disabled={submitDisabled}
+            isLoading={isLoading}
+            idleLabel={submitIdleLabel}
+            loadingLabel={submitLoadingLabel}
+          />
         )}
       />
 
@@ -380,73 +342,39 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       )}
 
       {isApproveSuccess && !needsApproval && (
-        <div className="bg-green-950/30 border border-green-800/40 rounded-lg p-3">
-          <p className="text-sm text-green-300">
-            Approval successful! You can now deposit your
-            {' '}
-            {loanTokenSymbol}
-            .
-          </p>
-        </div>
+        <InlineNotice tone="green">
+          Approval successful! You can now deposit your
+          {' '}
+          {loanTokenSymbol}
+          .
+        </InlineNotice>
       )}
 
       {needsApproval && (
-        <div className="bg-yellow-950/30 border border-yellow-800/40 rounded-lg p-3">
-          <p className="text-sm text-yellow-300">
-            You need to approve the token spending first. This transaction will allow Morpho Blue to use your
-            {' '}
-            {loanTokenSymbol}
-            .
-          </p>
-        </div>
+        <InlineNotice tone="yellow">
+          You need to approve the token spending first. This transaction will allow Morpho Blue to use your
+          {' '}
+          {loanTokenSymbol}
+          .
+        </InlineNotice>
       )}
 
       {!!amount && !!address && tokenBalance !== undefined && !needsApproval && !hasSufficientBalance && (
-        <div className="bg-yellow-950/30 border border-yellow-800/40 rounded-lg p-3">
-          <p className="text-sm text-yellow-300">
-            Insufficient wallet balance for this deposit amount. Preview is shown, but deposit is disabled.
-          </p>
-        </div>
+        <InlineNotice tone="yellow">Insufficient wallet balance for this deposit amount. Preview is shown, but deposit is disabled.</InlineNotice>
       )}
 
       {hasError && (
-        <div className="bg-red-950/30 border border-red-800/40 rounded-lg p-3">
-          <p className="text-sm text-red-300">
-            {effectiveSupplyError?.message || approveError?.message || 'Transaction failed'}
-          </p>
-        </div>
+        <InlineNotice tone="red">{effectiveSupplyError?.message || approveError?.message || 'Transaction failed'}</InlineNotice>
       )}
 
       {/* Mobile CTA */}
       <div className="md:hidden">
-        <Button
-          type="submit"
-          disabled={!amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount) || (!needsApproval && !hasSufficientBalance)}
-          className="w-full"
-        >
-          {isLoading
-            ? (
-                <>
-                  <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" aria-hidden="true" />
-                  {(!isAllowanceReady && !!amount)
-                    ? 'Checking allowance...'
-                    : isSimulatingApproval
-                      ? 'Preparing approval...'
-                      : isApprovingToken || isApproveLoading
-                        ? 'Approving...'
-                        : isSimulatingSupply
-                          ? 'Preparing deposit...'
-                          : 'Depositing...'}
-                </>
-              )
-            : needsApproval
-              ? (
-                  `Approve ${loanTokenSymbol}`
-                )
-              : (
-                  `Deposit ${displayAmountShort} ${loanTokenSymbol}`
-                )}
-        </Button>
+        <SubmitButton
+          disabled={submitDisabled}
+          isLoading={isLoading}
+          idleLabel={submitIdleLabel}
+          loadingLabel={submitLoadingLabel}
+        />
       </div>
 
       {!address && (

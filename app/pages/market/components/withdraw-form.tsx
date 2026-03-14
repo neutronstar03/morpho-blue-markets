@@ -1,5 +1,4 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
-import { ArrowPathIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits, parseUnits } from 'viem'
@@ -12,6 +11,9 @@ import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
+import { ModeToggleSuffix } from './market-action-form/mode-toggle-suffix'
+import { InlineNotice, SuccessMessage } from './market-action-form/status-message'
+import { SubmitButton } from './market-action-form/submit-button'
 
 const WAD = 1_000_000_000_000_000_000n
 
@@ -290,35 +292,20 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
   const beforeApr = preview.supplyAprBefore
   const afterApr = preview.supplyAprAfter
   const showAprEstimateLabel = afterApr != null
+  const submitDisabled = isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100 || isAboveMaxWithdrawShares
+  const submitIdleLabel = `Withdraw ${withdrawAssetsShort} ${loanTokenSymbol}`
+  const desktopLoadingLabel = isSimulatingWithdraw ? 'Preparing...' : 'Withdraw'
+  const mobileLoadingLabel = isSimulatingWithdraw ? 'Preparing withdrawal...' : 'Withdrawing...'
 
   if (isSuccess && showSuccess) {
     return (
-      <div className="bg-green-950/30 border border-green-800/40 rounded-lg p-4">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">
-            <CheckCircleIcon className="h-5 w-5 text-green-400" aria-hidden="true" />
-          </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-green-300">
-              Withdrawal successful!
-            </p>
-          </div>
-          <div className="ml-auto pl-3">
-            <div className="-mx-1.5 -my-1.5">
-              <button
-                onClick={() => {
-                  setShowSuccess(false)
-                  onSuccess?.()
-                }}
-                className="inline-flex rounded-md p-1.5 text-green-400 hover:bg-green-900/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-950 focus:ring-green-600"
-              >
-                <span className="sr-only">Dismiss</span>
-                <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SuccessMessage
+        message="Withdrawal successful!"
+        onDismiss={() => {
+          setShowSuccess(false)
+          onSuccess?.()
+        }}
+      />
     )
   }
 
@@ -331,42 +318,20 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
         onMax={handleMaxClick}
         showSlider={mode === 'percent'}
         suffix={(
-          <span className="inline-flex items-center gap-1">
-            <button
-              type="button"
-              onClick={switchToPercent}
-              className={`px-1.5 py-0.5 rounded border border-white/10 text-xs ${mode === 'percent' ? 'bg-white/10 text-gray-100' : 'text-gray-300 hover:bg-white/10'}`}
-              aria-label="Switch to percentage"
-            >
-              %
-            </button>
-            <button
-              type="button"
-              onClick={switchToAsset}
-              className={`px-1.5 py-0.5 rounded border border-white/10 text-xs ${mode === 'asset' ? 'bg-white/10 text-gray-100' : 'text-gray-300 hover:bg-white/10'}`}
-              aria-label={`Switch to ${loanTokenSymbol} amount`}
-            >
-              {loanTokenSymbol}
-            </button>
-          </span>
+          <ModeToggleSuffix
+            mode={mode}
+            assetSymbol={loanTokenSymbol}
+            onPercentClick={switchToPercent}
+            onAssetClick={switchToAsset}
+          />
         )}
         desktopCta={(
-          <Button
-            type="submit"
-            disabled={isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100 || isAboveMaxWithdrawShares}
-            className="w-full"
-          >
-            {isLoading
-              ? (
-                  <>
-                    <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" aria-hidden="true" />
-                    {isSimulatingWithdraw ? 'Preparing...' : 'Withdraw'}
-                  </>
-                )
-              : (
-                  `Withdraw ${withdrawAssetsShort} ${loanTokenSymbol}`
-                )}
-          </Button>
+          <SubmitButton
+            disabled={submitDisabled}
+            isLoading={isLoading}
+            idleLabel={submitIdleLabel}
+            loadingLabel={desktopLoadingLabel}
+          />
         )}
       />
 
@@ -381,48 +346,27 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
       )}
 
       {isUtilizationAfterAbove100 && (
-        <div className="bg-yellow-950/30 border border-yellow-800/40 rounded-lg p-3">
-          <p className="text-sm text-yellow-300">
-            This withdrawal would push market utilization above 100% (not enough available liquidity). Reduce the amount.
-          </p>
-        </div>
+        <InlineNotice tone="yellow">This withdrawal would push market utilization above 100% (not enough available liquidity). Reduce the amount.</InlineNotice>
       )}
 
       {isAboveMaxWithdrawShares && !isUtilizationAfterAbove100 && (
-        <div className="bg-yellow-950/30 border border-yellow-800/40 rounded-lg p-3">
-          <p className="text-sm text-yellow-300">
-            This amount exceeds the maximum withdrawable given your position and current market liquidity. Use Max or reduce the amount.
-          </p>
-        </div>
+        <InlineNotice tone="yellow">This amount exceeds the maximum withdrawable given your position and current market liquidity. Use Max or reduce the amount.</InlineNotice>
       )}
 
       {hasError && (
-        <div className="bg-red-950/30 border border-red-800/40 rounded-lg p-3">
-          <p className="text-sm text-red-300">
-            {withdrawError?.message || 'Withdrawal failed'}
-          </p>
-        </div>
+        <InlineNotice tone="red">{withdrawError?.message || 'Withdrawal failed'}</InlineNotice>
       )}
 
       {/* Mobile CTA */}
       <div className="md:hidden">
-        <Button
-          type="submit"
-          disabled={isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100 || isAboveMaxWithdrawShares}
-          className="w-full"
+        <SubmitButton
+          disabled={submitDisabled}
+          isLoading={isLoading}
+          idleLabel={submitIdleLabel}
+          loadingLabel={mobileLoadingLabel}
           variant="outline"
-        >
-          {isLoading
-            ? (
-                <>
-                  <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-300" aria-hidden="true" />
-                  {isSimulatingWithdraw ? 'Preparing withdrawal...' : 'Withdrawing...'}
-                </>
-              )
-            : (
-                `Withdraw ${withdrawAssetsShort} ${loanTokenSymbol}`
-              )}
-        </Button>
+          spinnerClassName="text-gray-300"
+        />
       </div>
 
       {!address && (
