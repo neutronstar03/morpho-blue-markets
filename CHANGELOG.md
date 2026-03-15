@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.3 - 2026-03-16
+
+### Introduced
+- feat: Supply APR Optimizer can now use a wallet fallback row and show a vault-informed baseline venue suggestion in the recap.
+- feat: fallback venue suggestions can deep-link to the referenced Morpho vault page when a vault source is available.
+- test: added live and unit coverage for vault-derived market APR selection, including popular asset reporting.
+
+### Changed
+- ux: replaced the old optimizer minimum move size control with Market APR and added Max / Zero deposit shortcuts.
+- optimizer: sub-threshold markets are now skipped and excess capital can be left in wallet instead of being forced into lower-yield pools.
+- optimizer: vault-derived baseline yield now uses rewards-aware `avgNetApy`, includes V1 + V2 vaults, applies a Mainnet floor, refreshes on a 10-minute cache window, and ignores blocked asset symbols such as `APXUSD` and `AUSD`.
+
 ## v1.2.2 - 2026-03-15
 
 ### Introduced

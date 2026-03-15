@@ -5,7 +5,7 @@ An alternative frontend for the [Morpho Blue](https://docs.morpho.org/tools/onch
 This project focuses on practical Morpho market exploration and action tooling, including:
 
 - Markets table with live APR previews and filterable chain views
-- Supply APR optimizer for rebalance and deposit planning
+- Supply APR optimizer for rebalance and deposit planning, with wallet fallback and vault-informed baseline yield hints
 - Batch withdraw flow for lower-APR-first exits
 - Position recap and market-level deposit/withdraw flows
 - Opportunity recap for coarse chain-level deployable yield evaluation
@@ -68,6 +68,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.3` (2026-03-16): optimizer now uses a Market APR threshold with wallet fallback, supports vault-informed baseline yield suggestions with Morpho deep links, and includes live tests for vault-derived APR selection.
 - `v1.2.2` (2026-03-15): added a Markets Opportunity Recap, modularized major home/market feature files into page-local submodules, and unified shared deposit/withdraw form UI pieces.
 - `v1.1.30` (2026-02-25): added baseline all-chain optimizer candidate filters (`netSupplyApy >= 1%`, `netSupplyApy <= 600%`, `borrowAssetsUsd >= $5`) for faster optimizer and Home Magic scan runs.
 - `v1.1.29` (2026-02-24): magic scan now starts only from home, continues across route changes, records cooldown on completed scans, and keeps the magic header visible while background scanning is active.
