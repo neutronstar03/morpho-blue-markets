@@ -5,7 +5,7 @@ import { formatUnits } from 'viem'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { MarketRiskText } from '~/components/ui/market-risk-text'
 import { formatBigintShort } from '~/lib/formatters'
-import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
+import { morphoAppMarketUrl, morphoAppVaultUrl } from '~/lib/morpho/morpho-app'
 import { fmtToken, pctFromWad, trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
 import { BundleOptimizerResult } from '~/pages/home/bundle-optimizer-result'
 
@@ -22,6 +22,10 @@ interface SupplyAprOptimizerResultsProps {
   chainId?: number
   morphoAddress?: `0x${string}`
   userSupplySharesByMarketId: Map<string, bigint>
+  walletFallbackLink?: {
+    chainName: string
+    vaultAddress: string
+  }
 }
 
 const WAD = 10n ** 18n
@@ -39,6 +43,7 @@ export function SupplyAprOptimizerResults({
   chainId,
   morphoAddress,
   userSupplySharesByMarketId,
+  walletFallbackLink,
 }: SupplyAprOptimizerResultsProps) {
   return (
     <div className="space-y-3">
@@ -88,6 +93,9 @@ export function SupplyAprOptimizerResults({
                     amount: deepLinkAmount,
                   }).toString()
                 : ''
+              const walletFallbackUrl = isWallet && walletFallbackLink
+                ? morphoAppVaultUrl(walletFallbackLink.chainName, walletFallbackLink.vaultAddress)
+                : undefined
               const yearlyReturnAssets = (p.amountAssets * p.supplyAprAfterWad) / WAD
 
               return (
@@ -106,9 +114,21 @@ export function SupplyAprOptimizerResults({
                               <MarketRiskText status={riskStatus}>{marketLabel}</MarketRiskText>
                             </Link>
                           )
-                        : (
-                            <span className="text-gray-200">{marketLabel}</span>
-                          )}
+                        : isWallet && walletFallbackUrl
+                          ? (
+                              <a
+                                href={walletFallbackUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:opacity-90 transition-opacity text-gray-200"
+                                title="Open vault in Morpho official UI"
+                              >
+                                {marketLabel}
+                              </a>
+                            )
+                          : (
+                              <span className="text-gray-200">{marketLabel}</span>
+                            )}
                       {!isWallet && chainNameForLinks && (
                         <a
                           href={morphoAppMarketUrl(chainNameForLinks, p.marketId)}
@@ -116,6 +136,17 @@ export function SupplyAprOptimizerResults({
                           rel="noopener noreferrer"
                           className="text-white hover:text-blue-400 transition-colors flex items-center"
                           title="Open in Morpho official UI"
+                        >
+                          <LinkNewWindow className="w-5 h-5" />
+                        </a>
+                      )}
+                      {isWallet && walletFallbackUrl && (
+                        <a
+                          href={walletFallbackUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-white hover:text-blue-400 transition-colors flex items-center"
+                          title="Open vault in Morpho official UI"
                         >
                           <LinkNewWindow className="w-5 h-5" />
                         </a>

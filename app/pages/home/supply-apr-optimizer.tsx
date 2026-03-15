@@ -13,6 +13,7 @@ import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
+import { useMarketAprByVaults } from '~/lib/hooks/graphql/use-market-apr-by-vaults'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loan-assets-by-chain'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
@@ -54,6 +55,7 @@ export function SupplyAprOptimizer() {
 
   const heuristicCacheRef = useRef(new Map<string, { stepAssets: bigint }>())
   const optimizerWorkerRef = useRef<Worker | null>(null)
+  const marketAprManuallyEditedRef = useRef(false)
   const [autoStepInfo, setAutoStepInfo] = useState<AutoStepInfo | null>(null)
   const [runProgressLabel, setRunProgressLabel] = useState<string | null>(null)
   const [runProgressPercent, setRunProgressPercent] = useState<number | null>(null)
@@ -128,6 +130,25 @@ export function SupplyAprOptimizer() {
       return undefined
     return loanAssetOptions.find(o => o.address.toLowerCase() === selectedLoanAddr)
   }, [loanAssetOptions, selectedLoanAddr])
+  const vaultAprQuery = useMarketAprByVaults({
+    enabled: ctx.started,
+  })
+  const effectiveVaultApr = chain?.id ? vaultAprQuery.effectiveByChainId.get(chain.id) : undefined
+  const fallbackLabel = useMemo(() => {
+    if (!effectiveVaultApr?.vaultName)
+      return 'Withdraw to wallet'
+    return effectiveVaultApr.source === 'mainnet-floor'
+      ? `Mainnet: ${effectiveVaultApr.vaultName}`
+      : `Vault: ${effectiveVaultApr.vaultName}`
+  }, [effectiveVaultApr])
+  const walletFallbackLink = useMemo(() => {
+    if (!effectiveVaultApr?.vaultAddress || !effectiveVaultApr.vaultChainId)
+      return undefined
+    return {
+      chainName: getSupportedChainName(effectiveVaultApr.vaultChainId),
+      vaultAddress: effectiveVaultApr.vaultAddress,
+    }
+  }, [effectiveVaultApr])
 
   const selectedUserMarketsAll = useMemo(() => {
     if (!selectedLoanAddr)
@@ -210,6 +231,11 @@ export function SupplyAprOptimizer() {
 
   // Derive UserSupplyPosition[] and total supplied, then set default min move size (1%).
   useEffect(() => {
+    if (!ctx.started)
+      marketAprManuallyEditedRef.current = false
+  }, [ctx.started])
+
+  useEffect(() => {
     if (!selectedOption)
       return
     if (!userMarketStates || userMarketStates.length !== selectedUserMarkets.length)
@@ -267,6 +293,18 @@ export function SupplyAprOptimizer() {
     if (s)
       setNewDepositAmount(s)
   }, [newDepositAmount, selectedOption, setNewDepositAmount, walletBalanceRaw])
+
+  useEffect(() => {
+    if (!ctx.started || !selectedOption)
+      return
+    if (marketAprManuallyEditedRef.current)
+      return
+
+    const nextMarketApr = effectiveVaultApr?.effectiveAprInput ?? DEFAULT_MARKET_APR
+    if ((ctx.inputs.marketApr ?? '') === nextMarketApr)
+      return
+    ctx.setMarketApr(nextMarketApr)
+  }, [DEFAULT_MARKET_APR, ctx, effectiveVaultApr?.effectiveAprInput, selectedOption])
 
   const [optimizeRequest, setOptimizeRequest] = useState<null | {
     runId: number
@@ -468,7 +506,7 @@ export function SupplyAprOptimizer() {
             maxMarketsUsed: optimizeRequest.maxMarketsUsed,
             minSupplyAprWad: optimizeRequest.fallbackAprWad,
             fallbackAprWad: optimizeRequest.fallbackAprWad,
-            fallbackLabel: 'Withdraw to wallet',
+            fallbackLabel,
           },
           maxIterations: MAX_OPTIMIZER_ITERATIONS,
           stepAssets,
@@ -483,7 +521,7 @@ export function SupplyAprOptimizer() {
       setRunProgressPercent(null)
       stopOptimizerWorker()
     }
-  }, [finishRun, optimizeReadResult, optimizeRequest, stopOptimizerWorker])
+  }, [fallbackLabel, finishRun, optimizeReadResult, optimizeRequest, stopOptimizerWorker])
 
   const canStart = !isLoadingPositions
   const canPick = ctx.started && loanAssetOptions.length > 0
@@ -491,6 +529,7 @@ export function SupplyAprOptimizer() {
   const onStart = () => ctx.start()
 
   const onChangeLoanAsset = (addr: string) => {
+    marketAprManuallyEditedRef.current = false
     const opt = loanAssetOptions.find(o => o.address === addr)
     ctx.setSelection({
       chainId: chain?.id,
@@ -498,8 +537,14 @@ export function SupplyAprOptimizer() {
       loanAssetSymbol: opt?.symbol,
       loanAssetDecimals: opt?.decimals,
     })
+    ctx.setMarketApr(DEFAULT_MARKET_APR)
     ctx.setNewDepositAmount(undefined)
   }
+
+  const onChangeMarketApr = useCallback((value: string) => {
+    marketAprManuallyEditedRef.current = true
+    ctx.setMarketApr(value)
+  }, [ctx])
 
   // Parsed deposit amount used to enable deposit-only optimization when no positions exist.
   const parsedDepositAssetsForGate = useMemo(() => {
@@ -817,6 +862,7 @@ export function SupplyAprOptimizer() {
     if (!ctx.started)
       ctx.start()
 
+    marketAprManuallyEditedRef.current = false
     ctx.setSelection({
       chainId: optimizerPreset.chainId,
       loanAssetAddress: optimizerPreset.loanAssetAddress,
@@ -891,7 +937,7 @@ export function SupplyAprOptimizer() {
                 selectedOption={selectedOption}
                 totalSuppliedAssets={ctx.derived.totalSuppliedAssets ?? 0n}
                 marketApr={ctx.inputs.marketApr}
-                onChangeMarketApr={value => ctx.setMarketApr(value)}
+                onChangeMarketApr={onChangeMarketApr}
                 newDepositAmount={ctx.inputs.newDepositAmount}
                 onChangeNewDepositAmount={value => ctx.setNewDepositAmount(value)}
                 onFillMaxDeposit={onFillMaxDeposit}
@@ -932,6 +978,7 @@ export function SupplyAprOptimizer() {
                 chainId={chain?.id}
                 morphoAddress={morphoAddress as `0x${string}` | undefined}
                 userSupplySharesByMarketId={userSupplySharesByMarketId}
+                walletFallbackLink={walletFallbackLink}
               />
             )}
           </>

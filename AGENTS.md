@@ -45,6 +45,10 @@ If you are unsure where a bug lives, start from the relevant file in `app/pages/
 - bun run lint
 - bun run build (if change touches routing, bundling, or shared libs)
 
+## Lint workflow
+- If lint fails on import order / formatting / other autofixable issues, run `bun run lint --fix` instead of fixing them manually.
+- Prefer autofix first; only make manual lint-only edits when autofix cannot resolve the issue.
+
 ## Debugging (UI via MCP DevTools)
 
 When debugging the Supply APR optimizer UI, use stable `data-testid` hooks:
