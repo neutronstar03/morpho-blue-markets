@@ -145,7 +145,7 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
   if (stepAssets == null || stepAssets <= 0n) {
     return {
       status: 'failed',
-      error: 'Minimum move size must be > 0',
+      error: 'Optimizer step size must be > 0',
     }
   }
 

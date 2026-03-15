@@ -93,7 +93,41 @@ describe('Bundler3 optimizer bundle builder', () => {
     if (!res.ok)
       return
     expect(res.summary.depositNeededAssets).toBe(0n)
+    expect(res.summary.returnedToWalletAssets).toBe(0n)
     expect(res.permit2ToSign).toBeUndefined()
     expect(res.bundle.length).toBe(2)
+  })
+
+  test('wallet fallback: sends excess withdraws back to wallet', () => {
+    const chainId = 1
+    const user = '0x00000000000000000000000000000000000000aa' as const
+    const marketA = '0x1111111111111111111111111111111111111111111111111111111111111111' as const
+    const marketB = '0x2222222222222222222222222222222222222222222222222222222222222222' as const
+
+    const marketParamsById = new Map<string, any>([
+      [marketA.toLowerCase(), mkParams()],
+      [marketB.toLowerCase(), mkParams()],
+    ])
+
+    const positions = [
+      { marketId: marketA, destinationKind: 'market', deltaAssets: -10n, maxWithdrawAssets: 10n, amountAssets: 0n },
+      { marketId: marketB, destinationKind: 'market', deltaAssets: 4n, maxWithdrawAssets: 0n, amountAssets: 4n },
+      { marketId: 'wallet-fallback', destinationKind: 'wallet', deltaAssets: 6n, maxWithdrawAssets: 0n, amountAssets: 6n },
+    ] as any
+
+    const res = buildOptimizerBundle({
+      chainId,
+      userAddress: user,
+      marketParamsById,
+      positions,
+      nowSec: 1_700_000_000n,
+    })
+
+    expect(res.ok).toBe(true)
+    if (!res.ok)
+      return
+    expect(res.summary.depositNeededAssets).toBe(0n)
+    expect(res.summary.returnedToWalletAssets).toBe(6n)
+    expect(res.bundle.length).toBe(3)
   })
 })

@@ -32,6 +32,8 @@ const PERIODIC_RESCAN_CHECK_MS = 60 * 1000
 const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
 const MAX_CANDIDATE_NET_SUPPLY_APY = 6
 const MIN_CANDIDATE_BORROW_USD = 5
+const DEFAULT_MARKET_APR = '10'
+const DEFAULT_MARKET_APR_WAD = 100_000_000_000_000_000n
 
 export function useHomeMagicOptimizerScan() {
   const { isConnected, address: userAddress, chain } = useAccount()
@@ -343,11 +345,12 @@ export function useHomeMagicOptimizerScan() {
 
           if (userAddressLower) {
             upsertPrecomputedResult({
-              id: `${chainIdSafe}:${userAddressLower}:${loanAssetAddressLower}:6:0`,
+              id: `${chainIdSafe}:${userAddressLower}:${loanAssetAddressLower}:6:${DEFAULT_MARKET_APR}:0`,
               chainId: chainIdSafe,
               userAddressLower,
               loanAssetAddressLower,
               maxMarketsUsed: MAX_MARKETS_USED,
+              marketApr: DEFAULT_MARKET_APR,
               newDepositAmount: '0',
               computedAt: nowMs,
               expiresAt: nowMs + PRECOMPUTED_RESULT_TTL_MS,
@@ -389,6 +392,9 @@ export function useHomeMagicOptimizerScan() {
         timestamp: request.timestamp,
         constraints: {
           maxMarketsUsed: MAX_MARKETS_USED,
+          minSupplyAprWad: DEFAULT_MARKET_APR_WAD,
+          fallbackAprWad: DEFAULT_MARKET_APR_WAD,
+          fallbackLabel: 'Withdraw to wallet',
         },
         maxIterations: MAX_OPTIMIZER_ITERATIONS,
         auto: true,

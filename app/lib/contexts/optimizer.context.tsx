@@ -10,11 +10,13 @@ export interface SupplyAprOptimizerSelection {
 }
 
 export interface SupplyAprOptimizerInputs {
-  /** Human input in token units (e.g. "123.45"). Parsed later using decimals. */
-  minMoveSize?: string
+  /** Minimum acceptable APR for supplied markets, in percent units (e.g. "10"). */
+  marketApr?: string
   /** Optional: additional amount to supply (new deposit), in token units (e.g. "123.45"). */
   newDepositAmount?: string
 }
+
+const DEFAULT_MARKET_APR = '10'
 
 export interface SupplyAprOptimizerDerived {
   /** Total currently supplied for the selected loan asset (raw units). */
@@ -43,7 +45,7 @@ interface SupplyAprOptimizerContextValue extends SupplyAprOptimizerState {
   start: () => void
   clear: () => void
   setSelection: (next: SupplyAprOptimizerSelection) => void
-  setMinMoveSize: (v: string | undefined) => void
+  setMarketApr: (v: string | undefined) => void
   setNewDepositAmount: (v: string | undefined) => void
   setDerived: (next: SupplyAprOptimizerDerived) => void
   beginRun: (meta?: { timestamp?: bigint }) => number
@@ -57,7 +59,7 @@ const SupplyAprOptimizerContext = createContext<SupplyAprOptimizerContextValue |
 export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }) {
   const [started, setStarted] = useState(false)
   const [selection, setSelectionState] = useState<SupplyAprOptimizerSelection>({})
-  const [inputs, setInputs] = useState<SupplyAprOptimizerInputs>({})
+  const [inputs, setInputs] = useState<SupplyAprOptimizerInputs>({ marketApr: DEFAULT_MARKET_APR })
   const [derived, setDerivedState] = useState<SupplyAprOptimizerDerived>({})
   const [run, setRun] = useState<SupplyAprOptimizerRunState>({ isRunning: false, runId: 0 })
   const [result, setResult] = useState<OptimizeSupplyWithPositionsResult | undefined>(undefined)
@@ -68,7 +70,7 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
   const clear = useCallback(() => {
     setStarted(false)
     setSelectionState({})
-    setInputs({})
+    setInputs({ marketApr: DEFAULT_MARKET_APR })
     setDerivedState({})
     setRun((prev) => {
       const nextRunId = prev.runId + 1
@@ -86,8 +88,8 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
     setRun(prev => ({ ...prev, error: undefined }))
   }, [])
 
-  const setMinMoveSize = useCallback((v: string | undefined) => {
-    setInputs(prev => ({ ...prev, minMoveSize: v }))
+  const setMarketApr = useCallback((v: string | undefined) => {
+    setInputs(prev => ({ ...prev, marketApr: v }))
   }, [])
 
   const setNewDepositAmount = useCallback((v: string | undefined) => {
@@ -146,7 +148,7 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
       start,
       clear,
       setSelection,
-      setMinMoveSize,
+      setMarketApr,
       setNewDepositAmount,
       setDerived,
       beginRun,
@@ -154,7 +156,7 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
       finishRun,
       applyPrefetchedResult,
     }
-  }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMinMoveSize, setNewDepositAmount, setDerived, beginRun, cancelRun, finishRun, applyPrefetchedResult])
+  }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMarketApr, setNewDepositAmount, setDerived, beginRun, cancelRun, finishRun, applyPrefetchedResult])
 
   return (
     <SupplyAprOptimizerContext.Provider value={value}>

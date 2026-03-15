@@ -27,6 +27,7 @@ export function buildMoveSizeCacheKey(args: {
   chainId?: number
   loanAssetAddress?: string
   newDepositAssets: bigint
+  fallbackAprWad?: bigint
   maxMarketsUsed: number
   positions: UserSupplyPosition[]
 }): string {
@@ -38,6 +39,7 @@ export function buildMoveSizeCacheKey(args: {
     args.chainId ?? 0,
     (args.loanAssetAddress ?? 'unknown').toLowerCase(),
     args.newDepositAssets.toString(),
+    (args.fallbackAprWad ?? 0n).toString(),
     args.maxMarketsUsed.toString(),
     positionsKey,
   ].join('::')

@@ -45,6 +45,7 @@ export default function HomePage() {
       loanAssetAddress: opportunity.loanAssetAddress,
       loanAssetSymbol: opportunity.loanAssetSymbol,
       loanAssetDecimals: opportunity.loanAssetDecimals,
+      marketApr: '10',
       newDepositAmount: '0',
       maxMarketsUsed: 6,
       usePrecomputedIfFresh: true,

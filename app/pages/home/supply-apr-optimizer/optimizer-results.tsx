@@ -72,13 +72,16 @@ export function SupplyAprOptimizerResults({
           <tbody className="divide-y divide-gray-700 bg-gray-900/20">
             {displayResult.positions.map((p) => {
               const deltaSign = p.deltaAssets >= 0n ? '+' : ''
-              const meta = marketMetaById.get(p.marketId.toLowerCase())
+              const isWallet = p.destinationKind === 'wallet'
+              const meta = isWallet ? undefined : marketMetaById.get(p.marketId.toLowerCase())
               const riskStatus = meta?.status
-              const marketLabel = meta?.collateralSymbol ? `${meta.collateralSymbol} / ${symbol}` : `${p.marketId.slice(0, 10)}…${p.marketId.slice(-6)}`
+              const marketLabel = isWallet
+                ? (p.label ?? 'Withdraw to wallet')
+                : (meta?.collateralSymbol ? `${meta.collateralSymbol} / ${symbol}` : `${p.marketId.slice(0, 10)}…${p.marketId.slice(-6)}`)
               const absDeltaAssets = p.deltaAssets < 0n ? -p.deltaAssets : p.deltaAssets
               const deepLinkTab = p.deltaAssets < 0n ? 'withdraw' : 'deposit'
               const deepLinkAmount = trimTrailingZerosDecimalString(formatUnits(absDeltaAssets, selectedOption.decimals))
-              const deepLinkSearch = absDeltaAssets > 0n && deepLinkAmount
+              const deepLinkSearch = !isWallet && absDeltaAssets > 0n && deepLinkAmount
                 ? createSearchParams({
                     tab: deepLinkTab,
                     unit: 'asset',
@@ -91,7 +94,7 @@ export function SupplyAprOptimizerResults({
                 <tr key={p.marketId}>
                   <td className="px-3 sm:px-4 py-2 text-sm text-white">
                     <div className="flex items-center gap-2">
-                      {chainIdForLinks
+                      {!isWallet && chainIdForLinks
                         ? (
                             <Link
                               to={{
@@ -104,9 +107,9 @@ export function SupplyAprOptimizerResults({
                             </Link>
                           )
                         : (
-                            <MarketRiskText status={riskStatus}>{marketLabel}</MarketRiskText>
+                            <span className="text-gray-200">{marketLabel}</span>
                           )}
-                      {chainNameForLinks && (
+                      {!isWallet && chainNameForLinks && (
                         <a
                           href={morphoAppMarketUrl(chainNameForLinks, p.marketId)}
                           target="_blank"
@@ -171,7 +174,7 @@ export function SupplyAprOptimizerResults({
             </div>
           )}
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <p className="text-xs text-gray-400 whitespace-nowrap">Total allocated</p>
+            <p className="text-xs text-gray-400 whitespace-nowrap">Total optimized</p>
             <p className="text-sm text-white whitespace-nowrap">
               {formatBigintShort(totalAllocatedAssets, selectedOption.decimals)}
               {' '}

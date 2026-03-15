@@ -57,7 +57,7 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
   const executeMarketIds = useMemo(() => {
     const ids = new Set<string>()
     for (const p of displayResult.positions) {
-      if (p.deltaAssets !== 0n)
+      if (p.deltaAssets !== 0n && p.destinationKind === 'market')
         ids.add(p.marketId.toLowerCase())
     }
     return [...ids.values()].map(x => x as `0x${string}`)
@@ -269,7 +269,7 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
       </div>
 
       {bundleSummary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
           <div className="bg-gray-900 border border-gray-700 rounded px-2 py-1">
             <div className="text-gray-400">Withdraw</div>
             <div className="text-gray-100 tabular-nums">
@@ -290,6 +290,14 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
             <div className="text-gray-400">Wallet used</div>
             <div className="text-gray-100 tabular-nums">
               {fmtToken(bundleSummary.depositNeededAssets, loanToken.decimals)}
+              {' '}
+              {loanToken.symbol}
+            </div>
+          </div>
+          <div className="bg-gray-900 border border-gray-700 rounded px-2 py-1">
+            <div className="text-gray-400">Returned to wallet</div>
+            <div className="text-gray-100 tabular-nums">
+              {fmtToken(bundleSummary.returnedToWalletAssets, loanToken.decimals)}
               {' '}
               {loanToken.symbol}
             </div>

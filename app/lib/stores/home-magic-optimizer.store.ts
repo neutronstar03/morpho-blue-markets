@@ -17,6 +17,7 @@ export interface HomeMagicOptimizerPreset {
   loanAssetAddress: string
   loanAssetSymbol: string
   loanAssetDecimals: number
+  marketApr?: string
   newDepositAmount: string
   maxMarketsUsed: number
   usePrecomputedIfFresh?: boolean
@@ -28,6 +29,7 @@ interface HomeMagicPrecomputedResult {
   userAddressLower: string
   loanAssetAddressLower: string
   maxMarketsUsed: number
+  marketApr: string
   newDepositAmount: string
   computedAt: number
   expiresAt: number
@@ -56,6 +58,7 @@ interface HomeMagicOptimizerState {
     userAddress: string
     loanAssetAddress: string
     maxMarketsUsed: number
+    marketApr: string
     newDepositAmount: string
     nowMs?: number
   }) => OptimizeSupplyWithPositionsResult | undefined
@@ -132,6 +135,7 @@ export const useHomeMagicOptimizerStore = create<HomeMagicOptimizerState>((set, 
       userAddress,
       loanAssetAddress,
       maxMarketsUsed,
+      marketApr,
       newDepositAmount,
       nowMs = Date.now(),
     } = args
@@ -144,6 +148,7 @@ export const useHomeMagicOptimizerStore = create<HomeMagicOptimizerState>((set, 
         && item.userAddressLower === userAddressLower
         && item.loanAssetAddressLower === loanAssetAddressLower
         && item.maxMarketsUsed === maxMarketsUsed
+        && item.marketApr === marketApr
         && item.newDepositAmount === newDepositAmount
         && item.expiresAt >= nowMs
     })

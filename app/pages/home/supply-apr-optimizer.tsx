@@ -41,6 +41,7 @@ export function SupplyAprOptimizer() {
   const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
   const MAX_CANDIDATE_NET_SUPPLY_APY = 6
   const MIN_CANDIDATE_BORROW_USD = 5
+  const DEFAULT_MARKET_APR = '10'
 
   const ctx = useSupplyAprOptimizer()
   const { address: userAddress, chain } = useAccount()
@@ -272,6 +273,7 @@ export function SupplyAprOptimizer() {
     timestamp: bigint
     stepAssets?: bigint
     newDepositAssets: bigint
+    fallbackAprWad: bigint
     maxMarketsUsed: number
     positions: UserSupplyPosition[]
     markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>
@@ -411,7 +413,7 @@ export function SupplyAprOptimizer() {
           finishRun(
             optimizeRequest.runId,
             undefined,
-            'Optimizer stopped early (maximum iterations reached). Try increasing “Minimum move size”.',
+            'Optimizer stopped early (maximum iterations reached). Try narrowing the market set and retrying.',
           )
           return
         }
@@ -464,6 +466,9 @@ export function SupplyAprOptimizer() {
           timestamp: optimizeRequest.timestamp,
           constraints: {
             maxMarketsUsed: optimizeRequest.maxMarketsUsed,
+            minSupplyAprWad: optimizeRequest.fallbackAprWad,
+            fallbackAprWad: optimizeRequest.fallbackAprWad,
+            fallbackLabel: 'Withdraw to wallet',
           },
           maxIterations: MAX_OPTIMIZER_ITERATIONS,
           stepAssets,
@@ -493,8 +498,6 @@ export function SupplyAprOptimizer() {
       loanAssetSymbol: opt?.symbol,
       loanAssetDecimals: opt?.decimals,
     })
-    // Mark as "unset" so Auto applies for the new selection.
-    ctx.setMinMoveSize(undefined)
     ctx.setNewDepositAmount(undefined)
   }
 
@@ -518,6 +521,16 @@ export function SupplyAprOptimizer() {
     const parsed = Number.parseInt(value.trim(), 10)
     return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1
   }
+
+  const onFillMaxDeposit = useCallback(() => {
+    if (!selectedOption)
+      return
+    ctx.setNewDepositAmount(formatUnits(walletBalanceRaw ?? 0n, selectedOption.decimals))
+  }, [ctx, selectedOption, walletBalanceRaw])
+
+  const onFillZeroDeposit = useCallback(() => {
+    ctx.setNewDepositAmount('0')
+  }, [ctx])
 
   const onOptimize = () => {
     if (!selectedOption || !userAddress || !chain?.id)
@@ -547,19 +560,16 @@ export function SupplyAprOptimizer() {
     setRunProgressLabel('Loading data')
     setRunProgressPercent(null)
 
-    const minMoveSizeRaw = (ctx.inputs.minMoveSize ?? '').trim()
-    const useAutoMoveSize = minMoveSizeRaw.length === 0
-    let stepAssets: bigint | undefined
-
-    if (!useAutoMoveSize) {
-      stepAssets = parseTokenAmount(minMoveSizeRaw, selectedOption.decimals)
-      if (stepAssets <= 0n) {
-        finishRun(runId, undefined, 'Minimum move size must be > 0')
-        setRunProgressLabel(null)
-        setRunProgressPercent(null)
-        return
-      }
+    const marketAprRaw = (ctx.inputs.marketApr ?? DEFAULT_MARKET_APR).trim()
+    const fallbackAprWad = parseTokenAmount(marketAprRaw, 16)
+    if (fallbackAprWad < 0n) {
+      finishRun(runId, undefined, 'Market APR must be >= 0')
+      setRunProgressLabel(null)
+      setRunProgressPercent(null)
+      return
     }
+
+    let stepAssets: bigint | undefined
 
     const maxMarketsUsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
     if (!Number.isFinite(maxMarketsUsed) || maxMarketsUsed < 1) {
@@ -581,15 +591,14 @@ export function SupplyAprOptimizer() {
       chainId: chain?.id,
       loanAssetAddress: selectedOption.address,
       newDepositAssets,
+      fallbackAprWad,
       maxMarketsUsed,
       positions,
     })
 
-    if (useAutoMoveSize) {
-      const cached = heuristicCacheRef.current.get(cacheKey)
-      if (cached)
-        stepAssets = cached.stepAssets
-    }
+    const cached = heuristicCacheRef.current.get(cacheKey)
+    if (cached)
+      stepAssets = cached.stepAssets
 
     // Universe = top markets (<= 200) ∪ user's markets (for safety).
     const universe = new Map<string, { uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>()
@@ -634,11 +643,12 @@ export function SupplyAprOptimizer() {
       timestamp,
       stepAssets,
       newDepositAssets,
+      fallbackAprWad,
       maxMarketsUsed,
       positions,
       markets: [...universe.values()],
-      autoStep: useAutoMoveSize,
-      autoCacheKey: useAutoMoveSize ? cacheKey : undefined,
+      autoStep: true,
+      autoCacheKey: cacheKey,
     }
 
     const debugRequest: SupplyOptimizerDebugRequest = {
@@ -799,6 +809,7 @@ export function SupplyAprOptimizer() {
           userAddress,
           loanAssetAddress: optimizerPreset.loanAssetAddress,
           maxMarketsUsed: optimizerPreset.maxMarketsUsed,
+          marketApr: optimizerPreset.marketApr ?? DEFAULT_MARKET_APR,
           newDepositAmount: optimizerPreset.newDepositAmount,
         })
       : undefined
@@ -812,7 +823,7 @@ export function SupplyAprOptimizer() {
       loanAssetSymbol: optimizerPreset.loanAssetSymbol,
       loanAssetDecimals: optimizerPreset.loanAssetDecimals,
     })
-    ctx.setMinMoveSize(undefined)
+    ctx.setMarketApr(optimizerPreset.marketApr ?? DEFAULT_MARKET_APR)
     ctx.setNewDepositAmount(optimizerPreset.newDepositAmount)
     setMaxMarketsInput(String(optimizerPreset.maxMarketsUsed))
 
@@ -879,10 +890,12 @@ export function SupplyAprOptimizer() {
                 loanAssetOptions={loanAssetOptions}
                 selectedOption={selectedOption}
                 totalSuppliedAssets={ctx.derived.totalSuppliedAssets ?? 0n}
-                minMoveSize={ctx.inputs.minMoveSize}
-                onChangeMinMoveSize={value => ctx.setMinMoveSize(value)}
+                marketApr={ctx.inputs.marketApr}
+                onChangeMarketApr={value => ctx.setMarketApr(value)}
                 newDepositAmount={ctx.inputs.newDepositAmount}
                 onChangeNewDepositAmount={value => ctx.setNewDepositAmount(value)}
+                onFillMaxDeposit={onFillMaxDeposit}
+                onFillZeroDeposit={onFillZeroDeposit}
                 walletBalanceRaw={walletBalanceRaw}
                 symbol={symbol}
                 maxMarketsInput={maxMarketsInput ?? ''}

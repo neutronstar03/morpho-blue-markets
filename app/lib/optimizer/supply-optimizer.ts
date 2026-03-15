@@ -2,6 +2,19 @@ import { adaptiveCurveBorrowRateView } from '../irm/adaptive-curve-irm'
 import { aprWadFromRatePerSecondWad, apyWadFromRatePerSecondWad, supplyRatePerSecondWad, utilizationWad } from '../irm/apy-math'
 import { addDepositProRata, getPerMarketCap, max0, minBigint, normalizeId, sumBigints } from './supply-optimizer-utils'
 
+/**
+ * Optimizer design, at a glance:
+ * 1) Convert each venue into a post-allocation APR function using live Morpho state + IRM math.
+ * 2) Build a feasible starting point: either zero allocations, or per-market minimum finals when rebalancing.
+ * 3) Repeatedly evaluate one incremental "greedy step" across every allowed venue.
+ * 4) Score that step by marginal annualized benefit, not raw APR, so existing size and APR decay matter.
+ * 5) Commit the best next step, then repeat until funds run out or constraints stop allocation.
+ * 6) Recompute blended APR/APY and emit final targets/deltas for display and execution.
+ *
+ * In this file, a "greedy step" means: take one chunk of `stepAssets` and assign it to the
+ * venue whose next incremental chunk improves expected annualized return the most.
+ */
+
 export interface SupplyOptimizerMarketSnapshot {
   /** Morpho market id (bytes32 as 0x-hex). On Morpho GraphQL this is `uniqueKey`. */
   marketId: `0x${string}`
@@ -59,6 +72,10 @@ export interface SupplyOptimizerConstraints {
    * positions, while still preventing churn/noise in rebalance-only runs.
    */
   newMarketHysteresisAprWad?: bigint
+  /** Optional fallback APR used when funds are better left outside Morpho. */
+  fallbackAprWad?: bigint
+  /** Display label for the fallback destination. */
+  fallbackLabel?: string
 }
 
 export interface OptimizeSupplyAllocationArgs {
@@ -78,7 +95,7 @@ export interface OptimizeSupplyAllocationArgs {
 }
 
 export interface OptimizedMarketAllocation {
-  marketId: `0x${string}`
+  marketId: string
   uniqueKey?: string
   amountAssets: bigint
   /** Post-allocation utilization (WAD). */
@@ -128,6 +145,8 @@ export interface OptimizeSupplyWithPositionsArgs {
 }
 
 export interface OptimizedPositionDelta extends OptimizedMarketAllocation {
+  destinationKind: 'market' | 'wallet'
+  label?: string
   /** Current user supplied assets (raw). */
   currentUserAssets: bigint
   /** Delta to reach the optimized final amount (raw). Positive = supply, negative = withdraw. */
@@ -217,28 +236,67 @@ export function computeSupplyAfterDeltaWad(args: {
   }
 }
 
+const ZERO_WAD = 0n
+
+function allocationRatesAtIndex(args: {
+  index: number
+  markets: SupplyOptimizerMarketSnapshot[]
+  finalUserAllocations: readonly bigint[]
+  exUserSupplyAssets: readonly bigint[]
+  timestamp: bigint
+  fallbackIndex?: number
+  fallbackAprWad?: bigint
+}): {
+  utilizationAfterWad: bigint
+  supplyAprWad: bigint
+  supplyApyWad: bigint
+} {
+  const { index, markets, finalUserAllocations, exUserSupplyAssets, timestamp, fallbackIndex, fallbackAprWad } = args
+  if (fallbackIndex != null && index === fallbackIndex) {
+    const apr = fallbackAprWad ?? 0n
+    return {
+      utilizationAfterWad: ZERO_WAD,
+      supplyAprWad: apr,
+      supplyApyWad: apr,
+    }
+  }
+
+  const modeledMarket: SupplyOptimizerMarketSnapshot = {
+    ...markets[index],
+    totalSupplyAssets: exUserSupplyAssets[index] + finalUserAllocations[index],
+  }
+  const { utilizationAfterWad, supplyAprWad, supplyApyWad } = computeSupplyAfterDeltaWad({
+    market: modeledMarket,
+    deltaSupplyAssets: 0n,
+    timestamp,
+  })
+  return { utilizationAfterWad, supplyAprWad, supplyApyWad }
+}
+
 function blendedRatesFromFinalAllocations(args: {
   markets: SupplyOptimizerMarketSnapshot[]
   finalUserAllocations: readonly bigint[]
   exUserSupplyAssets: readonly bigint[]
   timestamp: bigint
+  fallbackIndex?: number
+  fallbackAprWad?: bigint
 }): { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint } {
-  const { markets, finalUserAllocations, exUserSupplyAssets, timestamp } = args
+  const { markets, finalUserAllocations, exUserSupplyAssets, timestamp, fallbackIndex, fallbackAprWad } = args
   let total = 0n
   let wApr = 0n
   let wApy = 0n
-  for (let i = 0; i < markets.length; i++) {
+  for (let i = 0; i < finalUserAllocations.length; i++) {
     const amt = finalUserAllocations[i]
     if (amt <= 0n)
       continue
-    const modeledMarket: SupplyOptimizerMarketSnapshot = {
-      ...markets[i],
-      totalSupplyAssets: exUserSupplyAssets[i] + amt,
-    }
-    const { supplyAprWad, supplyApyWad } = computeSupplyAfterDeltaWad({
-      market: modeledMarket,
-      deltaSupplyAssets: 0n,
+    const { supplyAprWad, supplyApyWad } = allocationRatesAtIndex({
+      index: i,
+      markets,
+      finalUserAllocations,
+      exUserSupplyAssets,
       timestamp,
+      fallbackIndex,
+      fallbackAprWad,
     })
     total += amt
     wApr += amt * supplyAprWad
@@ -251,6 +309,13 @@ function blendedRatesFromFinalAllocations(args: {
   }
 }
 
+/**
+ * Shared greedy allocator used for "add assets upward from a fixed starting point" flows.
+ *
+ * See design steps (3)-(5) above: this helper does the repeated next-step selection.
+ * It does not try to solve the whole portfolio in one shot; instead it chooses the best next
+ * chunk of size `stepAssets`, commits it, and loops until nothing else should be added.
+ */
 function greedyAllocateUpwards(args: {
   markets: SupplyOptimizerMarketSnapshot[]
   exUserSupplyAssets: readonly bigint[]
@@ -262,6 +327,8 @@ function greedyAllocateUpwards(args: {
   constraints?: SupplyOptimizerConstraints
   used: Set<number>
   maxIterations: number
+  fallbackIndex?: number
+  fallbackAprWad?: bigint
 }): { remaining: bigint, iterations: number } {
   const {
     markets,
@@ -274,6 +341,8 @@ function greedyAllocateUpwards(args: {
     constraints,
     used,
     maxIterations,
+    fallbackIndex,
+    fallbackAprWad,
   } = args
 
   if (stepAssets <= 0n)
@@ -297,11 +366,13 @@ function greedyAllocateUpwards(args: {
     let bestNewScore = -(2n ** 255n)
     let bestExistingScore = -(2n ** 255n)
 
-    for (let i = 0; i < markets.length; i++) {
-      if (maxMarketsUsed != null && maxMarketsUsed > 0 && allocations[i] === 0n && used.size >= maxMarketsUsed)
+    // Design step (3): enumerate every venue that could receive the next chunk.
+    for (let i = 0; i < allocations.length; i++) {
+      const isFallback = fallbackIndex != null && i === fallbackIndex
+      if (!isFallback && maxMarketsUsed != null && maxMarketsUsed > 0 && allocations[i] === 0n && used.size >= maxMarketsUsed)
         continue
 
-      const capRemaining = maxFinal[i] - allocations[i]
+      const capRemaining = isFallback ? (2n ** 255n) : (maxFinal[i] - allocations[i])
       if (capRemaining <= 0n)
         continue
 
@@ -312,9 +383,28 @@ function greedyAllocateUpwards(args: {
 
       const currentFinal = allocations[i]
 
-      // If we're about to consume the final available market slot, score opening this new market
-      // on a "probe" equal to the remaining allocation. This avoids opening markets that look
-      // good for a single tiny step but collapse at meaningful size.
+      if (isFallback) {
+        // The fallback venue has a flat APR, so its marginal score is linear in added size.
+        const apr = fallbackAprWad ?? 0n
+        const candidateFinalForScore = allocations[i] + step
+        const score = (candidateFinalForScore * apr) - (currentFinal * apr)
+        if (currentFinal === 0n) {
+          if (score > bestNewScore) {
+            bestNewScore = score
+            bestNewIdx = i
+            bestNewStep = step
+          }
+        }
+        else if (score > bestExistingScore) {
+          bestExistingScore = score
+          bestExistingIdx = i
+          bestExistingStep = step
+        }
+        continue
+      }
+
+      // If we're about to consume the last open-market slot, score the candidate using a larger
+      // probe. This reduces "slot stealing" by markets that only look attractive for a tiny step.
       const isLastSlotNewMarket = (currentFinal === 0n)
         && (maxMarketsUsed != null && maxMarketsUsed > 0)
         && (used.size === (maxMarketsUsed - 1))
@@ -341,6 +431,7 @@ function greedyAllocateUpwards(args: {
       }
       const candidateFinalForScore = allocations[i] + scoreStep
 
+      // Design step (1): reprice the market at current size vs candidate size.
       const currentMarket: SupplyOptimizerMarketSnapshot = {
         ...markets[i],
         totalSupplyAssets: exUserSupplyAssets[i] + currentFinal,
@@ -363,8 +454,8 @@ function greedyAllocateUpwards(args: {
       if (minAprWad != null && supplyAprWad < minAprWad)
         continue
 
-      // Score by *delta* expected 1y yield (assets * WAD), accounting for the APR shift on existing
-      // allocated assets when utilization changes. This reduces step-size sensitivity vs step*APR.
+      // Design step (4): score by marginal annualized benefit, not by raw APR alone.
+      // This means we account for APR decay on assets already allocated to the same market.
       const score = (candidateFinalForScore * supplyAprWad) - (currentFinal * supplyAprCurrentWad)
       if (minNewMarketBenefitWad != null && currentFinal === 0n && score < minNewMarketBenefitWad)
         continue
@@ -391,6 +482,7 @@ function greedyAllocateUpwards(args: {
     let chosenIdx = bestExistingIdx
     let chosenStep = bestExistingStep
 
+    // Design step (5): choose the best next step, with hysteresis to avoid noisy market opening.
     if (bestNewIdx >= 0 && (bestExistingIdx < 0 || bestNewScore > bestExistingScore)) {
       let allowNew = true
       if (bestExistingIdx >= 0 && newMarketHysteresisAprWad != null && newMarketHysteresisAprWad > 0n) {
@@ -407,8 +499,9 @@ function greedyAllocateUpwards(args: {
     if (chosenIdx < 0 || chosenStep <= 0n)
       break
 
+    // Commit the chosen greedy step, then continue from the updated state.
     allocations[chosenIdx] += chosenStep
-    if (allocations[chosenIdx] > 0n)
+    if ((fallbackIndex == null || chosenIdx !== fallbackIndex) && allocations[chosenIdx] > 0n)
       used.add(chosenIdx)
     remaining -= chosenStep
     iterations++
@@ -453,6 +546,7 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
     let bestNewScore = -(2n ** 255n)
     let bestExistingScore = -(2n ** 255n)
 
+    // Standalone allocator variant of the same greedy-step loop described above.
     for (let i = 0; i < markets.length; i++) {
       const m = markets[i]
 
@@ -505,7 +599,7 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
       if (minAprWad != null && supplyAprWad < minAprWad)
         continue
 
-      // Score by *delta* expected 1y yield (assets * WAD), accounting for APR shift on already-allocated assets.
+      // Same marginal-benefit scoring rule as `greedyAllocateUpwards()`.
       const score = (candidateAmtForScore * supplyAprWad) - (currentAmt * supplyAprCurrentWad)
       if (minNewMarketBenefitWad != null && currentAmt === 0n && score < minNewMarketBenefitWad)
         continue
@@ -548,6 +642,7 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
     if (chosenIdx < 0 || chosenStep <= 0n)
       break
 
+    // Commit the chosen greedy step.
     allocated[chosenIdx] += chosenStep
     used.add(chosenIdx)
     remaining -= chosenStep
@@ -606,6 +701,9 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
  *
  * To avoid double-counting the user inside `market.totalSupplyAssets`, utilization is modeled using:
  *   totalSupplyAssets_modeled = max(0, totalSupplyAssets - currentUserAssets) + x_i
+ *
+ * Compared with the standalone allocator, this function first builds a feasible minimum allocation
+ * per venue, then greedily adds the remaining assets upward from that floor. See design steps (2)-(6).
  */
 export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPositionsArgs): OptimizeSupplyWithPositionsResult {
   const {
@@ -624,6 +722,10 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
     throw new Error('stepAssets must be > 0')
 
   const n = markets.length
+  const fallbackAprWad = constraints?.fallbackAprWad
+  const hasFallback = fallbackAprWad != null && fallbackAprWad >= 0n
+  const fallbackIndex = hasFallback ? n : undefined
+  const fallbackLabel = constraints?.fallbackLabel ?? 'Withdraw to wallet'
   if (n === 0) {
     return {
       current: { totalAssets: 0n, blendedAprWad: 0n, blendedApyWad: 0n },
@@ -652,11 +754,12 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
       throw new Error(`Missing market snapshot for user position: ${id}`)
   }
 
-  const currentUser: bigint[] = Array.from({ length: n }, () => 0n)
-  const exUserSupply: bigint[] = Array.from({ length: n }, () => 0n)
-  const maxWithdraw: bigint[] = Array.from({ length: n }, () => 0n)
-  const minFinal: bigint[] = Array.from({ length: n }, () => 0n)
-  const maxFinal: bigint[] = Array.from({ length: n }, () => 0n)
+  const totalSlots = n + (hasFallback ? 1 : 0)
+  const currentUser: bigint[] = Array.from({ length: totalSlots }, () => 0n)
+  const exUserSupply: bigint[] = Array.from({ length: totalSlots }, () => 0n)
+  const maxWithdraw: bigint[] = Array.from({ length: totalSlots }, () => 0n)
+  const minFinal: bigint[] = Array.from({ length: totalSlots }, () => 0n)
+  const maxFinal: bigint[] = Array.from({ length: totalSlots }, () => 0n)
 
   for (let i = 0; i < n; i++) {
     const m = markets[i]
@@ -685,7 +788,7 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
   const currentTotal = sumBigints(currentUser)
   const targetTotal = currentTotal + newDepositAssets
 
-  // Seed with minimums and allocate remaining.
+  // Design step (2): seed with the minimum feasible finals, then only optimize the remaining amount.
   const finalAlloc = [...minFinal]
   const minSum = sumBigints(minFinal)
 
@@ -720,11 +823,13 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
     let bestNewScore = -(2n ** 255n)
     let bestExistingScore = -(2n ** 255n)
 
-    for (let i = 0; i < n; i++) {
-      if (maxMarketsUsed != null && maxMarketsUsed > 0 && finalAlloc[i] === 0n && used.size >= maxMarketsUsed)
+    // Design step (3): evaluate the next greedy step across both Morpho markets and fallback.
+    for (let i = 0; i < totalSlots; i++) {
+      const isFallback = fallbackIndex != null && i === fallbackIndex
+      if (!isFallback && maxMarketsUsed != null && maxMarketsUsed > 0 && finalAlloc[i] === 0n && used.size >= maxMarketsUsed)
         continue
 
-      const capRemaining = maxFinal[i] - finalAlloc[i]
+      const capRemaining = isFallback ? (2n ** 255n) : (maxFinal[i] - finalAlloc[i])
       if (capRemaining <= 0n)
         continue
 
@@ -734,6 +839,26 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
         continue
 
       const currentFinal = finalAlloc[i]
+
+      if (isFallback) {
+        // Flat-price fallback venue: no utilization curve, only its configured fallback APR.
+        const apr = fallbackAprWad ?? 0n
+        const candidateFinalForScore = currentFinal + step
+        const score = (candidateFinalForScore * apr) - (currentFinal * apr)
+        if (currentFinal === 0n) {
+          if (score > bestNewScore) {
+            bestNewScore = score
+            bestNewIdx = i
+            bestNewStep = step
+          }
+        }
+        else if (score > bestExistingScore) {
+          bestExistingScore = score
+          bestExistingIdx = i
+          bestExistingStep = step
+        }
+        continue
+      }
 
       const isLastSlotNewMarket = (currentFinal === 0n)
         && (maxMarketsUsed != null && maxMarketsUsed > 0)
@@ -770,6 +895,7 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
         totalSupplyAssets: exUserSupply[i] + candidateFinalForScore,
       }
 
+      // Design step (1): recompute the market curve at current and candidate post-step sizes.
       const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({
         market: currentMarket,
         deltaSupplyAssets: 0n,
@@ -783,8 +909,7 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
       if (minAprWad != null && supplyAprWad < minAprWad)
         continue
 
-      // Score by *delta* expected 1y yield (assets * WAD), accounting for the APR shift on existing
-      // allocated assets when utilization changes.
+      // Design step (4): compare venues by marginal annualized benefit of this one extra chunk.
       const score = (candidateFinalForScore * supplyAprWad) - (currentFinal * supplyAprCurrentWad)
       if (minNewMarketBenefitWad != null && currentFinal === 0n && score < minNewMarketBenefitWad)
         continue
@@ -811,6 +936,7 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
     let chosenIdx = bestExistingIdx
     let chosenStep = bestExistingStep
 
+    // Design step (5): select and commit the single best next chunk.
     if (bestNewIdx >= 0 && (bestExistingIdx < 0 || bestNewScore > bestExistingScore)) {
       let allowNew = true
       if (bestExistingIdx >= 0 && newMarketHysteresisAprWad != null && newMarketHysteresisAprWad > 0n) {
@@ -828,7 +954,7 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
       break
 
     finalAlloc[chosenIdx] += chosenStep
-    if (finalAlloc[chosenIdx] > 0n)
+    if ((fallbackIndex == null || chosenIdx !== fallbackIndex) && finalAlloc[chosenIdx] > 0n)
       used.add(chosenIdx)
     remaining -= chosenStep
     iterations++
@@ -840,11 +966,14 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
     })
   }
 
+  // Design step (6): once the final allocations are fixed, compute comparable portfolio-level rates.
   const currentRates = blendedRatesFromFinalAllocations({
     markets,
     finalUserAllocations: currentUser,
     exUserSupplyAssets: exUserSupply,
     timestamp,
+    fallbackIndex,
+    fallbackAprWad,
   })
 
   const currentAtTargetProRata = (newDepositAssets > 0n && currentTotal > 0n)
@@ -853,10 +982,12 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
         finalUserAllocations: addDepositProRata(currentUser, newDepositAssets),
         exUserSupplyAssets: exUserSupply,
         timestamp,
+        fallbackIndex,
+        fallbackAprWad,
       })
     : undefined
 
-  // Baseline: keep existing allocations, only add new deposit (no withdraw).
+  // Baseline: keep existing allocations, only add new deposit (no withdraw / no rebalance).
   let baselineNoRebalance: OptimizeSupplyWithPositionsResult['baselineNoRebalance']
   let baselineAllocForFallback: bigint[] | undefined
   let baselineRatesForFallback: { totalAssets: bigint, blendedAprWad: bigint, blendedApyWad: bigint } | undefined
@@ -879,12 +1010,16 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
       constraints,
       used: usedBaseline,
       maxIterations,
+      fallbackIndex,
+      fallbackAprWad,
     })
     const baselineRates = blendedRatesFromFinalAllocations({
       markets,
       finalUserAllocations: baselineAlloc,
       exUserSupplyAssets: exUserSupply,
       timestamp,
+      fallbackIndex,
+      fallbackAprWad,
     })
     baselineAllocForFallback = baselineAlloc
     baselineRatesForFallback = baselineRates
@@ -895,7 +1030,7 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
     }
   }
 
-  // Prefer not to rebalance into a strictly worse outcome when no new capital is added.
+  // Guardrail: never prefer a rebalance outcome that is strictly worse than the current or baseline plan.
   // (Current allocation is always feasible under the liquidity constraint model.)
   let optimizedFinalAlloc = finalAlloc
   let optimizedRates = blendedRatesFromFinalAllocations({
@@ -903,6 +1038,8 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
     finalUserAllocations: optimizedFinalAlloc,
     exUserSupplyAssets: exUserSupply,
     timestamp,
+    fallbackIndex,
+    fallbackAprWad,
   })
   if (newDepositAssets === 0n && optimizedRates.blendedAprWad < currentRates.blendedAprWad) {
     optimizedFinalAlloc = currentUser
@@ -915,26 +1052,27 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
   }
 
   const positionsOut: OptimizedPositionDelta[] = []
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < totalSlots; i++) {
     const cur = currentUser[i]
     const fin = optimizedFinalAlloc[i]
     if (cur === 0n && fin === 0n)
       continue
 
-    const modeledMarket: SupplyOptimizerMarketSnapshot = {
-      ...markets[i],
-      totalSupplyAssets: exUserSupply[i] + fin,
-    }
-
-    const { utilizationAfterWad, supplyAprWad, supplyApyWad } = computeSupplyAfterDeltaWad({
-      market: modeledMarket,
-      deltaSupplyAssets: 0n,
+    const { utilizationAfterWad, supplyAprWad, supplyApyWad } = allocationRatesAtIndex({
+      index: i,
+      markets,
+      finalUserAllocations: optimizedFinalAlloc,
+      exUserSupplyAssets: exUserSupply,
       timestamp,
+      fallbackIndex,
+      fallbackAprWad,
     })
 
     positionsOut.push({
-      marketId: markets[i].marketId,
-      uniqueKey: markets[i].uniqueKey,
+      marketId: i < n ? markets[i].marketId : 'wallet-fallback',
+      uniqueKey: i < n ? markets[i].uniqueKey : undefined,
+      destinationKind: i < n ? 'market' : 'wallet',
+      label: i < n ? undefined : fallbackLabel,
       currentUserAssets: cur,
       amountAssets: fin,
       deltaAssets: fin - cur,

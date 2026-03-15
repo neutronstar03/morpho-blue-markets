@@ -23,10 +23,12 @@ interface SupplyAprOptimizerFormProps {
   loanAssetOptions: LoanAssetOption[]
   selectedOption?: LoanAssetOption
   totalSuppliedAssets: bigint
-  minMoveSize?: string
-  onChangeMinMoveSize: (value: string) => void
+  marketApr?: string
+  onChangeMarketApr: (value: string) => void
   newDepositAmount?: string
   onChangeNewDepositAmount: (value: string) => void
+  onFillMaxDeposit: () => void
+  onFillZeroDeposit: () => void
   walletBalanceRaw?: bigint
   symbol: string
   maxMarketsInput: string
@@ -46,10 +48,12 @@ export function SupplyAprOptimizerForm({
   loanAssetOptions,
   selectedOption,
   totalSuppliedAssets,
-  minMoveSize,
-  onChangeMinMoveSize,
+  marketApr,
+  onChangeMarketApr,
   newDepositAmount,
   onChangeNewDepositAmount,
+  onFillMaxDeposit,
+  onFillZeroDeposit,
   walletBalanceRaw,
   symbol,
   maxMarketsInput,
@@ -119,12 +123,12 @@ export function SupplyAprOptimizerForm({
 
       <div className="flex flex-col gap-1.5 md:gap-2">
         <div className="h-5 flex items-center gap-2">
-          <Label>Minimum move size</Label>
+          <Label>Market APR</Label>
           <InfoTooltip
-            ariaLabel="Minimum move size info"
+            ariaLabel="Market APR info"
             content={(
               <span>
-                Leave blank for Auto (finds the smallest move size that converges).
+                If a market ends below this APR, the optimizer can withdraw funds and leave them in your wallet instead.
               </span>
             )}
           />
@@ -133,16 +137,16 @@ export function SupplyAprOptimizerForm({
           <Input
             type="text"
             inputMode="decimal"
-            value={minMoveSize ?? ''}
-            onChange={e => onChangeMinMoveSize(e.target.value)}
-            placeholder="Auto"
+            value={marketApr ?? ''}
+            onChange={e => onChangeMarketApr(e.target.value)}
+            placeholder="10"
             className="w-full h-10 pr-16 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
           />
           <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400 pointer-events-none">
-            {symbol}
+            %
           </span>
         </div>
-        <div className="h-0 md:h-4" />
+        <div className="text-xs text-gray-500 min-h-0 md:h-4">Default: 10%</div>
       </div>
 
       <div className="flex flex-col gap-1.5 md:gap-2">
@@ -162,16 +166,24 @@ export function SupplyAprOptimizerForm({
             {symbol}
           </span>
         </div>
-        <div className="text-xs text-gray-500 min-h-0 md:h-4">
-          {selectedOption && (
-            <>
-              Wallet balance:
-              {' '}
-              {fmtToken(walletBalanceRaw ?? 0n, selectedOption.decimals)}
-              {' '}
-              {selectedOption.symbol}
-            </>
-          )}
+        <div className="flex items-center gap-2 min-h-0 md:h-4">
+          <Button type="button" variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={onFillMaxDeposit}>
+            Max
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={onFillZeroDeposit}>
+            Zero
+          </Button>
+          <div className="text-xs text-gray-500 truncate">
+            {selectedOption && (
+              <>
+                Wallet balance:
+                {' '}
+                {fmtToken(walletBalanceRaw ?? 0n, selectedOption.decimals)}
+                {' '}
+                {selectedOption.symbol}
+              </>
+            )}
+          </div>
         </div>
       </div>
 

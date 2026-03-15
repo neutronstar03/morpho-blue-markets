@@ -9,6 +9,7 @@ import {
   encodePermit2PermitCall,
 } from '~/lib/bundler3/encode'
 import { buildPermit2PermitSingleTypedData, toUint48Clamp, toUint160Clamp } from '~/lib/bundler3/permit2'
+import { minBigint } from '~/lib/optimizer/supply-optimizer-utils'
 
 export interface BuildOptimizerBundleInputs {
   chainId: number
@@ -46,6 +47,7 @@ export interface BuildOptimizerBundleResultOk {
     withdrawTotalAssets: bigint
     supplyTotalAssets: bigint
     depositNeededAssets: bigint
+    returnedToWalletAssets: bigint
   }
   /**
    * If set, caller must request a Permit2 signature (and then rebuild with `permit2Signature`).
@@ -78,11 +80,13 @@ export function buildOptimizerBundle(inputs: BuildOptimizerBundleInputs): BuildO
 
   // Only act on non-zero deltas.
   const actionable = inputs.positions.filter(p => p.deltaAssets !== 0n)
+  const actionableMarkets = actionable.filter(p => p.destinationKind !== 'wallet')
+  const walletTargets = actionable.filter(p => p.destinationKind === 'wallet')
   if (actionable.length === 0)
     return { ok: false, error: 'Nothing to execute (all deltas are 0).' }
 
   // Liquidity safety: don’t attempt to withdraw more than optimizer says is withdrawable.
-  for (const p of actionable) {
+  for (const p of actionableMarkets) {
     if (p.deltaAssets < 0n) {
       const abs = -p.deltaAssets
       if (abs > p.maxWithdrawAssets)
@@ -92,11 +96,16 @@ export function buildOptimizerBundle(inputs: BuildOptimizerBundleInputs): BuildO
 
   let withdrawTotal = 0n
   let supplyTotal = 0n
-  for (const p of actionable) {
+  let returnedToWallet = 0n
+  for (const p of actionableMarkets) {
     if (p.deltaAssets < 0n)
       withdrawTotal += -p.deltaAssets
     else
       supplyTotal += p.deltaAssets
+  }
+  for (const p of walletTargets) {
+    if (p.deltaAssets > 0n)
+      returnedToWallet += p.deltaAssets
   }
 
   const depositNeeded = supplyTotal > withdrawTotal ? (supplyTotal - withdrawTotal) : 0n
@@ -144,10 +153,11 @@ export function buildOptimizerBundle(inputs: BuildOptimizerBundleInputs): BuildO
           permit2,
           bundle: [],
           summary: {
-            marketsTouched: actionable.length,
+            marketsTouched: actionableMarkets.length,
             withdrawTotalAssets: withdrawTotal,
             supplyTotalAssets: supplyTotal,
             depositNeededAssets: depositNeeded,
+            returnedToWalletAssets: returnedToWallet,
           },
           permit2ToSign: { depositNeededAssets: depositNeeded, typedData },
         }
@@ -176,7 +186,8 @@ export function buildOptimizerBundle(inputs: BuildOptimizerBundleInputs): BuildO
   }
 
   // Withdraws to adapter (so it can re-supply).
-  for (const p of actionable) {
+  let withdrawsToAdapterRemaining = supplyTotal > depositNeeded ? (supplyTotal - depositNeeded) : 0n
+  for (const p of actionableMarkets) {
     if (p.deltaAssets >= 0n)
       continue
     const params = inputs.marketParamsById.get(idKey(p.marketId))
@@ -185,19 +196,34 @@ export function buildOptimizerBundle(inputs: BuildOptimizerBundleInputs): BuildO
 
     const fullExit = p.amountAssets === 0n
     const userShares = inputs.userSupplySharesByMarketId?.get(idKey(p.marketId)) ?? 0n
-    const useSharesWithdraw = fullExit && userShares > 0n
+    const withdrawAmount = -p.deltaAssets
+    const toAdapter = minBigint(withdrawAmount, withdrawsToAdapterRemaining)
+    const toUser = withdrawAmount - toAdapter
 
-    bundle.push(encodeGeneralAdapterMorphoWithdraw({
-      adapter,
-      marketParams: params,
-      assets: useSharesWithdraw ? 0n : -p.deltaAssets,
-      shares: useSharesWithdraw ? userShares : undefined,
-      receiver: adapter,
-    }))
+    if (toAdapter > 0n) {
+      const useSharesWithdraw = fullExit && userShares > 0n && toUser === 0n
+      bundle.push(encodeGeneralAdapterMorphoWithdraw({
+        adapter,
+        marketParams: params,
+        assets: useSharesWithdraw ? 0n : toAdapter,
+        shares: useSharesWithdraw ? userShares : undefined,
+        receiver: adapter,
+      }))
+      withdrawsToAdapterRemaining -= toAdapter
+    }
+
+    if (toUser > 0n) {
+      bundle.push(encodeGeneralAdapterMorphoWithdraw({
+        adapter,
+        marketParams: params,
+        assets: toUser,
+        receiver: inputs.userAddress,
+      }))
+    }
   }
 
   // Supplies from adapter to the user’s position.
-  for (const p of actionable) {
+  for (const p of actionableMarkets) {
     if (p.deltaAssets <= 0n)
       continue
     const params = inputs.marketParamsById.get(idKey(p.marketId))
@@ -218,10 +244,11 @@ export function buildOptimizerBundle(inputs: BuildOptimizerBundleInputs): BuildO
     permit2,
     bundle,
     summary: {
-      marketsTouched: actionable.length,
+      marketsTouched: actionableMarkets.length,
       withdrawTotalAssets: withdrawTotal,
       supplyTotalAssets: supplyTotal,
       depositNeededAssets: depositNeeded,
+      returnedToWalletAssets: returnedToWallet,
     },
   }
 }
