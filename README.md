@@ -24,7 +24,8 @@ To run this project locally, follow these steps:
     ```bash
     bun dev
     ```
-    The application will be available at `http://localhost:5173`.
+    The application will usually be available at `http://localhost:5173`.
+    If that port is already in use, Vite will automatically choose the next free port.
 
 ### Collateral Whitelist (Optional)
 
@@ -68,6 +69,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.4` (2026-03-21): added local collateral blacklist controls, denser mobile market-page UI, richer optimizer opportunity cards, and refreshed app/tooling dependencies.
 - `v1.2.3` (2026-03-16): optimizer now uses a Market APR threshold with wallet fallback, supports vault-informed baseline yield suggestions with Morpho deep links, and includes live tests for vault-derived APR selection.
 - `v1.2.2` (2026-03-15): added a Markets Opportunity Recap, modularized major home/market feature files into page-local submodules, and unified shared deposit/withdraw form UI pieces.
 - `v1.1.30` (2026-02-25): added baseline all-chain optimizer candidate filters (`netSupplyApy >= 1%`, `netSupplyApy <= 600%`, `borrowAssetsUsd >= $5`) for faster optimizer and Home Magic scan runs.

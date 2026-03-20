@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.4 - 2026-03-21
+
+### Introduced
+- feat: added a local per-collateral blacklist mode that hides assets from optimizer/discovery suggestions while preserving positions, batch withdraw, and direct market access.
+
+### Changed
+- ux: market page now exposes local blacklist controls from a compact Advanced section with denser mobile spacing.
+- ux: home optimizer opportunity cards now show absolute APR gain, relative improvement over the previous allocation, and daily/yearly return deltas in a denser desktop-friendly layout.
+- optimizer: home magic suggestions now expire after 2 minutes, prune automatically, and share the same TTL as precomputed optimizer results.
+- optimizer: background scan timing is now documented and tuned to a 60-second heartbeat, 10-minute scan cooldown, and 30-second read-cache TTL.
+- chore: refreshed core app dependencies, upgraded Vite/Vitest/lucide, and kept RainbowKit on a wagmi v2-compatible stack.
+
 ## v1.2.3 - 2026-03-16
 
 ### Introduced
