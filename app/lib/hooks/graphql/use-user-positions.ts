@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
-import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
 
@@ -110,14 +109,7 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
         const supplyShares = BigInt(p.state.supplyShares || '0')
         return supplyShares > 0n
       })
-      return filterBlacklistedMarkets(positions, position => ({
-        uniqueKey: position.market.uniqueKey,
-        loanAssetAddress: position.market.loanAsset.address,
-        collateralAssetAddress: position.market.collateralAsset.address,
-        loanAssetSymbol: position.market.loanAsset.symbol,
-        collateralAssetSymbol: position.market.collateralAsset.symbol,
-        chainId,
-      })).filter(position => !isOracleMisconfiguredWarning(position.market.warnings))
+      return positions.filter(position => !isOracleMisconfiguredWarning(position.market.warnings))
     },
     enabled: !!userAddress && !!chainId,
     staleTime: 30 * 1000, // 30 seconds - positions don't change that often

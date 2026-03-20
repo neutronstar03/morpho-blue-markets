@@ -4,7 +4,6 @@ import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/s
 import { useNetworkContext } from '~/lib/contexts/network'
 import { adaptiveCurveBorrowRateView } from '~/lib/irm/adaptive-curve-irm'
 import { clampRatePerSecondWad, displayAprFromRatePerSecondWad, supplyRatePerSecondWad, wadDivDown } from '~/lib/irm/apy-math'
-import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
 import { computeMorphoMarketId, ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { getMorphoBlueAddress } from './use-morpho'
@@ -60,16 +59,8 @@ export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined) {
   const MAX_CHUNKS = 5 // matches default `useMarkets(first=100)`
 
   const marketsSafe = useMemo(() => {
-    const raw = markets ?? []
-    return filterBlacklistedMarkets(raw, market => ({
-      uniqueKey: market.uniqueKey,
-      loanAssetAddress: market.loanAsset.address,
-      collateralAssetAddress: market.collateralAsset.address,
-      loanAssetSymbol: market.loanAsset.symbol ?? undefined,
-      collateralAssetSymbol: market.collateralAsset.symbol ?? undefined,
-      chainId,
-    }))
-  }, [markets, chainId])
+    return markets ?? []
+  }, [markets])
 
   const morphoAddress = useMemo(() => getMorphoBlueAddress(chainId), [chainId])
 

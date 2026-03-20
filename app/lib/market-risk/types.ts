@@ -4,6 +4,7 @@ export type MarketRiskStatus = 'white' | 'blue' | 'yellow' | 'purple' | 'black'
 export type MarketRiskReasonCode
   = | 'ok'
     | 'unknown_collateral'
+    | 'local_blacklist'
     | 'manual_approve'
     | 'manual_ban'
     | 'blacklist'

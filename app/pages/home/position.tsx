@@ -19,6 +19,7 @@ import {
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
+import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
 import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
@@ -144,10 +145,12 @@ function PositionClient() {
 
   const decisionsVersion = useCollateralDecisionsVersion()
   const whitelistVersion = useCollateralWhitelistVersion()
+  const localBlacklistVersion = useLocalCollateralBlacklistVersion()
   const blacklistVersion = useMarketBlacklistVersion()
   const riskStatusByKey = useMemo(() => {
     void decisionsVersion
     void whitelistVersion
+    void localBlacklistVersion
     void blacklistVersion
     const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
     if (!chain?.id)
@@ -165,16 +168,7 @@ function PositionClient() {
       }).status
     }
     return out
-  }, [blacklistVersion, chain?.id, decisionsVersion, positions, whitelistVersion])
-
-  const visiblePositions = useMemo(() => {
-    if (!chain?.id)
-      return positions ?? []
-    return (positions ?? []).filter((p) => {
-      const key = `${chain.id}:${p.market.uniqueKey.toLowerCase()}`
-      return riskStatusByKey[key] !== 'black'
-    })
-  }, [chain?.id, positions, riskStatusByKey])
+  }, [blacklistVersion, chain?.id, decisionsVersion, localBlacklistVersion, positions, whitelistVersion])
 
   const [timeAgo, setTimeAgo] = useState('')
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
@@ -320,7 +314,7 @@ function PositionClient() {
           ? (
               <p className="text-gray-400">Loading your positions...</p>
             )
-          : visiblePositions && visiblePositions.length === 0
+          : positions && positions.length === 0
             ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mb-4">
@@ -332,9 +326,9 @@ function PositionClient() {
               )
             : (
                 <ul className="space-y-2 sm:space-y-3">
-                  {visiblePositions
+                  {positions
                     && chain?.id
-                    && visiblePositions.map((position: LiveMarketPosition) => {
+                    && positions.map((position: LiveMarketPosition) => {
                       const key = `${chain.id}:${position.market.uniqueKey.toLowerCase()}`
                       const riskStatus = riskStatusByKey[key]
                       return (

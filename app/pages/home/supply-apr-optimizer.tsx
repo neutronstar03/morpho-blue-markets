@@ -19,6 +19,7 @@ import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loa
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
+import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
 import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
@@ -161,10 +162,12 @@ export function SupplyAprOptimizer() {
 
   const decisionsVersion = useCollateralDecisionsVersion()
   const whitelistVersion = useCollateralWhitelistVersion()
+  const localBlacklistVersion = useLocalCollateralBlacklistVersion()
   const blacklistVersion = useMarketBlacklistVersion()
   const selectedUserMarkets = useMemo(() => {
     void decisionsVersion
     void whitelistVersion
+    void localBlacklistVersion
     void blacklistVersion
     if (!chain?.id)
       return selectedUserMarketsAll
@@ -180,7 +183,7 @@ export function SupplyAprOptimizer() {
       }).status
       return status !== 'black'
     })
-  }, [blacklistVersion, chain?.id, decisionsVersion, selectedUserMarketsAll, whitelistVersion])
+  }, [blacklistVersion, chain?.id, decisionsVersion, localBlacklistVersion, selectedUserMarketsAll, whitelistVersion])
 
   const userSupplySharesByMarketId = useMemo(() => {
     const map = new Map<string, bigint>()
@@ -786,7 +789,7 @@ export function SupplyAprOptimizer() {
       })
     }
     return map
-  }, [chain?.id, topMarkets, selectedUserMarkets])
+  }, [chain?.id, localBlacklistVersion, topMarkets, selectedUserMarkets])
 
   useEffect(() => {
     if (import.meta.env.PROD)
