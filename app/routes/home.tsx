@@ -7,6 +7,7 @@ import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
+import { formatUsd } from '~/lib/formatters'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { AdvancedList } from '~/pages/home/advanced-list'
 import { BatchWithdraw } from '~/pages/home/batch-withdraw'
@@ -74,43 +75,77 @@ export default function HomePage() {
       {/* Main Content */}
       <Main>
         <div className="w-full">
-          {chainOpportunities.map(opportunity => (
-            <Card key={opportunity.id} className="mb-4 border border-green-700/40 bg-green-950/20">
-              <div
-                className="w-full p-4 flex items-start gap-3 text-left cursor-pointer"
-                onClick={() => handleOpenOptimizer(opportunity)}
-              >
-                <div className="min-w-0">
-                  <h2 className="text-base font-semibold text-green-100">
-                    New optimal allocation found for
-                    {' '}
-                    {opportunity.loanAssetSymbol}
-                  </h2>
-                  <p className="text-sm text-green-200/90 mt-1">
-                    Estimated blended APR improvement:
-                    {' +'}
-                    {opportunity.aprGainPct.toFixed(2)}
-                    %
-                  </p>
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      dismissOpportunity(opportunity.id)
-                    }}
-                    className="h-8 w-8 px-0"
-                    aria-label={`Dismiss ${opportunity.loanAssetSymbol} opportunity`}
+          {chainOpportunities.length > 0 && (
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {chainOpportunities.map((opportunity, index) => {
+                const isOddLastCard = chainOpportunities.length % 2 === 1 && index === chainOpportunities.length - 1
+
+                return (
+                  <Card
+                    key={opportunity.id}
+                    className={`border border-green-700/40 bg-green-950/20 ${isOddLastCard ? 'md:col-span-2' : ''}`}
                   >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+                    <div
+                      className="flex w-full items-start gap-2 p-2.5 text-left cursor-pointer sm:gap-3 sm:p-4"
+                      onClick={() => handleOpenOptimizer(opportunity)}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-sm font-semibold text-green-100 sm:text-base">
+                          Optimizable:
+                          {' '}
+                          {opportunity.loanAssetSymbol}
+                        </h2>
+                        <div className="mt-1 space-y-0.5 text-xs text-green-200/90 sm:text-sm">
+                          <p>
+                            Estimated APR improvement
+                            {' '}
+                            +
+                            {opportunity.aprGainPct.toFixed(2)}
+                            %
+                          </p>
+                          <p>
+                            Improvement over previous
+                            {' '}
+                            {opportunity.relativeImprovementPct != null
+                              ? `+${opportunity.relativeImprovementPct.toFixed(2)}%`
+                              : '--'}
+                          </p>
+                          <p>
+                            Daily Return
+                            {' '}
+                            +
+                            {formatUsd(opportunity.yearlyReturnGainUsd / 365)}
+                            {' '}
+                            /
+                            {' '}
+                            Yearly Return
+                            {' '}
+                            +
+                            {formatUsd(opportunity.yearlyReturnGainUsd)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="ml-auto flex items-start gap-2 self-stretch">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            dismissOpportunity(opportunity.id)
+                          }}
+                          className="h-8 w-8 px-0"
+                          aria-label={`Dismiss ${opportunity.loanAssetSymbol} opportunity`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
 
           <Position />
           <div className="mt-8">

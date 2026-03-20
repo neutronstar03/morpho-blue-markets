@@ -7,7 +7,7 @@ interface MainProps {
 
 export function Main({ children }: MainProps) {
   return (
-    <main className="py-8">
+    <main className="py-4 sm:py-8">
       <Container>
         {children}
       </Container>

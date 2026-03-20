@@ -1,8 +1,14 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
+import { Settings2 } from 'lucide-react'
+import { useState } from 'react'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
+import { Button } from '~/components/ui/button'
+import { MarketRiskText } from '~/components/ui/market-risk-text'
 import { getSupportedChainName } from '~/lib/addresses'
 import { getExplorerUrl } from '~/lib/explorer'
+import { useMarketRiskStatus } from '~/lib/market-risk/hooks'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
+import { LocalCollateralBlacklistControl } from './local-collateral-blacklist-control'
 
 function formatAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -13,7 +19,17 @@ interface MarketHeaderProps {
 }
 
 export function MarketHeader({ market }: MarketHeaderProps) {
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
   const chainName = getSupportedChainName(market.morphoBlue.chain.id)
+  const { status } = useMarketRiskStatus({
+    chainId: market.morphoBlue.chain.id,
+    uniqueKey: market.uniqueKey,
+    loanAssetAddress: market.loanAsset.address,
+    collateralAssetAddress: market.collateralAsset.address,
+    loanAssetSymbol: market.loanAsset.symbol,
+    collateralAssetSymbol: market.collateralAsset.symbol,
+    warnings: market.warnings,
+  })
 
   const loanAssetExplorerUrl = getExplorerUrl(
     market.morphoBlue.chain.id,
@@ -27,39 +43,71 @@ export function MarketHeader({ market }: MarketHeaderProps) {
   const morphoMarketUrl = morphoAppMarketUrl(chainName, market.uniqueKey)
 
   return (
-    <div className="p-4 sm:p-6 border-b border-gray-700">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-2 flex flex-wrap items-center gap-x-2">
-            <a
-              className="flex items-center gap-x-2 hover:text-blue-400 transition-colors"
-              href={collateralAssetExplorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+    <div className="border-b border-gray-700 p-3 sm:p-6">
+      <div className="mb-3 flex items-start justify-between gap-3 sm:mb-4">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <h2 className="flex min-w-0 flex-wrap items-center gap-x-2 text-xl font-bold text-white sm:text-2xl">
+              <a
+                className="flex items-center gap-x-2 transition-colors hover:text-blue-400"
+                href={collateralAssetExplorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MarketRiskText status={status} size="xl">
+                  {market.collateralAsset.symbol}
+                </MarketRiskText>
+                <LinkNewWindow className="w-4 h-4" />
+              </a>
+              <span className="text-gray-500 mx-1">/</span>
+              <a
+                className="flex items-center gap-x-2 transition-colors hover:text-blue-400"
+                href={loanAssetExplorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span className="text-white text-xl">{market.loanAsset.symbol}</span>
+                <LinkNewWindow className="w-4 h-4" />
+              </a>
+            </h2>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={isAdvancedOpen
+                ? 'hidden h-8 w-8 shrink-0 border-cyan-500/40 bg-cyan-500/10 px-0 text-cyan-300 hover:bg-cyan-500/20 sm:inline-flex'
+                : 'hidden h-8 w-8 shrink-0 border-white/10 bg-white/[0.03] px-0 text-gray-400 hover:bg-white/[0.08] hover:text-gray-200 sm:inline-flex'}
+              onClick={() => setIsAdvancedOpen(prev => !prev)}
+              aria-label={isAdvancedOpen ? 'Close advanced options' : 'Open advanced options'}
+              aria-expanded={isAdvancedOpen}
             >
-              {market.collateralAsset.symbol}
-              <LinkNewWindow className="w-4 h-4" />
-            </a>
-            <span className="text-gray-500 mx-1">/</span>
-            <a
-              className="flex items-center gap-x-2 hover:text-blue-400 transition-colors"
-              href={loanAssetExplorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-sm text-gray-400">{chainName}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={isAdvancedOpen
+                ? 'h-7 w-7 shrink-0 border-cyan-500/40 bg-cyan-500/10 px-0 text-cyan-300 hover:bg-cyan-500/20 sm:hidden'
+                : 'h-7 w-7 shrink-0 border-white/10 bg-white/[0.03] px-0 text-gray-400 hover:bg-white/[0.08] hover:text-gray-200 sm:hidden'}
+              onClick={() => setIsAdvancedOpen(prev => !prev)}
+              aria-label={isAdvancedOpen ? 'Close advanced options' : 'Open advanced options'}
+              aria-expanded={isAdvancedOpen}
             >
-              {market.loanAsset.symbol}
-              <LinkNewWindow className="w-4 h-4" />
-            </a>
-          </h2>
-          <p className="text-sm text-gray-400 mt-1">{chainName}</p>
+              <Settings2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
-        <div className="text-left sm:text-right">
-          <p className="text-sm text-gray-400">Market ID</p>
+        <div className="shrink-0 text-right">
+          <p className="text-xs text-gray-400 sm:text-sm">Market ID</p>
           <a
             href={morphoMarketUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-mono text-sm text-gray-300 hover:text-blue-400 transition-colors inline-flex items-center gap-x-2 mt-1"
+            className="mt-1 inline-flex items-center gap-x-1.5 font-mono text-xs text-gray-300 transition-colors hover:text-blue-400 sm:gap-x-2 sm:text-sm"
             title="Open in Morpho official UI"
           >
             {formatAddress(market.uniqueKey)}
@@ -67,6 +115,7 @@ export function MarketHeader({ market }: MarketHeaderProps) {
           </a>
         </div>
       </div>
+      <LocalCollateralBlacklistControl market={market} isOpen={isAdvancedOpen} />
     </div>
   )
 }

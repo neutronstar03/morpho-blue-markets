@@ -20,7 +20,7 @@ function DetailRow({
   subValue?: React.ReactNode
 }) {
   return (
-    <div className="flex justify-between items-center py-2 border-b border-gray-700/50 last:border-b-0">
+    <div className="flex items-center justify-between border-b border-gray-700/50 py-2 last:border-b-0">
       <span className="text-gray-400 text-sm">{label}</span>
       <div className="text-right">
         <span className="text-white font-medium">{value}</span>
@@ -60,8 +60,8 @@ export function MarketDetails({ market }: MarketDetailsProps) {
   const safuTip = 'SAFUNESS = usable liquidity / total supply (aggregated across all markets that share this collateral on this chain). 1.0x means usable liquidity equals total supply; liquidation may incur significant price impact. Assumes ~50% in collateral. ≥3.0x safer, <1.0x risky.'
 
   return (
-    <div className="p-6">
-      <h2 className="text-xl font-semibold text-white mb-4">Market Details</h2>
+    <div className="p-3 sm:p-6">
+      <h2 className="mb-3 text-xl font-semibold text-white sm:mb-4">Market Details</h2>
 
       <DetailRow
         label="Total Supply"

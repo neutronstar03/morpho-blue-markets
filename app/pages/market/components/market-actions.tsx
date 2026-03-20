@@ -82,11 +82,11 @@ export function MarketActions({ market }: MarketActionsProps) {
     : 0
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
+    <div className="p-3 sm:p-6">
+      <div className="mb-4 sm:mb-6">
         <MarketPosition market={market} />
       </div>
-      <div className="pt-6">
+      <div className="pt-4 sm:pt-6">
         <div className="mb-4 grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
           <StatPill
             className="flex-1"
@@ -112,7 +112,7 @@ export function MarketActions({ market }: MarketActionsProps) {
           )}
         </div>
 
-        <div className="flex gap-3 mb-6">
+        <div className="mb-4 flex gap-2 sm:mb-6 sm:gap-3">
           <button
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
               activeTab === 'deposit'

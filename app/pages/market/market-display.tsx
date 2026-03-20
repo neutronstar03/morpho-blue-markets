@@ -15,7 +15,7 @@ export function MarketDisplay({ market }: MarketDisplayProps) {
   return (
     <div className="sm:bg-gray-800 sm:rounded-lg sm:shadow-lg sm:border sm:border-gray-700 overflow-hidden">
       <MarketHeader market={market} />
-      <div className="px-4 sm:px-6 pt-4 md:hidden">
+      <div className="px-3 pt-3 sm:px-6 sm:pt-4 md:hidden">
         <MarketRiskValidation market={market} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2">

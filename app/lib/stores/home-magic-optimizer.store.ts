@@ -7,9 +7,14 @@ export interface HomeMagicOpportunity {
   loanAssetAddress: string
   loanAssetSymbol: string
   loanAssetDecimals: number
+  currentAprPct: number
+  optimizedAprPct: number
   aprGainWad: bigint
   aprGainPct: number
+  relativeImprovementPct?: number
+  yearlyReturnGainUsd: number
   createdAt: number
+  expiresAt: number
 }
 
 export interface HomeMagicOptimizerPreset {
@@ -52,6 +57,7 @@ interface HomeMagicOptimizerState {
   addOpportunity: (opportunity: HomeMagicOpportunity) => void
   dismissOpportunity: (id: string) => void
   clearOpportunitiesForChain: (chainId: number) => void
+  pruneExpiredHomeMagicItems: (nowMs?: number) => void
   upsertPrecomputedResult: (entry: HomeMagicPrecomputedResult) => void
   consumeFreshPrecomputedResult: (args: {
     chainId: number
@@ -109,9 +115,13 @@ export const useHomeMagicOptimizerStore = create<HomeMagicOptimizerState>((set, 
   },
   addOpportunity: (opportunity) => {
     set((state) => {
-      const next = state.opportunities.filter(existing => existing.id !== opportunity.id)
+      const now = Date.now()
+      const next = state.opportunities.filter(existing => existing.id !== opportunity.id && existing.expiresAt > now)
       next.unshift(opportunity)
-      return { opportunities: next }
+      return {
+        opportunities: next,
+        precomputedResults: state.precomputedResults.filter(item => item.expiresAt > now),
+      }
     })
   },
   dismissOpportunity: (id) => {
@@ -119,6 +129,12 @@ export const useHomeMagicOptimizerStore = create<HomeMagicOptimizerState>((set, 
   },
   clearOpportunitiesForChain: (chainId) => {
     set(state => ({ opportunities: state.opportunities.filter(o => o.chainId !== chainId) }))
+  },
+  pruneExpiredHomeMagicItems: (nowMs = Date.now()) => {
+    set(state => ({
+      opportunities: state.opportunities.filter(item => item.expiresAt > nowMs),
+      precomputedResults: state.precomputedResults.filter(item => item.expiresAt > nowMs),
+    }))
   },
   upsertPrecomputedResult: (entry) => {
     set((state) => {

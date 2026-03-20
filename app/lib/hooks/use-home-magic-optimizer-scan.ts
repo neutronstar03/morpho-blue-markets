@@ -26,10 +26,16 @@ const NO_BENEFIT_DELTA_APR_WAD = 2_500_000_000_000_000n
 const MAX_MARKETS_USED = 6
 const MAX_OPTIMIZER_ITERATIONS = 1000
 const OPTIMIZER_READ_CHUNK_SIZE = 50
-const OPTIMIZER_READ_CACHE_TTL_MS = 60_000
-const THIRTY_MINUTES_MS = 30 * 60 * 1000
-const PRECOMPUTED_RESULT_TTL_MS = 30_000
-const PERIODIC_RESCAN_CHECK_MS = 60 * 1000
+
+// Timer model for home optimizer automation:
+// - Every 1 minute, the heartbeat wakes up and asks: should I do things?
+// - On each heartbeat, we also prune expired visible opportunities and cached precomputed results.
+// - A full optimizer scan is throttled separately so we do not rerun it too often.
+// - The optimizer read cache is shorter-lived and only exists to be kind to RPC providers.
+const PERIODIC_RESCAN_CHECK_MS = 60_000
+const SCAN_COOLDOWN_MS = 10 * 60 * 1000
+const HOME_OPPORTUNITY_TTL_MS = 2 * 60 * 1000
+const OPTIMIZER_READ_CACHE_TTL_MS = 30_000
 const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
 const MAX_CANDIDATE_NET_SUPPLY_APY = 6
 const MIN_CANDIDATE_BORROW_USD = 5
@@ -54,6 +60,7 @@ export function useHomeMagicOptimizerScan() {
     addOpportunity,
     upsertPrecomputedResult,
     clearOpportunitiesForChain,
+    pruneExpiredHomeMagicItems,
   } = useHomeMagicOptimizerStore()
 
   const [queue, setQueue] = useState<ScanAsset[]>([])
@@ -134,6 +141,27 @@ export function useHomeMagicOptimizerScan() {
     return out
   }, [selectedUserMarketsSafe])
 
+  const selectedUserMarketsUsd = useMemo(() => {
+    let totalPrincipalUsd = 0
+
+    for (const p of selectedUserMarketsSafe) {
+      const marketSupplyShares = BigInt(p.market.state.supplyShares)
+      const userSupplyShares = BigInt(p.userState.supplyShares)
+      const marketSupplyUsd = p.market.state.supplyAssetsUsd
+
+      if (marketSupplyShares <= 0n || userSupplyShares <= 0n || typeof marketSupplyUsd !== 'number')
+        continue
+
+      const shareRatio = Number(userSupplyShares) / Number(marketSupplyShares)
+      if (!Number.isFinite(shareRatio) || shareRatio <= 0)
+        continue
+
+      totalPrincipalUsd += marketSupplyUsd * shareRatio
+    }
+
+    return totalPrincipalUsd
+  }, [selectedUserMarketsSafe])
+
   const topMarketsQuery = useMarketsByChain(activeAsset ? chainId : undefined, activeAsset?.address, {
     minNetSupplyApy: MIN_CANDIDATE_NET_SUPPLY_APY,
     maxNetSupplyApy: MAX_CANDIDATE_NET_SUPPLY_APY,
@@ -185,14 +213,17 @@ export function useHomeMagicOptimizerScan() {
     if (!isConnected || !userAddress || !chainId)
       return
 
+    pruneExpiredHomeMagicItems()
+
     const intervalId = window.setInterval(() => {
+      pruneExpiredHomeMagicItems()
       setRescanCheckTick(prev => prev + 1)
     }, PERIODIC_RESCAN_CHECK_MS)
 
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [chainId, isConnected, userAddress])
+  }, [chainId, isConnected, pruneExpiredHomeMagicItems, userAddress])
 
   const scanAssets = useMemo(() => {
     const assetsMap = new Map<string, ScanAsset>()
@@ -230,15 +261,16 @@ export function useHomeMagicOptimizerScan() {
       return
 
     const now = Date.now()
+    pruneExpiredHomeMagicItems(now)
     const lastRun = getHomeMagicLastRunMs(chainId)
-    if (lastRun != null && now - lastRun < THIRTY_MINUTES_MS)
+    if (lastRun != null && now - lastRun < SCAN_COOLDOWN_MS)
       return
 
     clearOpportunitiesForChain(chainId)
     setQueue(scanAssets)
     setQueueIndex(0)
     startScan({ chainId, totalAssets: scanAssets.length })
-  }, [canInitializeScan, chainId, clearOpportunitiesForChain, rescanCheckTick, scanAssets, startScan])
+  }, [canInitializeScan, chainId, clearOpportunitiesForChain, pruneExpiredHomeMagicItems, rescanCheckTick, scanAssets, startScan])
 
   useEffect(() => {
     if (!isScanning)
@@ -342,6 +374,12 @@ export function useHomeMagicOptimizerScan() {
         if (aprGainWad > NO_BENEFIT_DELTA_APR_WAD) {
           const nowMs = Date.now()
           const pct = Number(aprGainWad) / 1e16
+          const currentAprPct = Number(runResult.result.current.blendedAprWad) / 1e16
+          const optimizedAprPct = Number(runResult.result.optimized.blendedAprWad) / 1e16
+          const relativeImprovementPct = currentAprPct > 0
+            ? (pct / currentAprPct) * 100
+            : undefined
+          const yearlyReturnGainUsd = selectedUserMarketsUsd * (Number.isFinite(pct) ? pct / 100 : 0)
           const chainIdSafe = chainId ?? 0
           const userAddressLower = userAddress?.toLowerCase()
           const loanAssetAddressLower = activeAsset.address.toLowerCase()
@@ -356,7 +394,7 @@ export function useHomeMagicOptimizerScan() {
               marketApr: DEFAULT_MARKET_APR,
               newDepositAmount: '0',
               computedAt: nowMs,
-              expiresAt: nowMs + PRECOMPUTED_RESULT_TTL_MS,
+              expiresAt: nowMs + HOME_OPPORTUNITY_TTL_MS,
               result: runResult.result,
             })
           }
@@ -367,9 +405,16 @@ export function useHomeMagicOptimizerScan() {
             loanAssetAddress: activeAsset.address,
             loanAssetSymbol: activeAsset.symbol,
             loanAssetDecimals: activeAsset.decimals,
+            currentAprPct: Number.isFinite(currentAprPct) ? currentAprPct : 0,
+            optimizedAprPct: Number.isFinite(optimizedAprPct) ? optimizedAprPct : 0,
             aprGainWad,
             aprGainPct: Number.isFinite(pct) ? pct : 0,
+            relativeImprovementPct: relativeImprovementPct != null && Number.isFinite(relativeImprovementPct)
+              ? relativeImprovementPct
+              : undefined,
+            yearlyReturnGainUsd: Number.isFinite(yearlyReturnGainUsd) ? yearlyReturnGainUsd : 0,
             createdAt: nowMs,
+            expiresAt: nowMs + HOME_OPPORTUNITY_TTL_MS,
           })
         }
       }
@@ -408,7 +453,7 @@ export function useHomeMagicOptimizerScan() {
       active = false
       worker.terminate()
     }
-  }, [activeAsset, addOpportunity, chainId, optimizeReadResult, request, upsertPrecomputedResult, userAddress])
+  }, [activeAsset, addOpportunity, chainId, optimizeReadResult, request, selectedUserMarketsUsd, upsertPrecomputedResult, userAddress])
 
   useEffect(() => {
     return () => {
