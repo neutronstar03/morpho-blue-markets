@@ -46,7 +46,10 @@ export function MarketTable({
               <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Chain</th>
             )}
             <th scope="col" className="px-2 sm:px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Size $</th>
-            <th scope="col" className="hidden sm:table-cell px-2 sm:px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">before 90%</th>
+            <th scope="col" className="px-2 sm:px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <span className="sm:hidden">Bef 90%</span>
+              <span className="hidden sm:inline">before 90%</span>
+            </th>
             <th scope="col" className="hidden sm:table-cell px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">usage %</th>
             <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Recent APY</th>
             <th scope="col" className="px-2 sm:px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
@@ -86,7 +89,7 @@ export function MarketTable({
                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-400">{market.chainName}</td>
               )}
               <td className="px-2 sm:px-3 py-4 whitespace-nowrap text-right text-sm text-white">{formatMarketSize(market.marketSizeUsd ?? undefined)}</td>
-              <td className="hidden sm:table-cell px-2 sm:px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.beforeTarget}</td>
+              <td className="px-2 sm:px-3 py-4 whitespace-nowrap text-right text-sm text-white">{market.beforeTarget}</td>
               <td className="hidden sm:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-white">{market.utilizationPct}</td>
               <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm ${colors.rateText}`}>
                 {`${((rateType === 'supply' ? market.netSupplyApy : market.netBorrowApy) * 100).toFixed(2)}%`}

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.5 - 2026-03-23
+
+### Introduced
+- feat: added a Blacklist Recap section on Home to review user-hidden assets and unsafe collateral bans in one place.
+
+### Changed
+- ux: footer Blacklist Recap link now opens and scrolls to the Home recap section, which can be closed again from its header.
+- ux: blacklist recap stores token symbol/name for new entries, keeps older local-storage entries readable, and links token addresses to the chain explorer.
+- ui: blacklist recap uses a denser desktop table and a simplified mobile layout with clearer reason labels (`User Blacklist`, `Unsafe collateral`).
+- ui: restored the mobile Markets `Bef 90%` column in AdvancedList.
+
 ## v1.2.4 - 2026-03-21
 
 ### Introduced

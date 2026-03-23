@@ -9,6 +9,7 @@ This project focuses on practical Morpho market exploration and action tooling, 
 - Batch withdraw flow for lower-APR-first exits
 - Position recap and market-level deposit/withdraw flows
 - Opportunity recap for coarse chain-level deployable yield evaluation
+- Blacklist recap for reviewing user-hidden and unsafe collaterals
 
 ## Development
 
@@ -69,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.5` (2026-03-23): added a Blacklist Recap review panel for user blacklist + unsafe collateral decisions, improved recap mobile UX, and restored the mobile `Bef 90%` Markets column.
 - `v1.2.4` (2026-03-21): added local collateral blacklist controls, denser mobile market-page UI, richer optimizer opportunity cards, and refreshed app/tooling dependencies.
 - `v1.2.3` (2026-03-16): optimizer now uses a Market APR threshold with wallet fallback, supports vault-informed baseline yield suggestions with Morpho deep links, and includes live tests for vault-derived APR selection.
 - `v1.2.2` (2026-03-15): added a Markets Opportunity Recap, modularized major home/market feature files into page-local submodules, and unified shared deposit/withdraw form UI pieces.
