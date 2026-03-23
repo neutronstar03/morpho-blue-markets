@@ -1,7 +1,14 @@
 import { useSyncExternalStore } from 'react'
 
-interface LocalCollateralBlacklistEntry {
+export interface LocalCollateralBlacklistEntry {
   ts: number
+  symbol?: string
+  name?: string
+}
+
+export interface LocalCollateralBlacklistRecord extends LocalCollateralBlacklistEntry {
+  chainId: number
+  collateralAddress: string
 }
 
 const KEY_PREFIX = 'local-collateral-blacklist:v1:'
@@ -17,6 +24,20 @@ function makeKey(chainId: number, collateralAddress: string) {
   return `${KEY_PREFIX}${chainId}:${normalizeAddress(collateralAddress)}`
 }
 
+function parseKey(key: string): { chainId: number, collateralAddress: string } | undefined {
+  if (!key.startsWith(KEY_PREFIX))
+    return undefined
+  const suffix = key.slice(KEY_PREFIX.length)
+  const sep = suffix.indexOf(':')
+  if (sep < 0)
+    return undefined
+  const chainId = Number.parseInt(suffix.slice(0, sep), 10)
+  const collateralAddress = normalizeAddress(suffix.slice(sep + 1))
+  if (!Number.isFinite(chainId) || chainId <= 0 || !collateralAddress)
+    return undefined
+  return { chainId, collateralAddress }
+}
+
 function safeRead(key: string): LocalCollateralBlacklistEntry | undefined {
   if (typeof window === 'undefined')
     return undefined
@@ -27,6 +48,8 @@ function safeRead(key: string): LocalCollateralBlacklistEntry | undefined {
     const parsed = JSON.parse(raw) as Partial<LocalCollateralBlacklistEntry>
     return {
       ts: typeof parsed?.ts === 'number' ? parsed.ts : 0,
+      symbol: typeof parsed?.symbol === 'string' && parsed.symbol.trim() ? parsed.symbol.trim() : undefined,
+      name: typeof parsed?.name === 'string' && parsed.name.trim() ? parsed.name.trim() : undefined,
     }
   }
   catch {
@@ -67,8 +90,16 @@ export function isCollateralLocallyBlacklisted(chainId?: number, collateralAddre
   return safeRead(makeKey(chainId, collateralAddress)) != null
 }
 
-export function setCollateralLocallyBlacklisted(chainId: number, collateralAddress: string) {
-  safeWrite(makeKey(chainId, collateralAddress), { ts: Date.now() })
+export function setCollateralLocallyBlacklisted(
+  chainId: number,
+  collateralAddress: string,
+  metadata?: { symbol?: string | null, name?: string | null },
+) {
+  safeWrite(makeKey(chainId, collateralAddress), {
+    ts: Date.now(),
+    symbol: typeof metadata?.symbol === 'string' && metadata.symbol.trim() ? metadata.symbol.trim() : undefined,
+    name: typeof metadata?.name === 'string' && metadata.name.trim() ? metadata.name.trim() : undefined,
+  })
   emitChange()
 }
 
@@ -97,6 +128,38 @@ export function subscribeLocalCollateralBlacklist(listener: () => void) {
     window.removeEventListener(CHANGE_EVENT, onEvent)
     window.removeEventListener('storage', onStorage)
   }
+}
+
+export function listLocallyBlacklistedCollaterals(): LocalCollateralBlacklistRecord[] {
+  if (typeof window === 'undefined')
+    return []
+
+  const out: LocalCollateralBlacklistRecord[] = []
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i)
+      if (!key)
+        continue
+      const parsedKey = parseKey(key)
+      if (!parsedKey)
+        continue
+      const entry = safeRead(key)
+      if (!entry)
+        continue
+      out.push({
+        chainId: parsedKey.chainId,
+        collateralAddress: parsedKey.collateralAddress,
+        ts: entry.ts,
+        symbol: entry.symbol,
+        name: entry.name,
+      })
+    }
+  }
+  catch {
+    return []
+  }
+
+  return out.sort((a, b) => b.ts - a.ts)
 }
 
 export function useLocalCollateralBlacklistVersion() {

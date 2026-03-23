@@ -85,7 +85,10 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
   })
 
   const onDecision = (decision: 'approve' | 'ban') => {
-    setCollateralDecision(chainId, collateralAddress, decision)
+    setCollateralDecision(chainId, collateralAddress, decision, {
+      symbol: market.collateralAsset.symbol,
+      name: market.collateralAsset.name,
+    })
     optimizer.clear()
   }
 

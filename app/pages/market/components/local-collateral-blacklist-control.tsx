@@ -19,6 +19,7 @@ export function LocalCollateralBlacklistControl({ market, isOpen }: LocalCollate
   const chainId = market.morphoBlue.chain.id
   const collateralAddress = market.collateralAsset.address
   const collateralSymbol = market.collateralAsset.symbol
+  const collateralName = market.collateralAsset.name
 
   const isBlacklisted = useMemo(() => {
     void version
@@ -30,7 +31,10 @@ export function LocalCollateralBlacklistControl({ market, isOpen }: LocalCollate
       clearCollateralLocallyBlacklisted(chainId, collateralAddress)
       return
     }
-    setCollateralLocallyBlacklisted(chainId, collateralAddress)
+    setCollateralLocallyBlacklisted(chainId, collateralAddress, {
+      symbol: collateralSymbol,
+      name: collateralName,
+    })
   }
 
   return (

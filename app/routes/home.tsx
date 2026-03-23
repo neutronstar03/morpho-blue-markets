@@ -1,6 +1,6 @@
 import type { Route } from './+types/home'
 import { X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
 import { Header } from '~/components/header'
 import { Button } from '~/components/ui/button'
@@ -8,9 +8,11 @@ import { Card } from '~/components/ui/card'
 import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { formatUsd } from '~/lib/formatters'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { AdvancedList } from '~/pages/home/advanced-list'
 import { BatchWithdraw } from '~/pages/home/batch-withdraw'
+import { BlacklistRecap } from '~/pages/home/blacklist-recap'
 import { Position } from '~/pages/home/position'
 import { SupplyAprOptimizer } from '~/pages/home/supply-apr-optimizer'
 
@@ -27,12 +29,80 @@ export default function HomePage() {
   const opportunities = useHomeMagicOptimizerStore(state => state.opportunities)
   const dismissOpportunity = useHomeMagicOptimizerStore(state => state.dismissOpportunity)
   const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
+  const [showBlacklistRecap, setShowBlacklistRecap] = useLocalStorage<boolean>('home:show-blacklist-recap', false)
+  const blacklistRecapRef = useRef<HTMLDivElement | null>(null)
+  const shouldScrollToBlacklistRecapRef = useRef(false)
+  const showBlacklistRecapRef = useRef(showBlacklistRecap)
 
   const chainOpportunities = opportunities.filter(o => o.chainId === chain?.id)
 
   useEffect(() => {
     setRequiredChainId(null)
   }, [setRequiredChainId])
+
+  useEffect(() => {
+    showBlacklistRecapRef.current = showBlacklistRecap
+  }, [showBlacklistRecap])
+
+  useEffect(() => {
+    const scrollToBlacklistRecap = () => {
+      const el = blacklistRecapRef.current
+      if (!el)
+        return false
+      const top = el.getBoundingClientRect().top + window.scrollY - 88
+      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+      return true
+    }
+
+    const openBlacklistRecap = () => {
+      shouldScrollToBlacklistRecapRef.current = true
+      if (showBlacklistRecapRef.current) {
+        scrollToBlacklistRecap()
+        return
+      }
+      setShowBlacklistRecap(true)
+    }
+
+    const onHashChange = () => {
+      if (window.location.hash === '#blacklist-recap')
+        openBlacklistRecap()
+    }
+
+    window.addEventListener('open-blacklist-recap', openBlacklistRecap)
+    window.addEventListener('hashchange', onHashChange)
+    if (window.location.hash === '#blacklist-recap')
+      openBlacklistRecap()
+
+    return () => {
+      window.removeEventListener('open-blacklist-recap', openBlacklistRecap)
+      window.removeEventListener('hashchange', onHashChange)
+    }
+  }, [setShowBlacklistRecap])
+
+  useEffect(() => {
+    if (!showBlacklistRecap || !shouldScrollToBlacklistRecapRef.current)
+      return
+
+    let raf2 = 0
+    const tryScroll = () => {
+      const el = blacklistRecapRef.current
+      if (!el)
+        return
+      shouldScrollToBlacklistRecapRef.current = false
+      const top = el.getBoundingClientRect().top + window.scrollY - 88
+      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+    }
+
+    const raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(tryScroll)
+    })
+
+    return () => {
+      window.cancelAnimationFrame(raf1)
+      if (raf2)
+        window.cancelAnimationFrame(raf2)
+    }
+  }, [showBlacklistRecap])
 
   const handleOpenOptimizer = (opportunity: {
     id: string
@@ -157,6 +227,11 @@ export default function HomePage() {
           <div className="mt-8">
             <AdvancedList />
           </div>
+          {showBlacklistRecap && (
+            <div ref={blacklistRecapRef} id="blacklist-recap" className="mt-8">
+              <BlacklistRecap onClose={() => setShowBlacklistRecap(false)} />
+            </div>
+          )}
         </div>
       </Main>
     </>

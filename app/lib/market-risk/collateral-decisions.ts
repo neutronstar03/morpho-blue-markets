@@ -5,6 +5,13 @@ export type CollateralDecision = 'approve' | 'ban'
 export interface CollateralDecisionEntry {
   decision: CollateralDecision
   ts: number
+  symbol?: string
+  name?: string
+}
+
+export interface CollateralDecisionRecord extends CollateralDecisionEntry {
+  chainId: number
+  collateralAddress: string
 }
 
 const KEY_PREFIX = 'collateral-decision:v1:'
@@ -20,6 +27,20 @@ function makeKey(chainId: number, collateralAddress: string) {
   return `${KEY_PREFIX}${chainId}:${normalizeAddress(collateralAddress)}`
 }
 
+function parseKey(key: string): { chainId: number, collateralAddress: string } | undefined {
+  if (!key.startsWith(KEY_PREFIX))
+    return undefined
+  const suffix = key.slice(KEY_PREFIX.length)
+  const sep = suffix.indexOf(':')
+  if (sep < 0)
+    return undefined
+  const chainId = Number.parseInt(suffix.slice(0, sep), 10)
+  const collateralAddress = normalizeAddress(suffix.slice(sep + 1))
+  if (!Number.isFinite(chainId) || chainId <= 0 || !collateralAddress)
+    return undefined
+  return { chainId, collateralAddress }
+}
+
 function safeRead(key: string): CollateralDecisionEntry | undefined {
   if (typeof window === 'undefined')
     return undefined
@@ -33,6 +54,8 @@ function safeRead(key: string): CollateralDecisionEntry | undefined {
     return {
       decision: parsed.decision,
       ts: typeof parsed.ts === 'number' ? parsed.ts : 0,
+      symbol: typeof parsed.symbol === 'string' && parsed.symbol.trim() ? parsed.symbol.trim() : undefined,
+      name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : undefined,
     }
   }
   catch {
@@ -73,9 +96,19 @@ export function getCollateralDecision(chainId?: number, collateralAddress?: stri
   return safeRead(makeKey(chainId, collateralAddress))
 }
 
-export function setCollateralDecision(chainId: number, collateralAddress: string, decision: CollateralDecision) {
+export function setCollateralDecision(
+  chainId: number,
+  collateralAddress: string,
+  decision: CollateralDecision,
+  metadata?: { symbol?: string | null, name?: string | null },
+) {
   const key = makeKey(chainId, collateralAddress)
-  safeWrite(key, { decision, ts: Date.now() })
+  safeWrite(key, {
+    decision,
+    ts: Date.now(),
+    symbol: typeof metadata?.symbol === 'string' && metadata.symbol.trim() ? metadata.symbol.trim() : undefined,
+    name: typeof metadata?.name === 'string' && metadata.name.trim() ? metadata.name.trim() : undefined,
+  })
   emitChange()
 }
 
@@ -105,6 +138,39 @@ export function subscribeCollateralDecisions(listener: () => void) {
     window.removeEventListener(CHANGE_EVENT, onEvent)
     window.removeEventListener('storage', onStorage)
   }
+}
+
+export function listCollateralDecisions(): CollateralDecisionRecord[] {
+  if (typeof window === 'undefined')
+    return []
+
+  const out: CollateralDecisionRecord[] = []
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i)
+      if (!key)
+        continue
+      const parsedKey = parseKey(key)
+      if (!parsedKey)
+        continue
+      const entry = safeRead(key)
+      if (!entry)
+        continue
+      out.push({
+        chainId: parsedKey.chainId,
+        collateralAddress: parsedKey.collateralAddress,
+        decision: entry.decision,
+        ts: entry.ts,
+        symbol: entry.symbol,
+        name: entry.name,
+      })
+    }
+  }
+  catch {
+    return []
+  }
+
+  return out.sort((a, b) => b.ts - a.ts)
 }
 
 // Convenience helper for places that want to show the outcome.

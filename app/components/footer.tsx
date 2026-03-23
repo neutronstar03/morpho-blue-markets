@@ -81,6 +81,21 @@ export function Footer() {
     catch {} // Ignore storage errors and still refresh.
     window.location.reload()
   }
+
+  const onOpenBlacklistRecap = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    if (typeof window === 'undefined')
+      return
+    const baseUrl = (import.meta as any).env?.BASE_URL as string | undefined
+    const homePath = new URL(baseUrl && typeof baseUrl === 'string' ? baseUrl : '/', window.location.origin).pathname
+    const isHome = window.location.pathname === homePath
+    if (isHome) {
+      window.dispatchEvent(new Event('open-blacklist-recap'))
+      return
+    }
+    window.location.assign(`${homePath}#blacklist-recap`)
+  }
+
   return (
     <footer className="border-t border-gray-800 text-gray-400 text-xs">
       <Container className="py-4">
@@ -148,14 +163,23 @@ export function Footer() {
                 )
               : <span />}
 
-            <a
-              href="#"
-              onClick={onWipeCache}
-              className="underline underline-offset-2 hover:text-gray-200"
-              title="Clear local cache and reload"
-            >
-              Wipe cache & reload
-            </a>
+            <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+              <a
+                href="#blacklist-recap"
+                onClick={onOpenBlacklistRecap}
+                className="underline underline-offset-2 hover:text-gray-200"
+              >
+                Blacklist recap
+              </a>
+              <a
+                href="#"
+                onClick={onWipeCache}
+                className="underline underline-offset-2 hover:text-gray-200"
+                title="Clear local cache and reload"
+              >
+                Wipe cache & reload
+              </a>
+            </div>
           </div>
         </div>
       </Container>
