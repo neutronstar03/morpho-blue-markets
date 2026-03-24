@@ -13,7 +13,6 @@ import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
-import { useMarketAprByVaults } from '~/lib/hooks/graphql/use-market-apr-by-vaults'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loan-assets-by-chain'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
@@ -131,25 +130,7 @@ export function SupplyAprOptimizer() {
       return undefined
     return loanAssetOptions.find(o => o.address.toLowerCase() === selectedLoanAddr)
   }, [loanAssetOptions, selectedLoanAddr])
-  const vaultAprQuery = useMarketAprByVaults({
-    enabled: ctx.started,
-  })
-  const effectiveVaultApr = chain?.id ? vaultAprQuery.effectiveByChainId.get(chain.id) : undefined
-  const fallbackLabel = useMemo(() => {
-    if (!effectiveVaultApr?.vaultName)
-      return 'Withdraw to wallet'
-    return effectiveVaultApr.source === 'mainnet-floor'
-      ? `Mainnet: ${effectiveVaultApr.vaultName}`
-      : `Vault: ${effectiveVaultApr.vaultName}`
-  }, [effectiveVaultApr])
-  const walletFallbackLink = useMemo(() => {
-    if (!effectiveVaultApr?.vaultAddress || !effectiveVaultApr.vaultChainId)
-      return undefined
-    return {
-      chainName: getSupportedChainName(effectiveVaultApr.vaultChainId),
-      vaultAddress: effectiveVaultApr.vaultAddress,
-    }
-  }, [effectiveVaultApr])
+  const fallbackLabel = 'Withdraw to wallet'
 
   const selectedUserMarketsAll = useMemo(() => {
     if (!selectedLoanAddr)
@@ -303,11 +284,11 @@ export function SupplyAprOptimizer() {
     if (marketAprManuallyEditedRef.current)
       return
 
-    const nextMarketApr = effectiveVaultApr?.effectiveAprInput ?? DEFAULT_MARKET_APR
+    const nextMarketApr = DEFAULT_MARKET_APR
     if ((ctx.inputs.marketApr ?? '') === nextMarketApr)
       return
     ctx.setMarketApr(nextMarketApr)
-  }, [DEFAULT_MARKET_APR, ctx, effectiveVaultApr?.effectiveAprInput, selectedOption])
+  }, [DEFAULT_MARKET_APR, ctx, selectedOption])
 
   const [optimizeRequest, setOptimizeRequest] = useState<null | {
     runId: number
@@ -981,7 +962,6 @@ export function SupplyAprOptimizer() {
                 chainId={chain?.id}
                 morphoAddress={morphoAddress as `0x${string}` | undefined}
                 userSupplySharesByMarketId={userSupplySharesByMarketId}
-                walletFallbackLink={walletFallbackLink}
               />
             )}
           </>

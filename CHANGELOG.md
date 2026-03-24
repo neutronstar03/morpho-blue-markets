@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.6 - 2026-03-25
+
+### Changed
+- optimizer: removed the fetched vault/mainnet fallback yield path from Supply APR Optimizer and now default the wallet fallback baseline to 10% APR.
+- ui: Market page `Risk` section now colors `Supplying Vaults` red when the count is `0` and green when it is greater than `1`.
+- chore: refreshed selected patch-level dependencies (`react-router*`, `viem`, `vite`, `vitest`, `caniuse-lite`, `baseline-browser-mapping`).
+
 ## v1.2.5 - 2026-03-23
 
 ### Introduced

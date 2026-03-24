@@ -5,7 +5,7 @@ An alternative frontend for the [Morpho Blue](https://docs.morpho.org/tools/onch
 This project focuses on practical Morpho market exploration and action tooling, including:
 
 - Markets table with live APR previews and filterable chain views
-- Supply APR optimizer for rebalance and deposit planning, with wallet fallback and vault-informed baseline yield hints
+- Supply APR optimizer for rebalance and deposit planning, with wallet fallback and a default 10% baseline APR
 - Batch withdraw flow for lower-APR-first exits
 - Position recap and market-level deposit/withdraw flows
 - Opportunity recap for coarse chain-level deployable yield evaluation
@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.6` (2026-03-25): simplified optimizer wallet fallback to a fixed 10% APR baseline, colored Market risk vault counts, and refreshed patch-level routing/build/test dependencies.
 - `v1.2.5` (2026-03-23): added a Blacklist Recap review panel for user blacklist + unsafe collateral decisions, improved recap mobile UX, and restored the mobile `Bef 90%` Markets column.
 - `v1.2.4` (2026-03-21): added local collateral blacklist controls, denser mobile market-page UI, richer optimizer opportunity cards, and refreshed app/tooling dependencies.
 - `v1.2.3` (2026-03-16): optimizer now uses a Market APR threshold with wallet fallback, supports vault-informed baseline yield suggestions with Morpho deep links, and includes live tests for vault-derived APR selection.

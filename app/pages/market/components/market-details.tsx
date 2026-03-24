@@ -187,7 +187,11 @@ export function MarketDetails({ market }: MarketDetailsProps) {
       />
       <DetailRow
         label="Supplying Vaults"
-        value={market.supplyingVaults.length}
+        value={(
+          <span className={market.supplyingVaults.length === 0 ? 'text-red-500' : market.supplyingVaults.length > 1 ? 'text-green-500' : undefined}>
+            {market.supplyingVaults.length}
+          </span>
+        )}
       />
 
       <SectionTitle title="Supply Rates" />
