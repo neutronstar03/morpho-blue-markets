@@ -15,6 +15,24 @@
     {
       "assetContract": "0x610209dabf47375307bb2a3263f85440eedc7834",
       "comment": "ILLIQUID_PERPDEX_COLL: unverified synthetic collateral with owner-controlled mint/burn and opaque admin surface."
+    },
+    {
+      "assetContract": "0x1202f5c7b4b9e47a1a484e8b270be34dbbc75055",
+      "comment": "wstUSR: Resolv exposure manually blacklisted after depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x4956b52ae2ff65d74ca2d61207523288e4528f96",
+      "comment": "RLP: Resolv exposure manually blacklisted after depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x66a1e37c9b0eaddca17d3662d6c05f4decf3e110",
+      "comment": "USR: Resolv exposure manually blacklisted after depeg; avoid new deposits."
+    }
+  ],
+  "42161": [
+    {
+      "assetContract": "0x35e5db674d8e93a03d814fa0ada70731efe8a4b9",
+      "comment": "RLP: Resolv exposure manually blacklisted after depeg; avoid new deposits."
     }
   ]
 }

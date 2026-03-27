@@ -251,6 +251,33 @@ function isPendleSymbolExpired(symbol?: string | null) {
   return expiry < formatTodayPendleSortable()
 }
 
+function normalizeSymbol(symbol?: string | null) {
+  return symbol?.trim().toUpperCase() ?? ''
+}
+
+const MANUAL_BLACKLISTED_SYMBOLS = new Set([
+  'APRUSR',
+  'MC-USR',
+])
+
+const MANUAL_BLACKLISTED_SYMBOL_PREFIXES = [
+  'PT-RLP-',
+  'PT-SW-RLP-',
+  'PT-USR-',
+  'PT-WSTUSR-',
+  'LP-USR-',
+  'BWPT-USR-',
+]
+
+function isManuallyBlacklistedSymbol(symbol?: string | null) {
+  const normalized = normalizeSymbol(symbol)
+  if (!normalized)
+    return false
+  if (MANUAL_BLACKLISTED_SYMBOLS.has(normalized))
+    return true
+  return MANUAL_BLACKLISTED_SYMBOL_PREFIXES.some(prefix => normalized.startsWith(prefix))
+}
+
 function hasValueInChainMap(
   map: Record<number, Set<string>>,
   value: string | null | undefined,
@@ -286,6 +313,8 @@ export function isMarketBlacklisted(args: {
     isMarketIdBlacklisted(args.uniqueKey, args.chainId)
     || isAssetBlacklisted(args.loanAssetAddress, args.chainId)
     || isAssetBlacklisted(args.collateralAssetAddress, args.chainId)
+    || isManuallyBlacklistedSymbol(args.loanAssetSymbol)
+    || isManuallyBlacklistedSymbol(args.collateralAssetSymbol)
     || isPendleSymbolExpired(args.loanAssetSymbol)
     || isPendleSymbolExpired(args.collateralAssetSymbol)
   )

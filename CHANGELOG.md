@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.7 - 2026-03-28
+
+### Changed
+- blacklist: manually blacklisted direct Resolv asset addresses for mainnet `wstUSR`, mainnet `RLP`, mainnet `USR`, and arbitrum `RLP` after the depeg to prevent new deposits.
+- blacklist: added targeted symbol-family blocking for related Resolv wrappers and Pendle derivatives (`aprUSR`, `MC-USR`, `PT-RLP-*`, `PT-sw-RLP-*`, `PT-USR-*`, `PT-wstUSR-*`, `LP-USR-*`, `bwPT-USR-*`).
+
 ## v1.2.6 - 2026-03-25
 
 ### Changed
