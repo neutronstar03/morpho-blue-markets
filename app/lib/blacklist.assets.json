@@ -37,6 +37,10 @@
     {
       "assetContract": "0x4bcaf180df5b13c0441fe41a66e9638a2a410c6d",
       "comment": "Clearly scam tokens"
+    },
+    {
+      "assetContract": "0xc31389794ffac23331e0d9f611b7953f90aa5fdc",
+      "comment": "RLP: Resolv exposure manually blacklisted after hack; avoid new deposits."
     }
   ],
   "42161": [

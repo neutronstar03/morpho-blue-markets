@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.9` (2026-04-01): added the missing Base `RLP` Resolv-related asset to the permanent blacklist.
 - `v1.2.8` (2026-04-01): enabled Monad collateral quick links across explorer/GeckoTerminal/CoinGecko and permanently blacklisted two reported scam-token assets on mainnet and Base.
 - `v1.2.7` (2026-03-28): blacklisted direct Resolv assets and related wrapper families after the depeg so optimizer/discovery flows avoid new deposits there.
 - `v1.2.6` (2026-03-25): simplified optimizer wallet fallback to a fixed 10% APR baseline, colored Market risk vault counts, and refreshed patch-level routing/build/test dependencies.

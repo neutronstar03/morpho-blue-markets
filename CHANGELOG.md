@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.9 - 2026-04-01
+
+### Changed
+- blacklist: added the missing Base `RLP` asset address to the permanent manual blacklist after the Resolv hack.
+
 ## v1.2.8 - 2026-04-01
 
 ### Changed
