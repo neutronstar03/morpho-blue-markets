@@ -19,6 +19,7 @@ const GECKOTERMINAL_NETWORK_BY_CHAIN: Record<number, string> = {
   130: 'unichain',
   999: 'hyperevm',
   747474: 'katana',
+  143: 'monad',
 }
 
 const DEFINED_CHAIN_BY_ID: Record<number, string> = {
@@ -43,6 +44,7 @@ const COINGECKO_PLATFORM_BY_CHAIN: Record<number, string> = {
   130: 'unichain',
   999: 'hyperevm',
   747474: 'katana',
+  143: 'monad',
 }
 
 function getGeckoTerminalTokenUrl(chainId: number, address: string) {

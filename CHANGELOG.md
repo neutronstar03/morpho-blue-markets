@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.8 - 2026-04-01
+
+### Changed
+- ui: enabled Monad unknown-collateral quick links for explorer, GeckoTerminal, and CoinGecko.
+- blacklist: permanently blacklisted the reported mainnet and Base scam-token asset addresses.
+
 ## v1.2.7 - 2026-03-28
 
 ### Changed

@@ -27,6 +27,16 @@
     {
       "assetContract": "0x66a1e37c9b0eaddca17d3662d6c05f4decf3e110",
       "comment": "USR: Resolv exposure manually blacklisted after depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x3d4762b4bb4b4c922377fe5b887e900d7fb64cdf",
+      "comment": "Clearly scam tokens"
+    }
+  ],
+  "8453": [
+    {
+      "assetContract": "0x4bcaf180df5b13c0441fe41a66e9638a2a410c6d",
+      "comment": "Clearly scam tokens"
     }
   ],
   "42161": [
