@@ -33,7 +33,6 @@ export interface SupplyAprOptimizerRunState {
 }
 
 export interface SupplyAprOptimizerState {
-  started: boolean
   selection: SupplyAprOptimizerSelection
   inputs: SupplyAprOptimizerInputs
   derived: SupplyAprOptimizerDerived
@@ -42,7 +41,6 @@ export interface SupplyAprOptimizerState {
 }
 
 interface SupplyAprOptimizerContextValue extends SupplyAprOptimizerState {
-  start: () => void
   clear: () => void
   setSelection: (next: SupplyAprOptimizerSelection) => void
   setMarketApr: (v: string | undefined) => void
@@ -57,7 +55,6 @@ interface SupplyAprOptimizerContextValue extends SupplyAprOptimizerState {
 const SupplyAprOptimizerContext = createContext<SupplyAprOptimizerContextValue | null>(null)
 
 export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }) {
-  const [started, setStarted] = useState(false)
   const [selection, setSelectionState] = useState<SupplyAprOptimizerSelection>({})
   const [inputs, setInputs] = useState<SupplyAprOptimizerInputs>({ marketApr: DEFAULT_MARKET_APR })
   const [derived, setDerivedState] = useState<SupplyAprOptimizerDerived>({})
@@ -65,10 +62,7 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
   const [result, setResult] = useState<OptimizeSupplyWithPositionsResult | undefined>(undefined)
   const runIdRef = useRef<number>(0)
 
-  const start = useCallback(() => setStarted(true), [])
-
   const clear = useCallback(() => {
-    setStarted(false)
     setSelectionState({})
     setInputs({ marketApr: DEFAULT_MARKET_APR })
     setDerivedState({})
@@ -139,13 +133,11 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
 
   const value = useMemo<SupplyAprOptimizerContextValue>(() => {
     return {
-      started,
       selection,
       inputs,
       derived,
       run,
       result,
-      start,
       clear,
       setSelection,
       setMarketApr,
@@ -156,7 +148,7 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
       finishRun,
       applyPrefetchedResult,
     }
-  }, [started, selection, inputs, derived, run, result, start, clear, setSelection, setMarketApr, setNewDepositAmount, setDerived, beginRun, cancelRun, finishRun, applyPrefetchedResult])
+  }, [selection, inputs, derived, run, result, clear, setSelection, setMarketApr, setNewDepositAmount, setDerived, beginRun, cancelRun, finishRun, applyPrefetchedResult])
 
   return (
     <SupplyAprOptimizerContext.Provider value={value}>

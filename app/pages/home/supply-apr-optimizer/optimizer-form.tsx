@@ -77,7 +77,7 @@ export function SupplyAprOptimizerForm({
           value={selectedLoanAssetAddress ?? undefined}
           onValueChange={onChangeLoanAsset}
         >
-          <SelectTrigger className="w-full h-10 bg-gray-900 border-gray-700 text-white text-sm">
+          <SelectTrigger className="w-full h-10 bg-gray-900 border-gray-700 text-white text-sm data-[placeholder]:text-gray-500">
             <SelectValue placeholder="Select an asset" />
           </SelectTrigger>
           <SelectContent>

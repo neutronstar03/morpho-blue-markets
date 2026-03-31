@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.10` (2026-04-01): made the Supply APR optimizer always open, removed the Start gate, and restored a visible asset placeholder.
 - `v1.2.9` (2026-04-01): added the missing Base `RLP` Resolv-related asset to the permanent blacklist.
 - `v1.2.8` (2026-04-01): enabled Monad collateral quick links across explorer/GeckoTerminal/CoinGecko and permanently blacklisted two reported scam-token assets on mainnet and Base.
 - `v1.2.7` (2026-03-28): blacklisted direct Resolv assets and related wrapper families after the depeg so optimizer/discovery flows avoid new deposits there.

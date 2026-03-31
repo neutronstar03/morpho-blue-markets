@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.10 - 2026-04-01
+
+### Changed
+- ui: made the Supply APR optimizer open by default, removed the Start gate, and kept the form visible after Clear.
+- ui: restored a visible placeholder for the optimizer asset select when no asset is chosen.
+
 ## v1.2.9 - 2026-04-01
 
 ### Changed

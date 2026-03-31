@@ -3,7 +3,7 @@ import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/li
 import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
 import type { OptimizerReadResult } from '~/lib/optimizer/use-supply-optimizer-reads'
 import type { AutoStepInfo, LoanAssetOption, OptimizerMarketMeta } from '~/pages/home/supply-apr-optimizer/shared'
-import { Coins, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits } from 'viem'
 import { useAccount, usePublicClient, useReadContracts } from 'wagmi'
@@ -91,7 +91,7 @@ export function SupplyAprOptimizer() {
   }, [livePositions])
 
   const { data: popularLoanAssets } = usePopularLoanAssetsByChain(chain?.id, {
-    enabled: ctx.started,
+    enabled: !!userAddress && !!chain?.id,
     topN: 20,
     first: 200,
     minNetSupplyApy: 0.05,
@@ -213,11 +213,10 @@ export function SupplyAprOptimizer() {
     },
   })
 
-  // Derive UserSupplyPosition[] and total supplied, then set default min move size (1%).
   useEffect(() => {
-    if (!ctx.started)
+    if (!ctx.selection.loanAssetAddress)
       marketAprManuallyEditedRef.current = false
-  }, [ctx.started])
+  }, [ctx.selection.loanAssetAddress])
 
   useEffect(() => {
     if (!selectedOption)
@@ -279,7 +278,7 @@ export function SupplyAprOptimizer() {
   }, [newDepositAmount, selectedOption, setNewDepositAmount, walletBalanceRaw])
 
   useEffect(() => {
-    if (!ctx.started || !selectedOption)
+    if (!selectedOption)
       return
     if (marketAprManuallyEditedRef.current)
       return
@@ -506,11 +505,6 @@ export function SupplyAprOptimizer() {
       stopOptimizerWorker()
     }
   }, [fallbackLabel, finishRun, optimizeReadResult, optimizeRequest, stopOptimizerWorker])
-
-  const canStart = !isLoadingPositions
-  const canPick = ctx.started && loanAssetOptions.length > 0
-
-  const onStart = () => ctx.start()
 
   const onChangeLoanAsset = (addr: string) => {
     marketAprManuallyEditedRef.current = false
@@ -843,9 +837,6 @@ export function SupplyAprOptimizer() {
         })
       : undefined
 
-    if (!ctx.started)
-      ctx.start()
-
     marketAprManuallyEditedRef.current = false
     ctx.setSelection({
       chainId: optimizerPreset.chainId,
@@ -863,6 +854,12 @@ export function SupplyAprOptimizer() {
     consumeOptimizerPreset()
   }, [chain?.id, consumeFreshPrecomputedResult, consumeOptimizerPreset, ctx, optimizerPreset, setMaxMarketsInput, userAddress])
 
+  const hasSomethingToClear = !!ctx.selection.loanAssetAddress
+    || ctx.inputs.newDepositAmount != null
+    || !!ctx.result
+    || !!ctx.run.error
+    || ctx.run.isRunning
+
   return (
     <Card className="mb-8" data-testid="supply-apr-optimizer-card">
       <div className="p-4 border-b border-gray-700 flex items-center gap-3">
@@ -872,7 +869,7 @@ export function SupplyAprOptimizer() {
             Suggests how to rebalance your existing supply to improve APR.
           </p>
         </div>
-        {ctx.started && (
+        {hasSomethingToClear && (
           <Button
             type="button"
             variant="outline"
@@ -888,59 +885,46 @@ export function SupplyAprOptimizer() {
       </div>
 
       <div className="p-4 sm:p-6 space-y-6">
-        {!ctx.started && (
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-300">
-              Pick a supplied token and compute an optimized rebalance plan.
-            </div>
-            <Button onClick={onStart} disabled={!canStart} isLoading={isLoadingPositions}>
-              Start
-            </Button>
-          </div>
+        {!userAddress && (
+          <div className="text-sm text-gray-300">Connect your wallet to compute an optimized supply plan.</div>
         )}
 
-        {ctx.started && (
+        {userAddress && (
           <>
-            {loanAssetOptions.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mb-3">
-                  <Coins className="w-5 h-5 text-gray-500" />
-                </div>
-                <p className="text-gray-300 font-medium mb-1">No supply positions detected</p>
-                <p className="text-sm text-gray-500">You need to have active supply positions to use the optimizer.</p>
+            {!isLoadingPositions && ownedLoanAssetOptions.length === 0 && (
+              <div className="text-sm text-gray-300 border border-gray-700 bg-gray-900/40 rounded-md p-3">
+                No current supply positions detected. You can still pick a supported asset and simulate a new deposit.
               </div>
             )}
 
-            {canPick && (
-              <SupplyAprOptimizerForm
-                selectedLoanAssetAddress={ctx.selection.loanAssetAddress}
-                onChangeLoanAsset={onChangeLoanAsset}
-                ownedLoanAssetOptions={ownedLoanAssetOptions}
-                popularLoanAssetOptions={popularLoanAssetOptions}
-                loanAssetOptions={loanAssetOptions}
-                selectedOption={selectedOption}
-                totalSuppliedAssets={ctx.derived.totalSuppliedAssets ?? 0n}
-                marketApr={ctx.inputs.marketApr}
-                onChangeMarketApr={onChangeMarketApr}
-                newDepositAmount={ctx.inputs.newDepositAmount}
-                onChangeNewDepositAmount={value => ctx.setNewDepositAmount(value)}
-                onFillMaxDeposit={onFillMaxDeposit}
-                onFillZeroDeposit={onFillZeroDeposit}
-                walletBalanceRaw={walletBalanceRaw}
-                symbol={symbol}
-                maxMarketsInput={maxMarketsInput ?? ''}
-                setMaxMarketsInput={setMaxMarketsInput}
-                parseMaxMarkets={parseMaxMarkets}
-                onOptimize={onOptimize}
-                optimizeDisabled={ctx.run.isRunning || !canOptimize || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
-                optimizeLoading={ctx.run.isRunning || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
-                optimizeLabel={topMarketsQuery.isLoading || topMarketsQuery.isFetching
-                  ? 'Loading markets...'
-                  : ctx.run.isRunning
-                    ? `${runProgressLabel ?? 'Optimizing'}${runProgressPercent != null ? ` ${runProgressPercent}%` : ''}`
-                    : 'Optimize'}
-              />
-            )}
+            <SupplyAprOptimizerForm
+              selectedLoanAssetAddress={ctx.selection.loanAssetAddress}
+              onChangeLoanAsset={onChangeLoanAsset}
+              ownedLoanAssetOptions={ownedLoanAssetOptions}
+              popularLoanAssetOptions={popularLoanAssetOptions}
+              loanAssetOptions={loanAssetOptions}
+              selectedOption={selectedOption}
+              totalSuppliedAssets={ctx.derived.totalSuppliedAssets ?? 0n}
+              marketApr={ctx.inputs.marketApr}
+              onChangeMarketApr={onChangeMarketApr}
+              newDepositAmount={ctx.inputs.newDepositAmount}
+              onChangeNewDepositAmount={value => ctx.setNewDepositAmount(value)}
+              onFillMaxDeposit={onFillMaxDeposit}
+              onFillZeroDeposit={onFillZeroDeposit}
+              walletBalanceRaw={walletBalanceRaw}
+              symbol={symbol}
+              maxMarketsInput={maxMarketsInput ?? ''}
+              setMaxMarketsInput={setMaxMarketsInput}
+              parseMaxMarkets={parseMaxMarkets}
+              onOptimize={onOptimize}
+              optimizeDisabled={ctx.run.isRunning || !canOptimize || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
+              optimizeLoading={ctx.run.isRunning || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
+              optimizeLabel={topMarketsQuery.isLoading || topMarketsQuery.isFetching
+                ? 'Loading markets...'
+                : ctx.run.isRunning
+                  ? `${runProgressLabel ?? 'Optimizing'}${runProgressPercent != null ? ` ${runProgressPercent}%` : ''}`
+                  : 'Optimize'}
+            />
 
             {ctx.run.error && (
               <div className="text-sm text-red-300 border border-red-900/40 bg-red-950/20 rounded-md p-3">
