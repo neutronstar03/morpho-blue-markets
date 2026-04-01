@@ -1,7 +1,7 @@
 {
   "name": "morpho-blue-markets",
   "type": "module",
-  "version": "1.2.10",
+  "version": "1.2.11",
   "private": true,
   "description": "An alternative frontend for the Morpho Blue DEFI protocol.",
   "author": {
@@ -17,7 +17,7 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
-    "lint": "eslint .",
+    "lint": "eslint . --fix",
     "typecheck": "react-router typegen && tsc",
     "gen:blacklist:markets": "bun scripts/blacklist-generator.ts",
     "gen:whitelist:collaterals": "bun scripts/collateral-whitelist-generator.ts",
@@ -46,6 +46,7 @@
     "@tanstack/react-query": "5.91.3",
     "@wagmi/connectors": "6.2.0",
     "@wagmi/core": "2.22.1",
+    "@web3icons/react": "^4.1.17",
     "caniuse-lite": "1.0.30001781",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

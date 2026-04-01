@@ -13,6 +13,7 @@ import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
+import { DEFAULT_MARKET_APR, getDefaultMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loan-assets-by-chain'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
@@ -42,8 +43,6 @@ export function SupplyAprOptimizer() {
   const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
   const MAX_CANDIDATE_NET_SUPPLY_APY = 6
   const MIN_CANDIDATE_BORROW_USD = 5
-  const DEFAULT_MARKET_APR = '10'
-
   const ctx = useSupplyAprOptimizer()
   const { address: userAddress, chain } = useAccount()
   const newDepositAmount = ctx.inputs.newDepositAmount
@@ -283,11 +282,11 @@ export function SupplyAprOptimizer() {
     if (marketAprManuallyEditedRef.current)
       return
 
-    const nextMarketApr = DEFAULT_MARKET_APR
+    const nextMarketApr = getDefaultMarketAprByAssetSymbol(selectedOption.symbol)
     if ((ctx.inputs.marketApr ?? '') === nextMarketApr)
       return
     ctx.setMarketApr(nextMarketApr)
-  }, [DEFAULT_MARKET_APR, ctx, selectedOption])
+  }, [ctx, selectedOption])
 
   const [optimizeRequest, setOptimizeRequest] = useState<null | {
     runId: number

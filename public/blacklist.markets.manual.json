@@ -1,0 +1,17 @@
+[
+  {
+    "chainId": 1,
+    "uniqueKey": "0x9cb645a8588af9b16d82c919ee81cc8c6009ef6cf76b8b6453551ab60edab9f9",
+    "comment": "borrowers have 0% health ratio. misconfigured"
+  },
+  {
+    "chainId": 1,
+    "uniqueKey": "0x3889dee51674c6e728f7d05f11a3407c6853e433a0e63f8febbc45887a26a475",
+    "comment": "borrowers have 0% health ratio. misconfigured"
+  },
+  {
+    "chainId": 1,
+    "uniqueKey": "0x83b7ad16905809ea36482f4fbf6cfee9c9f316d128de9a5da1952607d5e4df5e",
+    "comment": "borrowers have 0% health ratio. misconfigured"
+  }
+]

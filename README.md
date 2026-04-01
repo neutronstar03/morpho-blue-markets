@@ -5,9 +5,9 @@ An alternative frontend for the [Morpho Blue](https://docs.morpho.org/tools/onch
 This project focuses on practical Morpho market exploration and action tooling, including:
 
 - Markets table with live APR previews and filterable chain views
-- Supply APR optimizer for rebalance and deposit planning, with wallet fallback and a default 10% baseline APR
+- Supply APR optimizer for rebalance and deposit planning, with wallet fallback defaults (10% baseline APR, with asset-specific overrides such as 4% for `WETH`)
 - Batch withdraw flow for lower-APR-first exits
-- Position recap and market-level deposit/withdraw flows
+- Position recap grouped by lent asset, with cross-chain quick-switch pills and market-level deposit/withdraw flows
 - Opportunity recap for coarse chain-level deployable yield evaluation
 - Blacklist recap for reviewing user-hidden and unsafe collaterals
 
@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.11` (2026-04-02): added a manual market blacklist overlay, hid those markets from portfolio/withdraw recaps, grouped Positions by lent asset with cross-chain quick-switch pills, and added a lower default Market APR override for `WETH`.
 - `v1.2.10` (2026-04-01): made the Supply APR optimizer always open, removed the Start gate, and restored a visible asset placeholder.
 - `v1.2.9` (2026-04-01): added the missing Base `RLP` Resolv-related asset to the permanent blacklist.
 - `v1.2.8` (2026-04-01): enabled Monad collateral quick links across explorer/GeckoTerminal/CoinGecko and permanently blacklisted two reported scam-token assets on mainnet and Base.

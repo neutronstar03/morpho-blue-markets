@@ -1,4 +1,7 @@
+import { NetworkIcon } from '@web3icons/react/dynamic'
 import { Link } from 'react-router-dom'
+import { useSwitchChain } from 'wagmi'
+import { useNetworkContext } from '~/lib/contexts/network'
 import { formatUsd } from '~/lib/formatters'
 
 const OPPORTUNITY_TARGET_UTILIZATION = 0.9
@@ -28,7 +31,6 @@ interface OpportunityRecapChain {
   chainName: string
   totalDeployableUsd: number
   blendedApy: number
-  estimatedYearlyUsd: number
   marketCountUsed: number
   topAllocations: OpportunityRecapAllocation[]
 }
@@ -104,14 +106,11 @@ function buildOpportunityRecaps(markets: OpportunityRecapMarket[]): OpportunityR
     const totalDeployableUsd = allocations.reduce((sum, allocation) => sum + allocation.allocatedUsd, 0)
     const weightedApy = allocations.reduce((sum, allocation) => sum + (allocation.allocatedUsd * allocation.apy), 0)
     const blendedApy = totalDeployableUsd > 0 ? (weightedApy / totalDeployableUsd) : 0
-    const estimatedYearlyUsd = totalDeployableUsd * blendedApy
-
     const recap = {
       chainId,
       chainName: group.chainName,
       totalDeployableUsd,
       blendedApy,
-      estimatedYearlyUsd,
       marketCountUsed: allocations.length,
       topAllocations: allocations.slice(0, OPPORTUNITY_TOP_MARKETS),
     }
@@ -123,19 +122,19 @@ function buildOpportunityRecaps(markets: OpportunityRecapMarket[]): OpportunityR
   }
 
   return recaps.sort((a, b) => {
-    if (b.estimatedYearlyUsd !== a.estimatedYearlyUsd)
-      return b.estimatedYearlyUsd - a.estimatedYearlyUsd
     return b.totalDeployableUsd - a.totalDeployableUsd
   })
 }
 
 export function OpportunityRecap({ markets }: { markets: OpportunityRecapMarket[] }) {
+  const { switchChain } = useSwitchChain()
+  const { setRequiredChainId } = useNetworkContext()
   const recaps = buildOpportunityRecaps(markets)
 
   if (!recaps.length) {
     return (
       <div className="rounded-md border border-gray-700 bg-gray-900/40 p-4">
-        <p className="text-sm text-gray-300">No conservative supply opportunity found in the current Markets selection.</p>
+        <p className="text-sm text-gray-300">No sizable supply opportunities found for the current Markets filters.</p>
       </div>
     )
   }
@@ -164,7 +163,17 @@ export function OpportunityRecap({ markets }: { markets: OpportunityRecapMarket[
           <div key={recap.chainId} className="rounded-md border border-gray-700 bg-gray-900/50 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-base font-semibold text-white">{recap.chainName}</div>
+                <button
+                  type="button"
+                  className="inline-flex cursor-pointer items-center gap-2 text-base font-semibold text-white transition-colors hover:text-blue-300"
+                  onClick={() => {
+                    setRequiredChainId(recap.chainId)
+                    switchChain({ chainId: recap.chainId })
+                  }}
+                >
+                  <NetworkIcon chainId={recap.chainId} size={18} variant="branded" className="h-[18px] w-[18px]" />
+                  <span>{recap.chainName}</span>
+                </button>
                 <p className="mt-1 text-sm text-gray-300">
                   About
                   {' '}
@@ -185,10 +194,6 @@ export function OpportunityRecap({ markets }: { markets: OpportunityRecapMarket[
                   {recap.marketCountUsed}
                   {' '}
                   markets
-                </div>
-                <div>
-                  {formatUsd(recap.estimatedYearlyUsd)}
-                  /yr
                 </div>
               </div>
             </div>

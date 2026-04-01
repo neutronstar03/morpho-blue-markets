@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAccount, usePublicClient } from 'wagmi'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
+import { getDefaultMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress } from '~/lib/hooks/rpc/use-morpho'
 import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
@@ -39,7 +40,6 @@ const OPTIMIZER_READ_CACHE_TTL_MS = 30_000
 const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
 const MAX_CANDIDATE_NET_SUPPLY_APY = 6
 const MIN_CANDIDATE_BORROW_USD = 5
-const DEFAULT_MARKET_APR = '10'
 const DEFAULT_MARKET_APR_WAD = 100_000_000_000_000_000n
 
 export function useHomeMagicOptimizerScan() {
@@ -369,6 +369,7 @@ export function useHomeMagicOptimizerScan() {
         return
 
       const runResult = message.result
+      const defaultMarketApr = getDefaultMarketAprByAssetSymbol(activeAsset.symbol)
       if (runResult.status === 'success' && runResult.result) {
         const aprGainWad = runResult.result.optimized.blendedAprWad - runResult.result.current.blendedAprWad
         if (aprGainWad > NO_BENEFIT_DELTA_APR_WAD) {
@@ -386,12 +387,12 @@ export function useHomeMagicOptimizerScan() {
 
           if (userAddressLower) {
             upsertPrecomputedResult({
-              id: `${chainIdSafe}:${userAddressLower}:${loanAssetAddressLower}:6:${DEFAULT_MARKET_APR}:0`,
+              id: `${chainIdSafe}:${userAddressLower}:${loanAssetAddressLower}:6:${defaultMarketApr}:0`,
               chainId: chainIdSafe,
               userAddressLower,
               loanAssetAddressLower,
               maxMarketsUsed: MAX_MARKETS_USED,
-              marketApr: DEFAULT_MARKET_APR,
+              marketApr: defaultMarketApr,
               newDepositAmount: '0',
               computedAt: nowMs,
               expiresAt: nowMs + HOME_OPPORTUNITY_TTL_MS,

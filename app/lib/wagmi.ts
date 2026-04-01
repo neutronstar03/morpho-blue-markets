@@ -1,5 +1,6 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { defineChain, fallback, http } from 'viem'
+import { monad } from 'viem/chains'
 import { arbitrum, base, katana, mainnet, optimism, polygon, unichain } from 'wagmi/chains'
 
 const hyperEvm = defineChain({
@@ -30,7 +31,7 @@ const hyperEvm = defineChain({
 export const config = getDefaultConfig({
   appName: 'Morpho Blue Markets',
   projectId: '0d13744a3dd855198cde1538ca87976d',
-  chains: [arbitrum, base, katana, mainnet, optimism, polygon, unichain, hyperEvm],
+  chains: [arbitrum, base, katana, mainnet, monad, optimism, polygon, unichain, hyperEvm],
   transports: {
     [mainnet.id]: fallback([
       http('https://ethereum-rpc.publicnode.com'),
@@ -63,6 +64,10 @@ export const config = getDefaultConfig({
       http('https://0xrpc.io/uni'),
     ], { rank: false, retryCount: 2 }),
     [hyperEvm.id]: http('https://rpc.hyperliquid.xyz/evm'),
+    [monad.id]: fallback([
+      http('https://rpc.monad.xyz'),
+      http('https://rpc1.monad.xyz'),
+    ], { rank: false, retryCount: 2 }),
     [polygon.id]: fallback([
       http('https://1rpc.io/matic'),
       http('https://polygon-bor-rpc.publicnode.com'),

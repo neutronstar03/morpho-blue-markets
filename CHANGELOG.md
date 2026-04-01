@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.11 - 2026-04-02
+
+### Introduced
+- feat: added a manual market blacklist dataset with comments so specific markets can be hidden locally without touching the generated market blacklist feed.
+
+### Changed
+- ui: Positions are now grouped by lent asset, ranked by current supplied value, and show per-asset value plus yearly return summaries.
+- ui: Position weights now use current value within each asset group, and cross-chain footer pills let you jump to other chains with open lending positions.
+- ui: manually blacklisted markets are hidden from Positions, Batch Withdraw, portfolio recap totals, and cross-chain pill counts.
+- ui: Opportunity recap chain rows now remove the noisy yearly-dollar summary and let you switch chains directly from the chain label/icon.
+- optimizer: added an asset-specific default Market APR override so `WETH` uses `4%` instead of the generic `10%` baseline in magic-scan and preset flows.
+- refactor: split the Home Positions feature into local submodules under `app/pages/home/position/` to keep the main component readable.
+
 ## v1.2.10 - 2026-04-01
 
 ### Changed

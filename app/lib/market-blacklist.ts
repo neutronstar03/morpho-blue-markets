@@ -6,16 +6,22 @@ interface BlacklistMarketEntry {
   uniqueKey: string
 }
 
+interface ManualBlacklistMarketEntry extends BlacklistMarketEntry {
+  comment?: string
+}
+
 type BlacklistStatus = 'uninitialized' | 'loading' | 'loaded' | 'failed'
 
 interface BlacklistState {
   status: BlacklistStatus
   marketIdsByChain: Record<number, Set<string>>
+  manualMarketIdsByChain: Record<number, Set<string>>
 }
 
 const CHANGE_EVENT = 'market-blacklist:changed'
 
 const LOCAL_URL_PATH = 'blacklist.markets.json'
+const LOCAL_MANUAL_URL_PATH = 'blacklist.markets.manual.json'
 const ARTIFACTS_URL = '/mbm-artifacts/v1/blacklist.markets.json'
 
 const LS_CACHE_KEY = 'market-blacklist-cache:v1'
@@ -24,6 +30,7 @@ let blacklistVersion = 0
 let blacklistState: BlacklistState = {
   status: 'uninitialized',
   marketIdsByChain: {},
+  manualMarketIdsByChain: {},
 }
 
 function emitChange() {
@@ -56,6 +63,22 @@ function buildMarketIdsByChain(entries: unknown) {
     if (!out[chainId])
       out[chainId] = new Set<string>()
     out[chainId].add(uniqueKey)
+  }
+  return out
+}
+
+function mergeMarketIdsByChain(
+  ...maps: Array<Record<number, Set<string>>>
+) {
+  const out: Record<number, Set<string>> = {}
+  for (const map of maps) {
+    for (const [chainIdRaw, values] of Object.entries(map)) {
+      const chainId = Number(chainIdRaw)
+      if (!out[chainId])
+        out[chainId] = new Set<string>()
+      for (const value of values)
+        out[chainId].add(value)
+    }
   }
   return out
 }
@@ -99,6 +122,18 @@ async function fetchJson(url: string) {
   return res
 }
 
+async function fetchOptionalJson(url: string) {
+  try {
+    const res = await fetchJson(url)
+    if (!res.ok)
+      return undefined
+    return await res.json()
+  }
+  catch {
+    return undefined
+  }
+}
+
 let loadPromise: Promise<void> | null = null
 
 export function ensureMarketBlacklistLoaded() {
@@ -112,12 +147,19 @@ export function ensureMarketBlacklistLoaded() {
   setState({ ...blacklistState, status: 'loading' })
   loadPromise = (async () => {
     try {
+      const manualEntries = await fetchOptionalJson(`${baseUrlPrefix()}${LOCAL_MANUAL_URL_PATH}`)
+      const manualMarketIdsByChain = buildMarketIdsByChain(manualEntries as ManualBlacklistMarketEntry[] | undefined)
       const localUrl = `${baseUrlPrefix()}${LOCAL_URL_PATH}`
       const localRes = await fetchJson(localUrl)
       if (localRes.ok) {
         const json = await localRes.json()
         safeWriteCache(json)
-        setState({ status: 'loaded', marketIdsByChain: buildMarketIdsByChain(json) })
+        const generatedMarketIdsByChain = buildMarketIdsByChain(json)
+        setState({
+          status: 'loaded',
+          marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
+          manualMarketIdsByChain,
+        })
         return
       }
 
@@ -126,31 +168,60 @@ export function ensureMarketBlacklistLoaded() {
         if (artifactsRes.ok) {
           const json = await artifactsRes.json()
           safeWriteCache(json)
-          setState({ status: 'loaded', marketIdsByChain: buildMarketIdsByChain(json) })
+          const generatedMarketIdsByChain = buildMarketIdsByChain(json)
+          setState({
+            status: 'loaded',
+            marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
+            manualMarketIdsByChain,
+          })
           return
         }
 
         if (artifactsRes.status === 404) {
-          setState({ status: 'loaded', marketIdsByChain: {} })
+          setState({
+            status: 'loaded',
+            marketIdsByChain: manualMarketIdsByChain,
+            manualMarketIdsByChain,
+          })
           return
         }
       }
 
       const cached = safeReadCache()
       if (cached) {
-        setState({ status: 'loaded', marketIdsByChain: buildMarketIdsByChain(cached) })
+        const generatedMarketIdsByChain = buildMarketIdsByChain(cached)
+        setState({
+          status: 'loaded',
+          marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
+          manualMarketIdsByChain,
+        })
         return
       }
 
-      setState({ status: 'failed', marketIdsByChain: {} })
+      setState({
+        status: 'failed',
+        marketIdsByChain: manualMarketIdsByChain,
+        manualMarketIdsByChain,
+      })
     }
     catch {
+      const manualEntries = await fetchOptionalJson(`${baseUrlPrefix()}${LOCAL_MANUAL_URL_PATH}`)
+      const manualMarketIdsByChain = buildMarketIdsByChain(manualEntries as ManualBlacklistMarketEntry[] | undefined)
       const cached = safeReadCache()
       if (cached) {
-        setState({ status: 'loaded', marketIdsByChain: buildMarketIdsByChain(cached) })
+        const generatedMarketIdsByChain = buildMarketIdsByChain(cached)
+        setState({
+          status: 'loaded',
+          marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
+          manualMarketIdsByChain,
+        })
         return
       }
-      setState({ status: 'failed', marketIdsByChain: {} })
+      setState({
+        status: 'failed',
+        marketIdsByChain: manualMarketIdsByChain,
+        manualMarketIdsByChain,
+      })
     }
   })().finally(() => {
     loadPromise = null
@@ -299,6 +370,10 @@ export function isAssetBlacklisted(address?: string | null, chainId?: number) {
 
 export function isMarketIdBlacklisted(uniqueKey?: string | null, chainId?: number) {
   return hasValueInChainMap(blacklistState.marketIdsByChain, uniqueKey, chainId)
+}
+
+export function isMarketIdManuallyBlacklisted(uniqueKey?: string | null, chainId?: number) {
+  return hasValueInChainMap(blacklistState.manualMarketIdsByChain, uniqueKey, chainId)
 }
 
 export function isMarketBlacklisted(args: {

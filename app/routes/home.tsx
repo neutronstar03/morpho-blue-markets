@@ -7,6 +7,7 @@ import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
+import { getDefaultMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatUsd } from '~/lib/formatters'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
@@ -19,7 +20,7 @@ import { SupplyAprOptimizer } from '~/pages/home/supply-apr-optimizer'
 export function meta(_: Route.MetaArgs) {
   return [
     { title: 'Morpho Blue Markets' },
-    { name: 'description', content: 'Welcome to Morpho Blue Markets' },
+    { name: 'description', content: 'MBM - when the greatest frontend meets the greatest protocol' },
   ]
 }
 
@@ -116,7 +117,7 @@ export default function HomePage() {
       loanAssetAddress: opportunity.loanAssetAddress,
       loanAssetSymbol: opportunity.loanAssetSymbol,
       loanAssetDecimals: opportunity.loanAssetDecimals,
-      marketApr: '10',
+      marketApr: getDefaultMarketAprByAssetSymbol(opportunity.loanAssetSymbol),
       newDepositAmount: '0',
       maxMarketsUsed: 6,
       usePrecomputedIfFresh: true,

@@ -1,0 +1,28 @@
+import type { ChainIconComponent } from '~/lib/chain-icons'
+import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
+
+export interface Portfolio {
+  dailyUsd: number | undefined
+  yearlyUsd: number | undefined
+  weightedAprPct: number | undefined
+  totalAssets: bigint | undefined
+  totalAssetsUsd: number | undefined
+  totalAssetsSymbol: string | undefined
+  totalAssetsDecimals: number | undefined
+}
+
+export interface PositionGroup {
+  key: string
+  loanAssetSymbol: string
+  loanAssetAddress: string
+  totalValueUsd: number
+  yearlyUsd: number
+  positions: LiveMarketPosition[]
+}
+
+export interface ChainPositionPillItem {
+  chainId: number
+  label: string
+  count: number
+  Icon?: ChainIconComponent
+}

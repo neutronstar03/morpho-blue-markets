@@ -22,6 +22,7 @@ import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
 import { useBatchWithdraw } from '~/lib/contexts/batch-withdraw.context'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
+import { isMarketIdManuallyBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
 import { BatchWithdrawExecutionPanel } from './execution-panel'
@@ -46,10 +47,18 @@ export function BatchWithdraw() {
   }, [chainId, ctx])
 
   const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions()
+  const blacklistVersion = useMarketBlacklistVersion()
+
+  const visibleLivePositions = useMemo(() => {
+    if (!livePositions || !chainId)
+      return livePositions ?? []
+    void blacklistVersion
+    return livePositions.filter(position => !isMarketIdManuallyBlacklisted(position.market.uniqueKey, chainId))
+  }, [blacklistVersion, chainId, livePositions])
 
   const loanAssetOptions = useMemo<LoanAssetOption[]>(() => {
     const map = new Map<string, LoanAssetOption>()
-    for (const p of (livePositions ?? [])) {
+    for (const p of visibleLivePositions) {
       if (p.userState.supplyShares <= 0n)
         continue
       const addr = p.market.loanAsset.address.toLowerCase()
@@ -62,7 +71,7 @@ export function BatchWithdraw() {
       }
     }
     return [...map.values()].sort((a, b) => a.symbol.localeCompare(b.symbol))
-  }, [livePositions])
+  }, [visibleLivePositions])
 
   const selectedLoanAssetAddress = ctx.selection.loanAssetAddress ?? ''
   const selectedOption = useMemo(() => {
@@ -82,10 +91,10 @@ export function BatchWithdraw() {
     if (!selectedOption)
       return []
     const addr = selectedOption.address.toLowerCase()
-    return (livePositions ?? []).filter((p) => {
+    return visibleLivePositions.filter((p) => {
       return p.userState.supplyShares > 0n && p.market.loanAsset.address.toLowerCase() === addr
     })
-  }, [livePositions, selectedOption])
+  }, [selectedOption, visibleLivePositions])
 
   const morphoAddress = useMemo(() => getMorphoBlueAddress(chainId), [chainId])
 
