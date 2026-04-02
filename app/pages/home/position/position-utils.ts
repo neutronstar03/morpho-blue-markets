@@ -1,8 +1,13 @@
 import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
+import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
+
+export function getMarketSupplyUsd(position: LiveMarketPosition) {
+  return getMarketSupplyUsdWithFallback(position.market)
+}
 
 export function getPositionPrincipalUsd(position: LiveMarketPosition) {
-  const marketSupplyUsd = position.market.state.supplyAssetsUsd
-  if (typeof marketSupplyUsd !== 'number')
+  const marketSupplyUsd = getMarketSupplyUsd(position)
+  if (marketSupplyUsd == null)
     return undefined
 
   const marketSupplyShares = BigInt(position.market.state.supplyShares)

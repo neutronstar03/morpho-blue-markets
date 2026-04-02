@@ -105,7 +105,7 @@ export function SupplyAprOptimizer() {
         address: a.address,
         symbol: a.symbol,
         decimals: a.decimals ?? 18,
-        oraclePriceUsd: a.oraclePriceUsd,
+        priceUsd: a.priceUsd,
       }))
       .sort((a, b) => a.symbol.localeCompare(b.symbol))
   }, [popularLoanAssets])
@@ -265,7 +265,7 @@ export function SupplyAprOptimizer() {
       return
     }
 
-    const priceUsd = selectedOption.oraclePriceUsd
+    const priceUsd = selectedOption.priceUsd
     if (priceUsd == null || !Number.isFinite(priceUsd) || priceUsd <= 0)
       return
 

@@ -6,9 +6,10 @@ import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 const MORPHO_API_URL = 'https://blue-api.morpho.org/graphql'
 
 const GetMarketDocument = gql`
-  query GetSingleMorphoMarket($uniqueKey: String!, $chainId: Int!) {
-    marketByUniqueKey(uniqueKey: $uniqueKey, chainId: $chainId) {
-      uniqueKey
+  query GetSingleMorphoMarket($marketId: String!, $chainId: Int!) {
+    marketById(marketId: $marketId, chainId: $chainId) {
+      marketId
+      uniqueKey: marketId
       lltv
       whitelisted
       oracleAddress
@@ -56,6 +57,7 @@ const GetMarketDocument = gql`
 `
 
 export interface SingleMorphoMarket {
+  marketId: string
   uniqueKey: string
   lltv: string // format 770000000000000000
   whitelisted: boolean
@@ -116,15 +118,15 @@ export function useMarketQuery(uniqueKey?: string, chainId?: number) {
     queryFn: async () => {
       if (!uniqueKey || !chainId)
         return null
-      const { marketByUniqueKey } = await request(
+      const { marketById } = await request(
         MORPHO_API_URL,
         GetMarketDocument,
         {
-          uniqueKey,
+          marketId: uniqueKey,
           chainId,
         },
       )
-      const market = marketByUniqueKey as SingleMorphoMarket | null
+      const market = marketById as SingleMorphoMarket | null
       if (!market)
         return null
       if (isOracleMisconfiguredWarning(market.warnings))

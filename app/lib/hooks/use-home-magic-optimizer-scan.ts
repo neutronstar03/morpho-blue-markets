@@ -11,6 +11,7 @@ import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-black
 import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
+import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { getHomeMagicLastRunMs, setHomeMagicLastRunMs } from '../stores/home-magic-last-run'
@@ -147,9 +148,9 @@ export function useHomeMagicOptimizerScan() {
     for (const p of selectedUserMarketsSafe) {
       const marketSupplyShares = BigInt(p.market.state.supplyShares)
       const userSupplyShares = BigInt(p.userState.supplyShares)
-      const marketSupplyUsd = p.market.state.supplyAssetsUsd
+      const marketSupplyUsd = getMarketSupplyUsdWithFallback(p.market)
 
-      if (marketSupplyShares <= 0n || userSupplyShares <= 0n || typeof marketSupplyUsd !== 'number')
+      if (marketSupplyShares <= 0n || userSupplyShares <= 0n || marketSupplyUsd == null)
         continue
 
       const shareRatio = Number(userSupplyShares) / Number(marketSupplyShares)

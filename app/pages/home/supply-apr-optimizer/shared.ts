@@ -2,7 +2,7 @@ export interface LoanAssetOption {
   address: string
   symbol: string
   decimals: number
-  oraclePriceUsd?: number | null
+  priceUsd?: number | null
 }
 
 export interface AutoStepInfo {

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.12 - 2026-04-02
+
+### Changed
+- data: updated Morpho GraphQL queries to use `marketId` and `loanAsset.price.usd` so the app stays compatible with the newer private API shape.
+- fix: restored Home Position weighted APR, daily USD, per-asset totals, and per-market weights by falling back to price-derived USD values when GraphQL returns `state.supplyAssetsUsd = null`.
+- optimizer: updated asset pricing and market identity plumbing used by Home Magic / Supply APR optimizer flows to rely on the newer GraphQL fields while preserving internal compatibility aliases.
+
 ## v1.2.11 - 2026-04-02
 
 ### Introduced

@@ -18,6 +18,7 @@ import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { PositionChainPills } from './position-chain-pills'
 import { PositionGroups } from './position-groups'
+import { getMarketSupplyUsd } from './position-utils'
 import { usePositionChainPills } from './use-position-chain-pills'
 import { usePositionGroups } from './use-position-groups'
 
@@ -111,9 +112,9 @@ function PositionClient() {
     for (const p of visiblePositions) {
       const marketSupplyShares = BigInt(p.market.state.supplyShares)
       const userSupplyShares = BigInt(p.userState.supplyShares)
-      const marketSupplyUsd = p.market.state.supplyAssetsUsd
+      const marketSupplyUsd = getMarketSupplyUsd(p)
 
-      if (marketSupplyShares === 0n || typeof marketSupplyUsd !== 'number')
+      if (marketSupplyShares === 0n || marketSupplyUsd == null)
         continue
 
       const shareRatio = Number(userSupplyShares) / Number(marketSupplyShares)

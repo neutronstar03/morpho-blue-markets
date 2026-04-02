@@ -7,11 +7,15 @@ import { graphqlClient } from '../../graphql/client'
 // Data returned from the GraphQL query for each position
 export interface UserPosition {
   market: {
+    marketId: string
     uniqueKey: string
     loanAsset: {
       symbol: string
       decimals: number
       address: string
+      price?: {
+        usd?: number | null
+      } | null
     }
     collateralAsset: {
       symbol: string
@@ -61,6 +65,7 @@ interface QueryCrossChainUserPositionsResult {
   marketPositions: {
     items: Array<{
       market: {
+        marketId: string
         uniqueKey: string
         warnings?: Array<{
           type: string
@@ -89,11 +94,15 @@ export const QUERY_USER_POSITIONS = gql`
     ) {
       items {
         market {
-          uniqueKey
+          marketId
+          uniqueKey: marketId
           loanAsset {
             symbol
             decimals
             address
+            price {
+              usd
+            }
           }
           collateralAsset {
             symbol
@@ -131,7 +140,8 @@ const QUERY_USER_POSITIONS_ALL_CHAINS = gql`
     ) {
       items {
         market {
-          uniqueKey
+          marketId
+          uniqueKey: marketId
           warnings { type level }
           morphoBlue {
             chain {

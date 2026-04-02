@@ -5,6 +5,7 @@ import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
 
 export interface MorphoMarket {
+  marketId: string
   uniqueKey: string
   lltv: string
   oracleAddress: string
@@ -77,7 +78,8 @@ export const QUERY_LIST_MARKETS = gql`
       where: $where
     ) {
       items {
-        uniqueKey
+        marketId
+        uniqueKey: marketId
         lltv
         oracleAddress
         irmAddress

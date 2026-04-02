@@ -21,6 +21,9 @@ export interface LiveMarketPosition {
       symbol: string
       decimals: number | null
       address: string
+      price?: {
+        usd?: number | null
+      } | null
     }
     collateralAsset: {
       symbol: string

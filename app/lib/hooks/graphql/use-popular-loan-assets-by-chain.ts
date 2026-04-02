@@ -11,7 +11,7 @@ export interface PopularLoanAsset {
   decimals?: number | null
   chainId: number
   chainNetwork?: string | null
-  oraclePriceUsd?: number | null
+  priceUsd?: number | null
   /** Sum of `state.borrowAssetsUsd` across interesting markets for this asset. */
   borrowUsdSum: number
   /** Number of interesting markets counted for this asset. */
@@ -21,13 +21,16 @@ export interface PopularLoanAsset {
 }
 
 interface InterestingMarketItem {
+  marketId: string
   uniqueKey: string
   loanAsset: {
     address: string
     symbol: string
     name?: string | null
     decimals?: number | null
-    oraclePriceUsd?: number | null
+    price?: {
+      usd?: number | null
+    } | null
     chain: { id: number, network?: string | null }
   }
   state: {
@@ -67,14 +70,15 @@ export const QUERY_INTERESTING_MARKETS = gql`
       }
     ) {
       items {
-        uniqueKey
+        marketId
+        uniqueKey: marketId
         loanAsset {
           address
           symbol
           name
           decimals
           chain { id network }
-          oraclePriceUsd
+          price { usd }
         }
         state {
           utilization
@@ -168,7 +172,7 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
             decimals: m.loanAsset.decimals,
             chainId: assetChainId,
             chainNetwork: m.loanAsset.chain.network,
-            oraclePriceUsd: m.loanAsset.oraclePriceUsd,
+            priceUsd: m.loanAsset.price?.usd,
             borrowUsdSum: borrowUsd,
             marketCount: 1,
             averageApy: 0,
@@ -179,8 +183,8 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
         prev.borrowUsdSum += borrowUsd
         prev.marketCount += 1
         // Prefer any defined oracle price.
-        if ((prev.oraclePriceUsd == null || !Number.isFinite(prev.oraclePriceUsd)) && m.loanAsset.oraclePriceUsd != null)
-          prev.oraclePriceUsd = m.loanAsset.oraclePriceUsd
+        if ((prev.priceUsd == null || !Number.isFinite(prev.priceUsd)) && m.loanAsset.price?.usd != null)
+          prev.priceUsd = m.loanAsset.price.usd
         // Prefer any defined decimals/name.
         if (prev.decimals == null && m.loanAsset.decimals != null)
           prev.decimals = m.loanAsset.decimals

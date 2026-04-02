@@ -6,6 +6,7 @@ import { gql } from 'graphql-request'
 // A specific, isolated type containing only the fields required for the
 // supply-side optimizer flows.
 export interface SupplyMarketData {
+  marketId: string
   uniqueKey: string
   irmAddress: string
   loanAsset: {
@@ -67,7 +68,8 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
       where: $where
     ) {
       items {
-        uniqueKey
+        marketId
+        uniqueKey: marketId
         irmAddress
         loanAsset {
           address
