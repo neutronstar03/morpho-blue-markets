@@ -1,4 +1,5 @@
 import type { Portfolio } from './position-types'
+import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import { Wallet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useSwitchChain } from 'wagmi'
@@ -6,16 +7,19 @@ import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useNetworkContext } from '~/lib/contexts/network'
+import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { useIsClient } from '~/lib/hooks/use-is-client'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
 import { isMarketIdManuallyBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
+import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { PositionChainPills } from './position-chain-pills'
 import { PositionGroups } from './position-groups'
 import { getMarketSupplyUsd } from './position-utils'
@@ -28,6 +32,8 @@ function PositionClient() {
   const { address: userAddress, isConnected, chain } = useAccount()
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain()
   const { setRequiredChainId } = useNetworkContext()
+  const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
+  const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
   const {
     data: positions,
     isLoading,
@@ -164,6 +170,31 @@ function PositionClient() {
     switchChain({ chainId })
   }
 
+  const handleOpenOptimizerForGroup = (group: typeof groupedPositions[number]) => {
+    const firstPosition = group.positions[0]
+    if (!chain?.id || !firstPosition)
+      return
+
+    setOptimizerPreset({
+      chainId: chain.id,
+      loanAssetAddress: firstPosition.market.loanAsset.address,
+      loanAssetSymbol: group.loanAssetSymbol,
+      loanAssetDecimals: firstPosition.market.loanAsset.decimals ?? 18,
+      marketApr: resolveMarketAprByAssetSymbol(group.loanAssetSymbol, marketAprBySymbol),
+      newDepositAmount: '0',
+      maxMarketsUsed: 6,
+      usePrecomputedIfFresh: false,
+    })
+
+    window.requestAnimationFrame(() => {
+      const el = document.querySelector('[data-testid="supply-apr-optimizer-card"]') as HTMLElement | null
+      if (!el)
+        return
+      const top = el.getBoundingClientRect().top + window.scrollY - 88
+      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+    })
+  }
+
   if (!isConnected) {
     return (
       <Card className="mb-8">
@@ -234,6 +265,7 @@ function PositionClient() {
                 riskStatusByKey={riskStatusByKey}
                 summaryMode={assetSummaryMode}
                 onToggleSummaryMode={() => setAssetSummaryMode(mode => mode === 'total' ? 'yearly' : 'total')}
+                onSelectLoanAsset={handleOpenOptimizerForGroup}
               />
             )}
         {(chainPills.length > 0 || portfolio.totalAssetsUsd != null || (portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null)) && (
