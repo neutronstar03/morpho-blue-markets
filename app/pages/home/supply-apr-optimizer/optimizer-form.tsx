@@ -24,6 +24,7 @@ interface SupplyAprOptimizerFormProps {
   selectedOption?: LoanAssetOption
   totalSuppliedAssets: bigint
   marketApr?: string
+  defaultMarketApr: string
   onChangeMarketApr: (value: string) => void
   newDepositAmount?: string
   onChangeNewDepositAmount: (value: string) => void
@@ -49,6 +50,7 @@ export function SupplyAprOptimizerForm({
   selectedOption,
   totalSuppliedAssets,
   marketApr,
+  defaultMarketApr,
   onChangeMarketApr,
   newDepositAmount,
   onChangeNewDepositAmount,
@@ -146,7 +148,12 @@ export function SupplyAprOptimizerForm({
             %
           </span>
         </div>
-        <div className="text-xs text-gray-500 min-h-0 md:h-4">Default: 10%</div>
+        <div className="text-xs text-gray-500 min-h-0 md:h-4">
+          Default:
+          {' '}
+          {defaultMarketApr}
+          %
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5 md:gap-2">

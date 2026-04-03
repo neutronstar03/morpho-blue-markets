@@ -5,7 +5,7 @@ An alternative frontend for the [Morpho Blue](https://docs.morpho.org/tools/onch
 This project focuses on practical Morpho market exploration and action tooling, including:
 
 - Markets table with live APR previews and filterable chain views
-- Supply APR optimizer for rebalance and deposit planning, with wallet fallback defaults (10% baseline APR, with asset-specific overrides such as 4% for `WETH`)
+- Supply APR optimizer for rebalance and deposit planning, with wallet fallback defaults (10% baseline APR, with asset-specific overrides such as 4% for `WETH`) and sticky per-asset Market APR preferences
 - Batch withdraw flow for lower-APR-first exits
 - Position recap grouped by lent asset, with cross-chain quick-switch pills and market-level deposit/withdraw flows
 - Opportunity recap for coarse chain-level deployable yield evaluation
@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.14` (2026-04-04): made Supply APR optimizer Market APR sticky by asset symbol across asset/chain switches and reloads, reused remembered values when opening optimizer presets, and documented the repo's `prep for release` workflow.
 - `v1.2.13` (2026-04-03): enriched Home Positions asset sections with per-asset weight/APR metadata, a switchable total-vs-yearly summary control across desktop and mobile, and leaner position rows with less redundant labeling.
 - `v1.2.12` (2026-04-02): updated Morpho GraphQL usage for the newer private API (`marketId`, `loanAsset.price.usd`), restored Position USD/weight calculations when `supplyAssetsUsd` is null, and hardened related optimizer data flows against missing GraphQL USD fields.
 - `v1.2.11` (2026-04-02): added a manual market blacklist overlay, hid those markets from portfolio/withdraw recaps, grouped Positions by lent asset with cross-chain quick-switch pills, and added a lower default Market APR override for `WETH`.

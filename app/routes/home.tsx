@@ -1,4 +1,5 @@
 import type { Route } from './+types/home'
+import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import { X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
@@ -7,7 +8,7 @@ import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { Main } from '~/components/ui/main'
 import { useNetworkContext } from '~/lib/contexts/network'
-import { getDefaultMarketAprByAssetSymbol } from '~/lib/default-market-apr'
+import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatUsd } from '~/lib/formatters'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
@@ -31,6 +32,7 @@ export default function HomePage() {
   const dismissOpportunity = useHomeMagicOptimizerStore(state => state.dismissOpportunity)
   const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
   const [showBlacklistRecap, setShowBlacklistRecap] = useLocalStorage<boolean>('home:show-blacklist-recap', false)
+  const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
   const blacklistRecapRef = useRef<HTMLDivElement | null>(null)
   const shouldScrollToBlacklistRecapRef = useRef(false)
   const showBlacklistRecapRef = useRef(showBlacklistRecap)
@@ -117,7 +119,7 @@ export default function HomePage() {
       loanAssetAddress: opportunity.loanAssetAddress,
       loanAssetSymbol: opportunity.loanAssetSymbol,
       loanAssetDecimals: opportunity.loanAssetDecimals,
-      marketApr: getDefaultMarketAprByAssetSymbol(opportunity.loanAssetSymbol),
+      marketApr: resolveMarketAprByAssetSymbol(opportunity.loanAssetSymbol, marketAprBySymbol),
       newDepositAmount: '0',
       maxMarketsUsed: 6,
       usePrecomputedIfFresh: true,

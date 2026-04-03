@@ -1,3 +1,4 @@
+import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import type { SupplyOptimizerDebugRequest } from '~/lib/optimizer/supply-apr-optimizer-debugger'
 import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
@@ -13,7 +14,13 @@ import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
-import { DEFAULT_MARKET_APR, getDefaultMarketAprByAssetSymbol } from '~/lib/default-market-apr'
+import {
+  DEFAULT_MARKET_APR,
+  getDefaultMarketAprByAssetSymbol,
+
+  normalizeMarketAprAssetSymbol,
+  resolveMarketAprByAssetSymbol,
+} from '~/lib/default-market-apr'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loan-assets-by-chain'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
@@ -54,7 +61,6 @@ export function SupplyAprOptimizer() {
 
   const heuristicCacheRef = useRef(new Map<string, { stepAssets: bigint }>())
   const optimizerWorkerRef = useRef<Worker | null>(null)
-  const marketAprManuallyEditedRef = useRef(false)
   const [autoStepInfo, setAutoStepInfo] = useState<AutoStepInfo | null>(null)
   const [runProgressLabel, setRunProgressLabel] = useState<string | null>(null)
   const [runProgressPercent, setRunProgressPercent] = useState<number | null>(null)
@@ -64,6 +70,10 @@ export function SupplyAprOptimizer() {
   const [maxMarketsInput, setMaxMarketsInput] = useLocalStorage<string>(
     'supply-apr-optimizer:max-markets',
     '5',
+  )
+  const [marketAprBySymbol, setMarketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>(
+    'supply-apr-optimizer:market-apr-by-symbol',
+    {},
   )
   const optimizerPreset = useHomeMagicOptimizerStore(state => state.optimizerPreset)
   const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
@@ -213,11 +223,6 @@ export function SupplyAprOptimizer() {
   })
 
   useEffect(() => {
-    if (!ctx.selection.loanAssetAddress)
-      marketAprManuallyEditedRef.current = false
-  }, [ctx.selection.loanAssetAddress])
-
-  useEffect(() => {
     if (!selectedOption)
       return
     if (!userMarketStates || userMarketStates.length !== selectedUserMarkets.length)
@@ -279,14 +284,12 @@ export function SupplyAprOptimizer() {
   useEffect(() => {
     if (!selectedOption)
       return
-    if (marketAprManuallyEditedRef.current)
-      return
 
-    const nextMarketApr = getDefaultMarketAprByAssetSymbol(selectedOption.symbol)
+    const nextMarketApr = resolveMarketAprByAssetSymbol(selectedOption.symbol, marketAprBySymbol)
     if ((ctx.inputs.marketApr ?? '') === nextMarketApr)
       return
     ctx.setMarketApr(nextMarketApr)
-  }, [ctx, selectedOption])
+  }, [ctx, marketAprBySymbol, selectedOption])
 
   const [optimizeRequest, setOptimizeRequest] = useState<null | {
     runId: number
@@ -506,7 +509,6 @@ export function SupplyAprOptimizer() {
   }, [fallbackLabel, finishRun, optimizeReadResult, optimizeRequest, stopOptimizerWorker])
 
   const onChangeLoanAsset = (addr: string) => {
-    marketAprManuallyEditedRef.current = false
     const opt = loanAssetOptions.find(o => o.address === addr)
     ctx.setSelection({
       chainId: chain?.id,
@@ -514,14 +516,31 @@ export function SupplyAprOptimizer() {
       loanAssetSymbol: opt?.symbol,
       loanAssetDecimals: opt?.decimals,
     })
-    ctx.setMarketApr(DEFAULT_MARKET_APR)
+    ctx.setMarketApr(resolveMarketAprByAssetSymbol(opt?.symbol, marketAprBySymbol))
     ctx.setNewDepositAmount(undefined)
   }
 
   const onChangeMarketApr = useCallback((value: string) => {
-    marketAprManuallyEditedRef.current = true
     ctx.setMarketApr(value)
-  }, [ctx])
+    const normalizedSymbol = normalizeMarketAprAssetSymbol(selectedOption?.symbol ?? ctx.selection.loanAssetSymbol)
+    if (!normalizedSymbol)
+      return
+
+    const trimmed = value.trim()
+    setMarketAprBySymbol((prev) => {
+      if (!trimmed) {
+        if (!(normalizedSymbol in prev))
+          return prev
+        const next = { ...prev }
+        delete next[normalizedSymbol]
+        return next
+      }
+
+      if (prev[normalizedSymbol] === trimmed)
+        return prev
+      return { ...prev, [normalizedSymbol]: trimmed }
+    })
+  }, [ctx, marketAprBySymbol, selectedOption?.symbol, setMarketAprBySymbol])
 
   // Parsed deposit amount used to enable deposit-only optimization when no positions exist.
   const parsedDepositAssetsForGate = useMemo(() => {
@@ -836,7 +855,6 @@ export function SupplyAprOptimizer() {
         })
       : undefined
 
-    marketAprManuallyEditedRef.current = false
     ctx.setSelection({
       chainId: optimizerPreset.chainId,
       loanAssetAddress: optimizerPreset.loanAssetAddress,
@@ -905,6 +923,7 @@ export function SupplyAprOptimizer() {
               selectedOption={selectedOption}
               totalSuppliedAssets={ctx.derived.totalSuppliedAssets ?? 0n}
               marketApr={ctx.inputs.marketApr}
+              defaultMarketApr={getDefaultMarketAprByAssetSymbol(selectedOption?.symbol ?? ctx.selection.loanAssetSymbol)}
               onChangeMarketApr={onChangeMarketApr}
               newDepositAmount={ctx.inputs.newDepositAmount}
               onChangeNewDepositAmount={value => ctx.setNewDepositAmount(value)}

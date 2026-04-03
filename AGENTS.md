@@ -45,6 +45,20 @@ If you are unsure where a bug lives, start from the relevant file in `app/pages/
 - bun run lint
 - bun run build (if change touches routing, bundling, or shared libs)
 
+## Release workflow
+- Treat release prep as a repo workflow that updates `README.md`, `CHANGELOG.md`, and `package.json` together.
+- Default to a patch bump; major/minor bumps should usually come from the user.
+- Add the newest release entry at the top of `CHANGELOG.md` and the short recent-updates list in `README.md`.
+- Re-run verification before releasing:
+  - `bun run typecheck`
+  - `bun run lint`
+  - `bun run build`
+- Release commit format:
+  - `v1.2.xx: short summary`
+- Release tag format:
+  - `v1.2.xx`
+- When the user explicitly asks to do the release now, finish by creating the git commit, creating the matching tag, and pushing both the branch and the tag.
+
 ## Lint workflow
 - If lint fails on import order / formatting / other autofixable issues, run `bun run lint --fix` instead of fixing them manually.
 - Prefer autofix first; only make manual lint-only edits when autofix cannot resolve the issue.

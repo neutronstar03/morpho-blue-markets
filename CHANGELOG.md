@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.14 - 2026-04-04
+
+### Changed
+- optimizer: Market APR is now remembered by asset symbol so manual thresholds persist across asset switches, chain changes, and reloads.
+- optimizer: opportunity-card preset opens now reuse the remembered asset-specific Market APR when available instead of always resetting to the symbol default.
+- ui: the optimizer Market APR helper now shows the active asset-specific default, and `AGENTS.md` documents the repo release workflow.
+
 ## v1.2.13 - 2026-04-03
 
 ### Changed
