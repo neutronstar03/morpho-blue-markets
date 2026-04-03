@@ -1,9 +1,9 @@
 import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
+import { Scale } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge, BadgeLabel } from '~/components/ui/badge'
 import { MarketRiskText } from '~/components/ui/market-risk-text'
-import { getSupportedChainName } from '~/lib/addresses'
 import { formatBigintShort } from '~/lib/formatters'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
 import { getPositionPrincipalUsd } from './position-utils'
@@ -56,14 +56,11 @@ export function PositionListItem({
           <div className="space-y-0.5 sm:space-y-1">
             <div>
               <MarketRiskText status={riskStatus} size="xl" className="font-semibold">
-                {`${position.market.collateralAsset.symbol} / ${position.market.loanAsset.symbol}`}
+                {position.market.collateralAsset.symbol}
               </MarketRiskText>
-              <p className="text-xs text-gray-500">{getSupportedChainName(chainId)}</p>
             </div>
 
-            <p className="text-sm sm:text-base text-gray-300">
-              <span className="text-xs sm:text-sm text-gray-400">Supply:</span>
-              {' '}
+            <p className="text-base text-gray-300 sm:text-lg">
               {formatBigintShort(suppliedAssets, loanDecimals)}
               {' '}
               {position.market.loanAsset.symbol}
@@ -80,7 +77,7 @@ export function PositionListItem({
               {safuness != null ? `${safuness.toFixed(2)}x` : '—'}
             </Badge>
             <Badge variant="subtle" size="sm">
-              <span>Weight</span>
+              <Scale className="h-3.5 w-3.5 text-slate-300" aria-hidden="true" />
               <span className="text-gray-400">{contributionPct != null ? `${contributionPct.toFixed(1)}%` : '—'}</span>
             </Badge>
           </div>

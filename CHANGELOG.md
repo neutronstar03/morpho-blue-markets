@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.13 - 2026-04-03
+
+### Changed
+- ui: enriched Home Positions asset headers with per-asset weight and APR metadata using compact inline icons.
+- ui: asset-group value summaries are now switchable between total USD and yearly USD via a shared clickable control, with consistent behavior across desktop and mobile.
+- ui: simplified Home Position rows by removing redundant chain/loan-asset labels, hiding 100%-weight asset badges, and making supplied amounts more prominent.
+- ux: added stable `data-testid` hooks for Home Positions asset-group headers and summary toggles to simplify inspection and future UI checks.
+
 ## v1.2.12 - 2026-04-02
 
 ### Changed

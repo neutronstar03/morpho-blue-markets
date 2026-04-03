@@ -74,6 +74,7 @@ function PositionClient() {
   }, [blacklistVersion, chain?.id, positions])
 
   const [timeAgo, setTimeAgo] = useState('')
+  const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'yearly'>('total')
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
 
   useEffect(() => {
@@ -231,6 +232,8 @@ function PositionClient() {
                 portfolioTotalAssetsUsd={portfolio.totalAssetsUsd}
                 aprByMarketKey={aprByMarketKey}
                 riskStatusByKey={riskStatusByKey}
+                summaryMode={assetSummaryMode}
+                onToggleSummaryMode={() => setAssetSummaryMode(mode => mode === 'total' ? 'yearly' : 'total')}
               />
             )}
         {(chainPills.length > 0 || portfolio.totalAssetsUsd != null || (portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null)) && (

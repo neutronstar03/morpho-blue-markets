@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.13` (2026-04-03): enriched Home Positions asset sections with per-asset weight/APR metadata, a switchable total-vs-yearly summary control across desktop and mobile, and leaner position rows with less redundant labeling.
 - `v1.2.12` (2026-04-02): updated Morpho GraphQL usage for the newer private API (`marketId`, `loanAsset.price.usd`), restored Position USD/weight calculations when `supplyAssetsUsd` is null, and hardened related optimizer data flows against missing GraphQL USD fields.
 - `v1.2.11` (2026-04-02): added a manual market blacklist overlay, hid those markets from portfolio/withdraw recaps, grouped Positions by lent asset with cross-chain quick-switch pills, and added a lower default Market APR override for `WETH`.
 - `v1.2.10` (2026-04-01): made the Supply APR optimizer always open, removed the Start gate, and restored a visible asset placeholder.
