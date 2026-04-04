@@ -48,6 +48,7 @@ export interface BatchWithdrawExecutionState {
   isConfirming: boolean
   onAuthorizeAdapter: () => void
   onExecuteBundle: () => void
+  requiredSteps?: string[]
 }
 
 export function max0(x: bigint): bigint {

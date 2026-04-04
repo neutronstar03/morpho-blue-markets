@@ -2,14 +2,13 @@ import type { Address } from 'viem'
 import type { BatchWithdrawExecutionState, BatchWithdrawPlanState, LoanAssetOption, MarketPlanItem } from './shared'
 import type { SupplyOptimizerMarketSnapshot } from '~/lib/optimizer/supply-optimizer'
 import { X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits } from 'viem'
 import {
   useAccount,
   useReadContract,
   useReadContracts,
   useSimulateContract,
-  useWaitForTransactionReceipt,
   useWriteContract,
 } from 'wagmi'
 import { Button } from '~/components/ui/button'
@@ -21,13 +20,13 @@ import { getBundler3Config } from '~/lib/bundler3/addresses'
 import { encodeGeneralAdapterMorphoWithdraw } from '~/lib/bundler3/encode'
 import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
 import { useBatchWithdraw } from '~/lib/contexts/batch-withdraw.context'
-import { useTransactionFeedback } from '~/lib/contexts/transaction-feedback.context'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
 import { isMarketIdManuallyBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
+import { useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
 import { BatchWithdrawExecutionPanel } from './execution-panel'
 import { BatchWithdrawForm } from './form'
 import { BatchWithdrawResults } from './results'
@@ -40,16 +39,6 @@ function fmtToken(amount: bigint, decimals: number, digits = 4): string {
   return asNum.toLocaleString(undefined, { maximumFractionDigits: digits })
 }
 
-type BatchWithdrawAction = 'authorize' | 'executeBundle' | null
-
-interface BatchWithdrawTrackingState {
-  action: Exclude<BatchWithdrawAction, null>
-  flowId: string
-  attemptId: string
-  baselineHash?: `0x${string}`
-  trackedHash?: `0x${string}`
-}
-
 export function BatchWithdraw() {
   const ctx = useBatchWithdraw()
   const { address: userAddress, chain } = useAccount()
@@ -57,8 +46,8 @@ export function BatchWithdraw() {
   const chainNameForLinks = chainId ? getSupportedChainName(chainId) : undefined
 
   const [executeError, setExecuteError] = useState<string | undefined>(undefined)
-  const [tracking, setTracking] = useState<BatchWithdrawTrackingState | null>(null)
-  const { beginFlow, completeFlow, failFlow, setStatus, setStepStatus, setTxHash } = useTransactionFeedback()
+  const [isRunningFlow, setIsRunningFlow] = useState(false)
+  const { startFlow, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
 
   useEffect(() => {
     if (!chainId)
@@ -472,13 +461,13 @@ export function BatchWithdraw() {
   const clear = () => {
     ctx.clear()
     setExecuteError(undefined)
-    setTracking(null)
+    setIsRunningFlow(false)
   }
 
   const resetAfterSuccess = useCallback(() => {
     ctx.clear()
     setExecuteError(undefined)
-    setTracking(null)
+    setIsRunningFlow(false)
   }, [ctx])
 
   const authorizeSim = useSimulateContract({
@@ -489,8 +478,7 @@ export function BatchWithdraw() {
     query: { enabled: !!bundlerCfg && !!morphoAddress && !!userAddress && !isMorphoAuthorized },
   })
 
-  const { writeContract, isPending: isWriting, data: txHash, error: writeError } = useWriteContract()
-  const receipt = useWaitForTransactionReceipt({ hash: tracking?.trackedHash })
+  const { writeContractAsync, isPending: isWriting } = useWriteContract()
 
   const withdrawFacts = useMemo(() => {
     if (!selectedOption || !hasPlan)
@@ -513,13 +501,6 @@ export function BatchWithdraw() {
       tone: 'orange' as const,
     }))
   }, [hasPlan, plan.items, selectedOption])
-
-  useEffect(() => {
-    if (!receipt.isSuccess)
-      return
-    isMorphoAuthorizedRead.refetch()
-    marketParamsRead.refetch()
-  }, [receipt.isSuccess])
 
   const bundle = useMemo(() => {
     if (!bundlerCfg || !userAddress || !hasPlan)
@@ -557,97 +538,119 @@ export function BatchWithdraw() {
     },
   })
 
-  const onAuthorizeAdapter = () => {
-    setExecuteError(undefined)
-    if (!authorizeSim.data?.request)
-      return
-    const scope = beginFlow({
-      kind: 'authorization',
-      title: 'Authorize batch withdraw adapter',
-      summary: 'Confirm authorization in wallet',
-      chainId,
-      steps: [
-        { key: 'wallet', label: 'Confirm authorization in wallet' },
-        { key: 'confirm', label: 'Confirming onchain' },
-      ],
-    })
-    setTracking({ action: 'authorize', baselineHash: txHash, ...scope })
-    writeContract(authorizeSim.data.request as any)
-  }
-
-  const onExecuteBundle = () => {
-    setExecuteError(undefined)
-    if (!multicallSim.data?.request)
-      return
-    const scope = beginFlow({
-      kind: 'batchWithdraw',
-      title: `Withdraw ${selectedOption ? fmtToken(plannedTotal, selectedOption.decimals) : '0'} ${symbol}`,
-      summary: 'Confirm in wallet to submit batch withdraw',
-      chainId,
-      steps: [
-        { key: 'wallet', label: 'Confirm batch withdraw in wallet' },
-        { key: 'confirm', label: 'Confirming onchain' },
-      ],
-    })
-    setTracking({ action: 'executeBundle', baselineHash: txHash, ...scope })
-    writeContract(multicallSim.data.request)
-  }
+  const latestStateRef = useRef({
+    isMorphoAuthorized,
+    authorizeRequest: authorizeSim.data?.request,
+    executeRequest: multicallSim.data?.request,
+    withdrawFacts,
+    withdrawItems,
+  })
 
   useEffect(() => {
-    if (!tracking || tracking.trackedHash || !txHash || !chainId || txHash === tracking.baselineHash)
-      return
-    setTracking(current => current ? { ...current, trackedHash: txHash } : current)
-    setTxHash({ flowId: tracking.flowId, attemptId: tracking.attemptId }, txHash, chainId)
-    setStepStatus({ flowId: tracking.flowId, attemptId: tracking.attemptId }, 'wallet', 'completed')
-    setStepStatus({ flowId: tracking.flowId, attemptId: tracking.attemptId }, 'confirm', 'active')
-    setStatus({ flowId: tracking.flowId, attemptId: tracking.attemptId }, 'confirming', 'Confirming onchain')
-  }, [chainId, setStatus, setStepStatus, setTxHash, tracking, txHash])
-
-  useEffect(() => {
-    if (!tracking || !writeError)
-      return
-    const message = (writeError as any)?.shortMessage ?? (writeError as any)?.message ?? 'Transaction failed'
-    setExecuteError(message)
-    failFlow({ flowId: tracking.flowId, attemptId: tracking.attemptId }, message)
-    setTracking(null)
-  }, [failFlow, tracking, writeError])
-
-  useEffect(() => {
-    if (!tracking || !receipt.error)
-      return
-    const message = (receipt.error as any)?.shortMessage ?? (receipt.error as any)?.message ?? 'Transaction confirmation failed'
-    setExecuteError(message)
-    failFlow({ flowId: tracking.flowId, attemptId: tracking.attemptId }, message)
-    setTracking(null)
-  }, [failFlow, receipt.error, tracking])
-
-  useEffect(() => {
-    if (!tracking || !tracking.trackedHash || !receipt.isSuccess)
-      return
-    if (tracking.action === 'authorize') {
-      completeFlow({ flowId: tracking.flowId, attemptId: tracking.attemptId }, {
-        title: 'Batch withdraw adapter authorized',
-        summary: 'You can now continue with batch withdraw.',
-        txHash: tracking.trackedHash,
-        chainId,
-        showModal: false,
-      })
+    latestStateRef.current = {
+      isMorphoAuthorized,
+      authorizeRequest: authorizeSim.data?.request,
+      executeRequest: multicallSim.data?.request,
+      withdrawFacts,
+      withdrawItems,
     }
-    else if (tracking.action === 'executeBundle' && selectedOption) {
-      completeFlow({ flowId: tracking.flowId, attemptId: tracking.attemptId }, {
+  }, [authorizeSim.data?.request, isMorphoAuthorized, multicallSim.data?.request, withdrawFacts, withdrawItems])
+
+  const refreshExecutionState = useCallback(async () => {
+    await Promise.all([
+      isMorphoAuthorizedRead.refetch(),
+      marketParamsRead.refetch(),
+      authorizeSim.refetch(),
+      multicallSim.refetch(),
+    ])
+  }, [authorizeSim, isMorphoAuthorizedRead, marketParamsRead, multicallSim])
+
+  const requiredExecutionSteps = useMemo(() => {
+    const steps: string[] = []
+    if (!isMorphoAuthorized)
+      steps.push('Authorize adapter')
+    steps.push('Execute withdraw')
+    return steps
+  }, [isMorphoAuthorized])
+
+  const onStartExecutionFlow = useCallback(async () => {
+    if (!selectedOption)
+      return
+
+    setExecuteError(undefined)
+    setIsRunningFlow(true)
+
+    const steps = [] as Array<{ key: string, label: string }>
+    if (!latestStateRef.current.isMorphoAuthorized) {
+      steps.push({ key: 'authorizeWallet', label: 'Confirm adapter authorization in wallet' })
+      steps.push({ key: 'authorizeConfirm', label: 'Confirming adapter authorization onchain' })
+    }
+    steps.push({ key: 'executeWallet', label: 'Confirm batch withdraw in wallet' })
+    steps.push({ key: 'executeConfirm', label: 'Confirming batch withdraw onchain' })
+
+    const scope = startFlow({
+      kind: 'batchWithdraw',
+      title: `Withdraw ${fmtToken(plannedTotal, selectedOption.decimals)} ${selectedOption.symbol}`,
+      summary: 'Preparing guided withdrawal',
+      chainId,
+      steps,
+    })
+
+    try {
+      if (!latestStateRef.current.isMorphoAuthorized) {
+        const authorizeRequest = latestStateRef.current.authorizeRequest
+        if (!authorizeRequest)
+          throw new Error('Authorization transaction is not ready yet')
+        await runTransactionStep({
+          scope,
+          walletStepKey: 'authorizeWallet',
+          confirmStepKey: 'authorizeConfirm',
+          chainId,
+          walletSummary: 'Waiting for adapter authorization in wallet',
+          confirmSummary: 'Confirming adapter authorization onchain',
+          fallbackError: 'Adapter authorization failed',
+          run: () => writeContractAsync(authorizeRequest as any),
+        })
+        await refreshExecutionState()
+        await waitForTruthy(() => latestStateRef.current.isMorphoAuthorized ? true : undefined, {
+          errorMessage: 'Authorization succeeded but state did not refresh in time',
+        })
+      }
+
+      const executeRequest = await waitForTruthy(() => latestStateRef.current.executeRequest, {
+        errorMessage: 'Batch withdraw transaction is not ready yet',
+      })
+      const txHash = await runTransactionStep({
+        scope,
+        walletStepKey: 'executeWallet',
+        confirmStepKey: 'executeConfirm',
+        chainId,
+        walletSummary: 'Waiting for batch withdraw confirmation in wallet',
+        confirmSummary: 'Confirming batch withdraw onchain',
+        fallbackError: 'Batch withdraw failed',
+        run: () => writeContractAsync(executeRequest as any),
+      })
+
+      finishFlow(scope, {
         title: `Withdrew ${fmtToken(plannedTotal, selectedOption.decimals)} ${selectedOption.symbol}`,
         summary: 'Batch withdraw completed successfully.',
-        txHash: tracking.trackedHash,
+        txHash,
         chainId,
-        facts: withdrawFacts,
-        items: withdrawItems,
+        facts: latestStateRef.current.withdrawFacts,
+        items: latestStateRef.current.withdrawItems,
         showModal: true,
       })
       resetAfterSuccess()
-      return
     }
-    setTracking(null)
-  }, [chainId, completeFlow, plannedTotal, receipt.isSuccess, resetAfterSuccess, selectedOption, tracking, withdrawFacts, withdrawItems])
+    catch (error) {
+      const message = getErrorMessage(error, 'Batch withdraw failed')
+      setExecuteError(message)
+      failTransactionFlow(scope, message)
+    }
+    finally {
+      setIsRunningFlow(false)
+    }
+  }, [chainId, failTransactionFlow, finishFlow, getErrorMessage, plannedTotal, refreshExecutionState, resetAfterSuccess, runTransactionStep, selectedOption, startFlow, writeContractAsync])
 
   const execution: BatchWithdrawExecutionState = {
     bundlerCfg,
@@ -656,18 +659,19 @@ export function BatchWithdraw() {
     authorizeAvailable: !!authorizeSim.data?.request,
     multicallError: (multicallSim.error as any)?.shortMessage ?? (multicallSim.error as any)?.message,
     executeError,
-    canExecute: !!multicallSim.data?.request
-      && !!bundle
+    canExecute: !!bundle
       && bundle.length > 0
       && !!bundlerCfg
       && !!userAddress
-      && isMorphoAuthorized
       && !isWriting
-      && !receipt.isLoading,
-    isWriting,
-    isConfirming: receipt.isLoading,
-    onAuthorizeAdapter,
-    onExecuteBundle,
+      && !isRunningFlow
+      && (!isMorphoAuthorized ? !!authorizeSim.data?.request : true)
+      && (isMorphoAuthorized ? !!multicallSim.data?.request : true),
+    isWriting: isWriting || isRunningFlow,
+    isConfirming: false,
+    onAuthorizeAdapter: onStartExecutionFlow,
+    onExecuteBundle: onStartExecutionFlow,
+    requiredSteps: requiredExecutionSteps,
   }
 
   return (

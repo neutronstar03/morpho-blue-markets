@@ -160,7 +160,7 @@ Suggested responsibilities:
 Suggested conceptual step model:
 
 ```ts
-type ChainedFlowStep = {
+interface ChainedFlowStep {
   key: string
   label: string
   kind: 'wallet_tx' | 'signature' | 'wait_tx' | 'informational'

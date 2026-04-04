@@ -5,12 +5,12 @@ import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { MarketAprPreview } from '~/components/ui/market-apr-preview'
-import { useTransactionFeedback } from '~/lib/contexts/transaction-feedback.context'
 import { formatBigintShort, formatDecimalStringShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
-import { useMarket, useSupply, useTokenApproval, useTokenBalance, useTransactionStatus } from '~/lib/hooks/rpc/use-morpho'
+import { useMarket, useSupply, useTokenApproval, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
+import { useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
 import { ModeToggleSuffix } from './market-action-form/mode-toggle-suffix'
 import { InlineNotice } from './market-action-form/status-message'
 import { SubmitButton } from './market-action-form/submit-button'
@@ -23,18 +23,6 @@ interface DepositFormProps {
 }
 
 const isValidNumberInput = (value: string) => value === '' || /^\d*(?:\.\d*)?$/.test(value)
-
-interface PendingDepositFlow {
-  baselineHash?: `0x${string}`
-  amountLabel: string
-  marketLabel: string
-}
-
-interface ActiveDepositFlow extends PendingDepositFlow {
-  flowId: string
-  attemptId: string
-  trackedHash: `0x${string}`
-}
 
 function useDepositFormState() {
   const isClient = useIsClient()
@@ -66,9 +54,8 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     setAssetAmount,
   } = useDepositFormState()
   const { address } = useAccount()
-  const { beginFlow, completeFlow, failFlow, setStatus, setTxHash } = useTransactionFeedback()
-  const [pendingFlow, setPendingFlow] = useState<PendingDepositFlow | null>(null)
-  const [activeFlow, setActiveFlow] = useState<ActiveDepositFlow | null>(null)
+  const [isSubmittingFlow, setIsSubmittingFlow] = useState(false)
+  const { startFlow, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
 
   const { data: marketStateRaw } = useMarket(market.uniqueKey)
 
@@ -172,13 +159,13 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
 
   const {
     needsApproval,
-    approve,
-    hash: approveHash,
     isPending: isApprovingToken,
     error: approveError,
     refetch: refetchApproval,
     isSimulating: isSimulatingApproval,
     isAllowanceReady,
+    approveAsync,
+    approveRequest,
   } = useTokenApproval(market.loanAsset.address, debouncedAmount, address, market.loanAsset.decimals)
 
   const hasSufficientBalance = useMemo(() => {
@@ -194,64 +181,35 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
   const guardedAmount = (isAllowanceReady && !needsApproval && hasSufficientBalance) ? debouncedAmount : ''
 
   const {
-    supply,
     canSupply,
-    hash: supplyHash,
     isPending: isSupplying,
     error: supplyError,
     isSimulating: isSimulatingSupply,
+    supplyAsync,
+    supplyRequest,
   } = useSupply(market, guardedAmount, market.loanAsset.decimals!)
 
-  const supplyReceipt = useTransactionStatus(activeFlow?.trackedHash)
-  const { isSuccess: isSupplySuccess, isLoading: isSupplyLoading } = supplyReceipt
-  const { isSuccess: isApproveSuccess, isLoading: isApproveLoading } = useTransactionStatus(approveHash)
   const effectiveSupplyError = (!isAllowanceReady || needsApproval) ? undefined : supplyError
 
+  const latestStateRef = useRef({
+    needsApproval,
+    canSupply,
+    isAllowanceReady,
+    hasSufficientBalance,
+    approveRequest,
+    supplyRequest,
+  })
+
   useEffect(() => {
-    if (isApproveSuccess) {
-      refetchApproval?.()
+    latestStateRef.current = {
+      needsApproval,
+      canSupply,
+      isAllowanceReady,
+      hasSufficientBalance,
+      approveRequest,
+      supplyRequest,
     }
-  }, [isApproveSuccess, refetchApproval])
-
-  useEffect(() => {
-    if (!pendingFlow || activeFlow || !supplyHash || supplyHash === pendingFlow.baselineHash)
-      return
-    const scope = beginFlow({
-      kind: 'deposit',
-      title: `Deposit ${pendingFlow.amountLabel} ${loanTokenSymbol}`,
-      summary: 'Confirming deposit onchain',
-      steps: [{ key: 'confirm', label: 'Confirming deposit onchain' }],
-    })
-    setTxHash(scope, supplyHash)
-    setStatus(scope, 'confirming', 'Confirming deposit onchain')
-    setActiveFlow({ ...pendingFlow, ...scope, trackedHash: supplyHash })
-    setPendingFlow(null)
-  }, [activeFlow, beginFlow, loanTokenSymbol, pendingFlow, setStatus, setTxHash, supplyHash])
-
-  useEffect(() => {
-    if (!activeFlow || !supplyReceipt.error)
-      return
-    const message = (supplyReceipt.error as any)?.shortMessage ?? (supplyReceipt.error as any)?.message ?? 'Deposit failed'
-    failFlow({ flowId: activeFlow.flowId, attemptId: activeFlow.attemptId }, message)
-    setActiveFlow(null)
-  }, [activeFlow, failFlow, supplyReceipt.error])
-
-  useEffect(() => {
-    if (!activeFlow || !isSupplySuccess)
-      return
-    completeFlow({ flowId: activeFlow.flowId, attemptId: activeFlow.attemptId }, {
-      title: `Deposited ${activeFlow.amountLabel} ${loanTokenSymbol}`,
-      summary: `Deposit completed on ${activeFlow.marketLabel}.`,
-      txHash: activeFlow.trackedHash,
-      facts: [
-        { label: 'Market', value: activeFlow.marketLabel },
-        { label: 'Amount', value: `${activeFlow.amountLabel} ${loanTokenSymbol}` },
-      ],
-      showModal: true,
-    })
-    onSuccess?.()
-    setActiveFlow(null)
-  }, [activeFlow, completeFlow, isSupplySuccess, loanTokenSymbol, onSuccess])
+  }, [approveRequest, canSupply, hasSufficientBalance, isAllowanceReady, needsApproval, supplyRequest])
 
   const handleMaxClick = () => {
     if (mode === 'percent') {
@@ -272,30 +230,84 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     if (!amount || !address || !isClient)
       return
 
+    const marketLabel = `${market.collateralAsset.symbol} / ${loanTokenSymbol}`
+    const steps = [] as Array<{ key: string, label: string }>
+    if (needsApproval) {
+      steps.push({ key: 'approveWallet', label: `Confirm ${loanTokenSymbol} approval in wallet` })
+      steps.push({ key: 'approveConfirm', label: 'Confirming approval onchain' })
+    }
+    steps.push({ key: 'depositWallet', label: 'Confirm deposit in wallet' })
+    steps.push({ key: 'depositConfirm', label: 'Confirming deposit onchain' })
+    const scope = startFlow({
+      kind: 'deposit',
+      title: `Deposit ${displayAmountShort} ${loanTokenSymbol}`,
+      summary: 'Preparing guided deposit',
+      steps,
+    })
+
     try {
+      setIsSubmittingFlow(true)
+
       if (needsApproval) {
-        approve()
-      }
-      else if (hasSufficientBalance) {
-        if (!canSupply)
-          throw new Error('Deposit transaction is not ready yet')
-        setPendingFlow({
-          baselineHash: supplyHash,
-          amountLabel: displayAmountShort,
-          marketLabel: `${market.collateralAsset.symbol} / ${loanTokenSymbol}`,
+        await runTransactionStep({
+          scope,
+          walletStepKey: 'approveWallet',
+          confirmStepKey: 'approveConfirm',
+          walletSummary: `Waiting for ${loanTokenSymbol} approval in wallet`,
+          confirmSummary: 'Confirming approval onchain',
+          fallbackError: 'Approval failed',
+          run: approveAsync,
         })
-        supply()
+        await refetchApproval?.()
+        await waitForTruthy(() => {
+          const state = latestStateRef.current
+          return state.isAllowanceReady && !state.needsApproval && state.canSupply ? true : undefined
+        }, {
+          errorMessage: 'Approval succeeded but deposit transaction is not ready yet',
+        })
       }
+
+      if (!latestStateRef.current.hasSufficientBalance)
+        throw new Error('Insufficient wallet balance for this deposit amount')
+
+      if (!latestStateRef.current.canSupply)
+        throw new Error('Deposit transaction is not ready yet')
+
+      const txHash = await runTransactionStep({
+        scope,
+        walletStepKey: 'depositWallet',
+        confirmStepKey: 'depositConfirm',
+        walletSummary: 'Waiting for deposit confirmation in wallet',
+        confirmSummary: 'Confirming deposit onchain',
+        fallbackError: 'Deposit failed',
+        run: supplyAsync,
+      })
+
+      finishFlow(scope, {
+        title: `Deposited ${displayAmountShort} ${loanTokenSymbol}`,
+        summary: `Deposit completed on ${marketLabel}.`,
+        txHash,
+        facts: [
+          { label: 'Market', value: marketLabel },
+          { label: 'Amount', value: `${displayAmountShort} ${loanTokenSymbol}` },
+        ],
+        showModal: true,
+      })
+      onSuccess?.()
     }
     catch (error) {
-      setPendingFlow(null)
+      const message = getErrorMessage(error, 'Deposit failed')
+      failTransactionFlow(scope, message)
       console.error('Transaction failed:', error)
+    }
+    finally {
+      setIsSubmittingFlow(false)
     }
   }
 
   // Input handled by AmountControl
 
-  const isLoading = isSupplying || isApprovingToken || isSupplyLoading || isApproveLoading || isSimulatingSupply || isSimulatingApproval || (!needsApproval && !isAllowanceReady && !!amount)
+  const isLoading = isSubmittingFlow || isSupplying || isApprovingToken || isSimulatingSupply || isSimulatingApproval || (!needsApproval && !isAllowanceReady && !!amount)
   const hasError = effectiveSupplyError || approveError
 
   const preview = useMarketPreview({
@@ -315,14 +327,16 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     ? 'Checking allowance...'
     : isSimulatingApproval
       ? 'Preparing approval...'
-      : isApprovingToken || isApproveLoading
+      : isApprovingToken || isSubmittingFlow
         ? 'Approving...'
         : isSimulatingSupply
           ? 'Preparing deposit...'
           : 'Depositing...'
-  const submitIdleLabel = needsApproval
-    ? `Approve ${loanTokenSymbol}`
-    : `Deposit ${displayAmountShort} ${loanTokenSymbol}`
+  const submitIdleLabel = needsApproval && hasSufficientBalance
+    ? `Approve + deposit ${displayAmountShort} ${loanTokenSymbol}`
+    : needsApproval
+      ? `Approve ${loanTokenSymbol}`
+      : `Deposit ${displayAmountShort} ${loanTokenSymbol}`
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -380,15 +394,6 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
           afterApr={afterApr}
           showEstimateLabel={showAprEstimateLabel}
         />
-      )}
-
-      {isApproveSuccess && !needsApproval && (
-        <InlineNotice tone="green">
-          Approval successful! You can now deposit your
-          {' '}
-          {loanTokenSymbol}
-          .
-        </InlineNotice>
       )}
 
       {needsApproval && (
