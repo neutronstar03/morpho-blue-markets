@@ -18,7 +18,7 @@ import { MORPHO_AUTH_ABI, PERMIT2_ALLOWANCE_TRANSFER_ABI } from '~/lib/abis/bund
 import { getBundler3Config, PERMIT2_ADDRESS } from '~/lib/bundler3/addresses'
 import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
 import { buildOptimizerBundle } from '~/lib/bundler3/optimizer-bundle'
-import { useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
+import { isConfirmationDelayedError, useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
 
 function fmtToken(amount: bigint, decimals: number, digits = 4): string {
   const asNum = Number.parseFloat(formatUnits(amount, decimals))
@@ -430,6 +430,10 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
       resetExecutionState()
     }
     catch (error) {
+      if (isConfirmationDelayedError(error)) {
+        setExecuteError(undefined)
+        return
+      }
       const message = getErrorMessage(error, 'Optimizer execution failed')
       setExecuteError(message)
       failTransactionFlow(scope, message)

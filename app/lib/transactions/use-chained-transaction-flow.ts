@@ -22,6 +22,15 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+function isConfirmationTimeout(error: unknown) {
+  const message = getErrorMessage(error, '').toLowerCase()
+  return message.includes('timed out') || message.includes('timeout')
+}
+
+export function isConfirmationDelayedError(error: unknown) {
+  return typeof error === 'object' && !!error && 'name' in error && error.name === 'ConfirmationDelayedError'
+}
+
 export async function waitForTruthy<T>(
   read: () => T | null | undefined | false,
   {
@@ -52,6 +61,7 @@ export function useChainedTransactionFlow() {
     beginFlow,
     completeFlow,
     failFlow,
+    warnFlow,
     setStatus,
     setStepStatus,
     setTxHash,
@@ -130,11 +140,21 @@ export function useChainedTransactionFlow() {
       return txHash
     }
     catch (error) {
+      if (isConfirmationTimeout(error)) {
+        warnFlow(
+          scope,
+          'Still pending. Speed up in wallet or view in explorer.',
+          'Confirmation delayed',
+        )
+        const delayedError = new Error('Confirmation delayed')
+        delayedError.name = 'ConfirmationDelayedError'
+        throw delayedError
+      }
       const message = getErrorMessage(error, fallbackError)
       failFlow(scope, message)
       throw new Error(message)
     }
-  }, [activateStep, failFlow, markStepCompleted, publicClient, setTxHash])
+  }, [activateStep, failFlow, markStepCompleted, publicClient, setTxHash, warnFlow])
 
   const finishFlow = useCallback((scope: ScopedTransactionUpdate, payload: TransactionSuccessPayload) => {
     completeFlow(scope, payload)

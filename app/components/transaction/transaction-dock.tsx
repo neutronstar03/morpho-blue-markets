@@ -15,6 +15,8 @@ function statusLabel(status: string) {
       return 'Transaction submitted'
     case 'confirming':
       return 'Confirming onchain'
+    case 'warning':
+      return 'Confirmation delayed'
     case 'success':
       return 'Completed successfully'
     case 'error':
@@ -34,18 +36,22 @@ export function TransactionDock() {
     ?? flow.steps.find(step => step.status === 'error')
     ?? (flow.status === 'success' || flow.status === 'error' ? undefined : flow.steps[flow.steps.length - 1])
   const explorerUrl = flow.txHash && flow.chainId ? getExplorerTransactionUrl(flow.chainId, flow.txHash) : ''
-  const isTerminal = flow.status === 'success' || flow.status === 'error'
+  const isTerminal = flow.status === 'success' || flow.status === 'error' || flow.status === 'warning'
+  const isWarning = flow.status === 'warning'
+  const icon = isWarning
+    ? <ExclamationTriangleIcon className="h-5 w-5 text-amber-400" />
+    : flow.status === 'error'
+      ? <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+      : flow.status === 'success'
+        ? <CheckCircleIcon className="h-5 w-5 text-green-400" />
+        : <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 p-3 sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[min(92vw,440px)]">
       <div className="rounded-xl border border-gray-700 bg-gray-900/95 shadow-2xl backdrop-blur-sm">
         <div className="flex items-start gap-3 p-4">
           <div className="mt-0.5 shrink-0">
-            {flow.status === 'error'
-              ? <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
-              : flow.status === 'success'
-                ? <CheckCircleIcon className="h-5 w-5 text-green-400" />
-                : <Loader2 className="h-5 w-5 animate-spin text-blue-400" />}
+            {icon}
           </div>
 
           <div className="min-w-0 flex-1">
@@ -71,7 +77,11 @@ export function TransactionDock() {
                 <div className="text-[11px] uppercase tracking-wide text-gray-500">Current step</div>
                 <div className={cn(
                   'mt-1 text-sm',
-                  activeStep.status === 'error' ? 'text-red-300' : 'text-gray-200',
+                  activeStep.status === 'error'
+                    ? 'text-red-300'
+                    : isWarning
+                      ? 'text-amber-200'
+                      : 'text-gray-200',
                 )}
                 >
                   {activeStep.label}
@@ -80,7 +90,13 @@ export function TransactionDock() {
             )}
 
             {!!flow.errorMessage && (
-              <div className="mt-3 text-sm text-red-300">{flow.errorMessage}</div>
+              <div className={cn(
+                'mt-3 text-sm break-words',
+                isWarning ? 'text-amber-300' : 'text-red-300',
+              )}
+              >
+                {flow.errorMessage}
+              </div>
             )}
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -98,6 +114,11 @@ export function TransactionDock() {
               {flow.status === 'success' && flow.success?.showModal === false && (
                 <Button type="button" variant="outline" size="sm" onClick={() => clearFlow(flow.id)}>
                   Close
+                </Button>
+              )}
+              {isWarning && (
+                <Button type="button" variant="outline" size="sm" onClick={() => clearFlow(flow.id)}>
+                  Clear
                 </Button>
               )}
             </div>

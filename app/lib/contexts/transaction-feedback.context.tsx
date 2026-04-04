@@ -22,6 +22,7 @@ interface TransactionFeedbackContextValue {
   setTxHash: (scope: ScopedTransactionUpdate, txHash: `0x${string}` | undefined, chainId?: number) => void
   completeFlow: (scope: ScopedTransactionUpdate, payload: TransactionSuccessPayload) => void
   failFlow: (scope: ScopedTransactionUpdate, message: string) => void
+  warnFlow: (scope: ScopedTransactionUpdate, message: string, summary?: string) => void
   dismissSuccessModal: () => void
   clearFlow: (flowId?: string) => void
 }
@@ -150,6 +151,20 @@ export function TransactionFeedbackProvider({ children }: { children: ReactNode 
     })
   }, [])
 
+  const warnFlow = useCallback((scope: ScopedTransactionUpdate, message: string, summary?: string) => {
+    setIsSuccessModalOpen(false)
+    setFlow((current) => {
+      if (!current || !matchesScope(current, scope))
+        return current
+      return {
+        ...current,
+        status: 'warning',
+        summary: summary ?? current.summary,
+        errorMessage: message,
+      }
+    })
+  }, [])
+
   const dismissSuccessModal = useCallback(() => {
     setIsSuccessModalOpen(false)
   }, [])
@@ -175,9 +190,10 @@ export function TransactionFeedbackProvider({ children }: { children: ReactNode 
     setTxHash,
     completeFlow,
     failFlow,
+    warnFlow,
     dismissSuccessModal,
     clearFlow,
-  }), [beginFlow, clearFlow, completeFlow, dismissSuccessModal, failFlow, flow, isSuccessModalOpen, setStatus, setStepStatus, setTxHash, updateFlow])
+  }), [beginFlow, clearFlow, completeFlow, dismissSuccessModal, failFlow, flow, isSuccessModalOpen, setStatus, setStepStatus, setTxHash, updateFlow, warnFlow])
 
   return <TransactionFeedbackContext.Provider value={value}>{children}</TransactionFeedbackContext.Provider>
 }

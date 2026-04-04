@@ -10,7 +10,7 @@ import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useSupply, useTokenApproval, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
-import { useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
+import { isConfirmationDelayedError, useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
 import { ModeToggleSuffix } from './market-action-form/mode-toggle-suffix'
 import { InlineNotice } from './market-action-form/status-message'
 import { SubmitButton } from './market-action-form/submit-button'
@@ -296,6 +296,8 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       onSuccess?.()
     }
     catch (error) {
+      if (isConfirmationDelayedError(error))
+        return
       const message = getErrorMessage(error, 'Deposit failed')
       failTransactionFlow(scope, message)
       console.error('Transaction failed:', error)

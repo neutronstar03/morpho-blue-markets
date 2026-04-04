@@ -13,6 +13,7 @@ export type TransactionFlowStatus
     | 'signing'
     | 'submitted'
     | 'confirming'
+    | 'warning'
     | 'success'
     | 'error'
 

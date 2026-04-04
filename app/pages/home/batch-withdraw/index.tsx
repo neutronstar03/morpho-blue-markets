@@ -26,7 +26,7 @@ import { isMarketIdManuallyBlacklisted, useMarketBlacklistVersion } from '~/lib/
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
-import { useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
+import { isConfirmationDelayedError, useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
 import { BatchWithdrawExecutionPanel } from './execution-panel'
 import { BatchWithdrawForm } from './form'
 import { BatchWithdrawResults } from './results'
@@ -643,6 +643,10 @@ export function BatchWithdraw() {
       resetAfterSuccess()
     }
     catch (error) {
+      if (isConfirmationDelayedError(error)) {
+        setExecuteError(undefined)
+        return
+      }
       const message = getErrorMessage(error, 'Batch withdraw failed')
       setExecuteError(message)
       failTransactionFlow(scope, message)
