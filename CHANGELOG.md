@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.15 - 2026-04-04
+
+### Changed
+- ux: Home Positions asset groups can now open the Supply APR optimizer directly with the selected lent asset prefilled for faster rebalance and deposit flows.
+- fix: hidden dust supply positions with zero derived assets are now filtered consistently across Positions, Batch Withdraw, Market positions, and Home Magic / optimizer candidate inputs.
+
 ## v1.2.14 - 2026-04-04
 
 ### Changed
