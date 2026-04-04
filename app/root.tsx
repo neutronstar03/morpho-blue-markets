@@ -9,6 +9,8 @@ import {
   ScrollRestoration,
 } from 'react-router'
 import { Footer } from './components/footer'
+import { TransactionDock } from './components/transaction/transaction-dock'
+import { TransactionSuccessModal } from './components/transaction/transaction-success-modal'
 import { UpdateAvailableToast } from './components/update-available-toast'
 import { Providers } from './lib/providers'
 import './app.css'
@@ -74,6 +76,8 @@ export default function App() {
         <div className="flex-1">
           <Outlet />
         </div>
+        <TransactionDock />
+        <TransactionSuccessModal />
         <UpdateAvailableToast />
         <Footer />
       </div>

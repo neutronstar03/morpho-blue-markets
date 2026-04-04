@@ -99,11 +99,11 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     },
   })
 
-  const { writeContract, data: hash, isPending, error: writeError } = useWriteContract()
+  const { writeContract, writeContractAsync, data: hash, isPending, error: writeError } = useWriteContract()
 
   const handleApprove = () => {
     if (!simulateData?.request || !approveArgs)
-      return
+      throw new Error('Approval transaction is not ready yet')
     // For USDT mainnet, explicitly pass the ABI to ensure proper encoding
     // This avoids issues with wagmi's transaction encoding for non-standard ERC20 tokens
     if (isUsdtMainnet) {
@@ -119,6 +119,20 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     }
   }
 
+  const handleApproveAsync = async () => {
+    if (!simulateData?.request || !approveArgs)
+      throw new Error('Approval transaction is not ready yet')
+    if (isUsdtMainnet) {
+      return writeContractAsync({
+        address: tokenAddress as `0x${string}`,
+        abi: approveWriteAbi,
+        functionName: 'approve',
+        args: approveArgs,
+      })
+    }
+    return writeContractAsync(simulateData.request)
+  }
+
   const isAllowanceReady = allowance !== undefined
   const requiredAmount = isValidAmount ? parseTokenAmount(amount, decimals) : 0n
 
@@ -126,7 +140,10 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     allowance: allowance ? formatTokenAmount(allowance, decimals) : '0',
     needsApproval: isValidAmount ? (!isAllowanceReady || requiredAmount > (allowance ?? 0n)) : false,
     isAllowanceReady,
+    canApprove: !!simulateData?.request && !!approveArgs,
+    approveRequest: simulateData?.request,
     approve: handleApprove,
+    approveAsync: handleApproveAsync,
     hash,
     isPending,
     error: simulateError || writeError,
@@ -191,16 +208,25 @@ export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenD
     },
   })
 
-  const { writeContract: supply, data: hash, isPending, error: writeError } = useWriteContract()
+  const { writeContract: supply, writeContractAsync: supplyAsync, data: hash, isPending, error: writeError } = useWriteContract()
 
   const handleSupply = () => {
-    if (simulateData?.request) {
-      supply(simulateData.request)
-    }
+    if (!simulateData?.request)
+      throw new Error('Deposit transaction is not ready yet')
+    supply(simulateData.request)
+  }
+
+  const handleSupplyAsync = async () => {
+    if (!simulateData?.request)
+      throw new Error('Deposit transaction is not ready yet')
+    return supplyAsync(simulateData.request)
   }
 
   return {
     supply: handleSupply,
+    supplyAsync: handleSupplyAsync,
+    canSupply: !!simulateData?.request,
+    supplyRequest: simulateData?.request,
     hash,
     isPending,
     error: simulateError || writeError,
@@ -247,16 +273,25 @@ export function useWithdraw(market: SingleMorphoMarket, sharesIn: string) {
     },
   })
 
-  const { writeContract: withdraw, data: hash, isPending, error: writeError } = useWriteContract()
+  const { writeContract: withdraw, writeContractAsync: withdrawAsync, data: hash, isPending, error: writeError } = useWriteContract()
 
   const handleWithdraw = () => {
-    if (simulateData?.request) {
-      withdraw(simulateData.request)
-    }
+    if (!simulateData?.request)
+      throw new Error('Withdrawal transaction is not ready yet')
+    withdraw(simulateData.request)
+  }
+
+  const handleWithdrawAsync = async () => {
+    if (!simulateData?.request)
+      throw new Error('Withdrawal transaction is not ready yet')
+    return withdrawAsync(simulateData.request)
   }
 
   return {
     withdraw: handleWithdraw,
+    withdrawAsync: handleWithdrawAsync,
+    canWithdraw: !!simulateData?.request,
+    withdrawRequest: simulateData?.request,
     hash,
     isPending,
     error: simulateError || writeError,

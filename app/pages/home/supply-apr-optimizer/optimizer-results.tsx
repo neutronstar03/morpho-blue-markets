@@ -22,6 +22,7 @@ interface SupplyAprOptimizerResultsProps {
   chainId?: number
   morphoAddress?: `0x${string}`
   userSupplySharesByMarketId: Map<string, bigint>
+  onExecutedSuccess?: () => void
 }
 
 const WAD = 10n ** 18n
@@ -39,6 +40,7 @@ export function SupplyAprOptimizerResults({
   chainId,
   morphoAddress,
   userSupplySharesByMarketId,
+  onExecutedSuccess,
 }: SupplyAprOptimizerResultsProps) {
   return (
     <div className="space-y-3">
@@ -199,6 +201,7 @@ export function SupplyAprOptimizerResults({
           displayResult={displayResult}
           chainId={chainId}
           morphoAddress={morphoAddress}
+          marketMetaById={marketMetaById}
           userAddress={userAddress}
           userSupplySharesByMarketId={userSupplySharesByMarketId}
           loanToken={{
@@ -206,6 +209,7 @@ export function SupplyAprOptimizerResults({
             symbol,
             decimals: selectedOption.decimals,
           }}
+          onExecutedSuccess={onExecutedSuccess}
         />
       )}
     </div>
