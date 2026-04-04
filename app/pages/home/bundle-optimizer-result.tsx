@@ -36,10 +36,11 @@ export interface BundleOptimizerResultProps {
   loanToken: { address: Address, symbol: string, decimals: number }
   marketMetaById?: Map<string, OptimizerMarketMeta>
   executionGuard?: ExecutionGuard
+  onExecutedSuccess?: () => void
 }
 
 export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
-  const { chainId, morphoAddress, userAddress, userSupplySharesByMarketId, displayResult, loanToken, marketMetaById, executionGuard } = props
+  const { chainId, morphoAddress, userAddress, userSupplySharesByMarketId, displayResult, loanToken, marketMetaById, executionGuard, onExecutedSuccess } = props
   const { chain } = useAccount()
 
   const bundlerCfg = useMemo(() => getBundler3Config(chainId), [chainId])
@@ -427,6 +428,7 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
         items: finalState.optimizerSuccessItems,
         showModal: true,
       })
+      onExecutedSuccess?.()
       resetExecutionState()
     }
     catch (error) {
@@ -441,7 +443,7 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
     finally {
       setIsRunningFlow(false)
     }
-  }, [bundleBuild, bundlerCfg, chainId, failTransactionFlow, finishFlow, getErrorMessage, loanToken.decimals, loanToken.symbol, refreshPrerequisites, resetExecutionState, runSignatureStep, runTransactionStep, signTypedDataAsync, startFlow, writeContractAsync])
+  }, [bundleBuild, bundlerCfg, chainId, failTransactionFlow, finishFlow, getErrorMessage, loanToken.decimals, loanToken.symbol, onExecutedSuccess, refreshPrerequisites, resetExecutionState, runSignatureStep, runTransactionStep, signTypedDataAsync, startFlow, writeContractAsync])
 
   if (!bundlerCfg)
     return null

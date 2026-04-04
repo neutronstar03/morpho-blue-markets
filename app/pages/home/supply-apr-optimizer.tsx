@@ -971,6 +971,7 @@ export function SupplyAprOptimizer() {
                 chainId={chain?.id}
                 morphoAddress={morphoAddress as `0x${string}` | undefined}
                 userSupplySharesByMarketId={userSupplySharesByMarketId}
+                onExecutedSuccess={() => ctx.clear()}
               />
             )}
           </>
