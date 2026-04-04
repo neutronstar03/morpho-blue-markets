@@ -1,4 +1,5 @@
 import type { Portfolio } from './position-types'
+import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import { Wallet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useSwitchChain } from 'wagmi'
@@ -6,19 +7,22 @@ import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useNetworkContext } from '~/lib/contexts/network'
+import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { useIsClient } from '~/lib/hooks/use-is-client'
+import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
 import { isMarketIdManuallyBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
+import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { PositionChainPills } from './position-chain-pills'
 import { PositionGroups } from './position-groups'
-import { getMarketSupplyUsd } from './position-utils'
+import { getMarketSupplyUsd, getPositionSuppliedAssets, hasVisibleSupplyPosition } from './position-utils'
 import { usePositionChainPills } from './use-position-chain-pills'
 import { usePositionGroups } from './use-position-groups'
 
@@ -28,6 +32,8 @@ function PositionClient() {
   const { address: userAddress, isConnected, chain } = useAccount()
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain()
   const { setRequiredChainId } = useNetworkContext()
+  const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
+  const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
   const {
     data: positions,
     isLoading,
@@ -70,7 +76,13 @@ function PositionClient() {
     if (!positions || !chain?.id)
       return positions ?? []
     // Manual market blacklist is the strong local hide list: exclude it from UI, totals, and pills.
-    return positions.filter(position => !isMarketIdManuallyBlacklisted(position.market.uniqueKey, chain.id))
+    return positions.filter((position) => {
+      if (isMarketIdManuallyBlacklisted(position.market.uniqueKey, chain.id))
+        return false
+
+      const hasNonSupplyPosition = position.userState.borrowShares > 0n || position.userState.collateral > 0n
+      return hasNonSupplyPosition || hasVisibleSupplyPosition(position)
+    })
   }, [blacklistVersion, chain?.id, positions])
 
   const [timeAgo, setTimeAgo] = useState('')
@@ -134,11 +146,7 @@ function PositionClient() {
       totalAprWeighted += userPrincipalUsd * marketApr
 
       if (allSameAsset && totalAssets !== undefined) {
-        const marketSupplyAssets = BigInt(p.market.state.supplyAssets)
-        if (marketSupplyShares > 0n) {
-          const suppliedAssets = (userSupplyShares * marketSupplyAssets) / marketSupplyShares
-          totalAssets += suppliedAssets
-        }
+        totalAssets += getPositionSuppliedAssets(p)
       }
     }
 
@@ -162,6 +170,31 @@ function PositionClient() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
     setRequiredChainId(chainId)
     switchChain({ chainId })
+  }
+
+  const handleOpenOptimizerForGroup = (group: typeof groupedPositions[number]) => {
+    const firstPosition = group.positions[0]
+    if (!chain?.id || !firstPosition)
+      return
+
+    setOptimizerPreset({
+      chainId: chain.id,
+      loanAssetAddress: firstPosition.market.loanAsset.address,
+      loanAssetSymbol: group.loanAssetSymbol,
+      loanAssetDecimals: firstPosition.market.loanAsset.decimals ?? 18,
+      marketApr: resolveMarketAprByAssetSymbol(group.loanAssetSymbol, marketAprBySymbol),
+      newDepositAmount: '0',
+      maxMarketsUsed: 6,
+      usePrecomputedIfFresh: false,
+    })
+
+    window.requestAnimationFrame(() => {
+      const el = document.querySelector('[data-testid="supply-apr-optimizer-card"]') as HTMLElement | null
+      if (!el)
+        return
+      const top = el.getBoundingClientRect().top + window.scrollY - 88
+      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+    })
   }
 
   if (!isConnected) {
@@ -234,6 +267,7 @@ function PositionClient() {
                 riskStatusByKey={riskStatusByKey}
                 summaryMode={assetSummaryMode}
                 onToggleSummaryMode={() => setAssetSummaryMode(mode => mode === 'total' ? 'yearly' : 'total')}
+                onSelectLoanAsset={handleOpenOptimizerForGroup}
               />
             )}
         {(chainPills.length > 0 || portfolio.totalAssetsUsd != null || (portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null)) && (

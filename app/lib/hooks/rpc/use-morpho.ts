@@ -103,7 +103,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
 
   const handleApprove = () => {
     if (!simulateData?.request || !approveArgs)
-      return
+      throw new Error('Approval transaction is not ready yet')
     // For USDT mainnet, explicitly pass the ABI to ensure proper encoding
     // This avoids issues with wagmi's transaction encoding for non-standard ERC20 tokens
     if (isUsdtMainnet) {
@@ -126,6 +126,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     allowance: allowance ? formatTokenAmount(allowance, decimals) : '0',
     needsApproval: isValidAmount ? (!isAllowanceReady || requiredAmount > (allowance ?? 0n)) : false,
     isAllowanceReady,
+    canApprove: !!simulateData?.request && !!approveArgs,
     approve: handleApprove,
     hash,
     isPending,
@@ -194,13 +195,14 @@ export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenD
   const { writeContract: supply, data: hash, isPending, error: writeError } = useWriteContract()
 
   const handleSupply = () => {
-    if (simulateData?.request) {
-      supply(simulateData.request)
-    }
+    if (!simulateData?.request)
+      throw new Error('Deposit transaction is not ready yet')
+    supply(simulateData.request)
   }
 
   return {
     supply: handleSupply,
+    canSupply: !!simulateData?.request,
     hash,
     isPending,
     error: simulateError || writeError,
@@ -250,13 +252,14 @@ export function useWithdraw(market: SingleMorphoMarket, sharesIn: string) {
   const { writeContract: withdraw, data: hash, isPending, error: writeError } = useWriteContract()
 
   const handleWithdraw = () => {
-    if (simulateData?.request) {
-      withdraw(simulateData.request)
-    }
+    if (!simulateData?.request)
+      throw new Error('Withdrawal transaction is not ready yet')
+    withdraw(simulateData.request)
   }
 
   return {
     withdraw: handleWithdraw,
+    canWithdraw: !!simulateData?.request,
     hash,
     isPending,
     error: simulateError || writeError,

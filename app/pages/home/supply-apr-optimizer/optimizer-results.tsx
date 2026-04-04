@@ -199,6 +199,7 @@ export function SupplyAprOptimizerResults({
           displayResult={displayResult}
           chainId={chainId}
           morphoAddress={morphoAddress}
+          marketMetaById={marketMetaById}
           userAddress={userAddress}
           userSupplySharesByMarketId={userSupplySharesByMarketId}
           loanToken={{

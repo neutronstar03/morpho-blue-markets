@@ -1,7 +1,9 @@
 import type { Address, Hex } from 'viem'
+import type { OptimizerMarketMeta } from './supply-apr-optimizer/shared'
+import type { TransactionRecapItem } from '~/lib/contexts/transaction-feedback.types'
 import type { ExecutionGuard } from '~/lib/market-risk/types'
 import type { OptimizeSupplyWithPositionsResult } from '~/lib/optimizer/supply-optimizer'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { erc20Abi, formatUnits } from 'viem'
 import {
   useAccount,
@@ -17,6 +19,17 @@ import { MORPHO_AUTH_ABI, PERMIT2_ALLOWANCE_TRANSFER_ABI } from '~/lib/abis/bund
 import { getBundler3Config, PERMIT2_ADDRESS } from '~/lib/bundler3/addresses'
 import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
 import { buildOptimizerBundle } from '~/lib/bundler3/optimizer-bundle'
+import { useTransactionFeedback } from '~/lib/contexts/transaction-feedback.context'
+
+type OptimizerAction = 'authorize' | 'approvePermit2' | 'signPermit2' | 'executeBundle' | null
+
+interface OptimizerTrackingState {
+  action: Exclude<OptimizerAction, null>
+  flowId: string
+  attemptId: string
+  baselineHash?: `0x${string}`
+  trackedHash?: `0x${string}`
+}
 
 function fmtToken(amount: bigint, decimals: number, digits = 4): string {
   const asNum = Number.parseFloat(formatUnits(amount, decimals))
@@ -32,11 +45,12 @@ export interface BundleOptimizerResultProps {
   userAddress: Address
   userSupplySharesByMarketId: Map<string, bigint>
   loanToken: { address: Address, symbol: string, decimals: number }
+  marketMetaById?: Map<string, OptimizerMarketMeta>
   executionGuard?: ExecutionGuard
 }
 
 export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
-  const { chainId, morphoAddress, userAddress, userSupplySharesByMarketId, displayResult, loanToken, executionGuard } = props
+  const { chainId, morphoAddress, userAddress, userSupplySharesByMarketId, displayResult, loanToken, marketMetaById, executionGuard } = props
   const { chain } = useAccount()
 
   const bundlerCfg = useMemo(() => getBundler3Config(chainId), [chainId])
@@ -44,6 +58,8 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
 
   const [permit2Sig, setPermit2Sig] = useState<Hex | undefined>(undefined)
   const [executeError, setExecuteError] = useState<string | undefined>(undefined)
+  const [tracking, setTracking] = useState<OptimizerTrackingState | null>(null)
+  const { beginFlow, completeFlow, failFlow, setStatus, setStepStatus, setTxHash } = useTransactionFeedback()
 
   // Freeze timestamp per result/token/chain/user so Permit2 typed-data doesn't change after signing.
   const [frozenNowSec, setFrozenNowSec] = useState<bigint>(() => BigInt(Math.floor(Date.now() / 1000)))
@@ -151,6 +167,13 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
   const bundleSummary = bundleBuild && bundleBuild.ok ? bundleBuild.summary : undefined
   const permit2ToSign = bundleBuild && bundleBuild.ok ? bundleBuild.permit2ToSign : undefined
 
+  const resetExecutionState = useCallback(() => {
+    setPermit2Sig(undefined)
+    setExecuteError(undefined)
+    setTracking(null)
+    setFrozenNowSec(BigInt(Math.floor(Date.now() / 1000)))
+  }, [])
+
   const needsPermit2TokenApprove = useMemo(() => {
     if (!bundleSummary)
       return false
@@ -161,8 +184,38 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
   }, [bundleSummary, tokenAllowanceToPermit2.data])
 
   const { signTypedDataAsync, isPending: isSigningPermit2 } = useSignTypedData()
-  const { writeContract, isPending: isWriting, data: txHash } = useWriteContract()
-  const receipt = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, isPending: isWriting, data: txHash, error: writeError } = useWriteContract()
+  const receipt = useWaitForTransactionReceipt({ hash: tracking?.trackedHash })
+
+  const optimizerSuccessItems = useMemo<TransactionRecapItem[]>(() => {
+    return displayResult.positions
+      .filter(position => position.deltaAssets !== 0n)
+      .map((position) => {
+        const absDelta = position.deltaAssets < 0n ? -position.deltaAssets : position.deltaAssets
+        const isWallet = position.destinationKind === 'wallet'
+        const meta = isWallet ? undefined : marketMetaById?.get(position.marketId.toLowerCase())
+        const title = isWallet
+          ? (position.label ?? 'Wallet')
+          : (meta?.collateralSymbol ? `${meta.collateralSymbol} / ${loanToken.symbol}` : (position.label ?? `${position.marketId.slice(0, 10)}…${position.marketId.slice(-6)}`))
+        return {
+          title,
+          subtitle: position.deltaAssets >= 0n ? 'Supply increase' : 'Withdraw/reallocate',
+          value: `${position.deltaAssets >= 0n ? '+' : '-'}${fmtToken(absDelta, loanToken.decimals)} ${loanToken.symbol}`,
+          tone: position.deltaAssets >= 0n ? 'green' : 'orange',
+        }
+      })
+  }, [displayResult.positions, loanToken.decimals, loanToken.symbol, marketMetaById])
+
+  const optimizerFacts = useMemo(() => {
+    if (!bundleSummary)
+      return []
+    return [
+      { label: 'Optimized', value: `${fmtToken(bundleSummary.supplyTotalAssets, loanToken.decimals)} ${loanToken.symbol}` },
+      { label: 'Wallet used', value: `${fmtToken(bundleSummary.depositNeededAssets, loanToken.decimals)} ${loanToken.symbol}` },
+      { label: 'Returned to wallet', value: `${fmtToken(bundleSummary.returnedToWalletAssets, loanToken.decimals)} ${loanToken.symbol}` },
+      { label: 'Markets touched', value: String(bundleSummary.marketsTouched) },
+    ]
+  }, [bundleSummary, loanToken.decimals, loanToken.symbol])
 
   // After any tx completes, refresh the reads so gating updates immediately.
   useEffect(() => {
@@ -197,12 +250,32 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
     setPermit2Sig(undefined)
     if (!permit2ToSign)
       return
+    const scope = beginFlow({
+      kind: 'permit2Sign',
+      title: `Sign Permit2 for ${fmtToken(permit2ToSign.depositNeededAssets, loanToken.decimals)} ${loanToken.symbol}`,
+      summary: 'Waiting for wallet signature',
+      chainId,
+      steps: [{ key: 'signature', label: 'Confirm signature in wallet' }],
+    })
+    setTracking({ action: 'signPermit2', ...scope })
+    setStatus(scope, 'signing', 'Waiting for Permit2 signature')
     try {
       const sig = await signTypedDataAsync(permit2ToSign.typedData as any)
       setPermit2Sig(sig as Hex)
+      setStepStatus(scope, 'signature', 'completed')
+      completeFlow(scope, {
+        title: 'Permit2 signature ready',
+        summary: 'You can now execute the optimizer bundle.',
+        chainId,
+        showModal: false,
+      })
+      setTracking(null)
     }
     catch (e: any) {
-      setExecuteError(e?.shortMessage ?? e?.message ?? 'Permit2 signature failed')
+      const message = e?.shortMessage ?? e?.message ?? 'Permit2 signature failed'
+      setExecuteError(message)
+      failFlow(scope, message)
+      setTracking(null)
     }
   }
 
@@ -210,6 +283,17 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
     setExecuteError(undefined)
     if (!multicallSim.data?.request)
       return
+    const scope = beginFlow({
+      kind: 'optimizer',
+      title: `Optimize ${fmtToken(bundleSummary?.supplyTotalAssets ?? 0n, loanToken.decimals)} ${loanToken.symbol}`,
+      summary: 'Confirm in wallet to submit optimizer transaction',
+      chainId,
+      steps: [
+        { key: 'wallet', label: 'Confirm optimizer transaction in wallet' },
+        { key: 'confirm', label: 'Confirming onchain' },
+      ],
+    })
+    setTracking({ action: 'executeBundle', baselineHash: txHash, ...scope })
     writeContract(multicallSim.data.request)
   }
 
@@ -240,6 +324,17 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
     setExecuteError(undefined)
     if (!approvePermit2Sim.data?.request)
       return
+    const scope = beginFlow({
+      kind: 'approval',
+      title: `Approve Permit2 for ${loanToken.symbol}`,
+      summary: 'Confirm token approval in wallet',
+      chainId,
+      steps: [
+        { key: 'wallet', label: 'Confirm approval in wallet' },
+        { key: 'confirm', label: 'Confirming onchain' },
+      ],
+    })
+    setTracking({ action: 'approvePermit2', baselineHash: txHash, ...scope })
     writeContract(approvePermit2Sim.data.request as any)
   }
 
@@ -255,8 +350,84 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
     setExecuteError(undefined)
     if (!authorizeSim.data?.request)
       return
+    const scope = beginFlow({
+      kind: 'authorization',
+      title: 'Authorize Morpho adapter',
+      summary: 'Confirm authorization in wallet',
+      chainId,
+      steps: [
+        { key: 'wallet', label: 'Confirm authorization in wallet' },
+        { key: 'confirm', label: 'Confirming onchain' },
+      ],
+    })
+    setTracking({ action: 'authorize', baselineHash: txHash, ...scope })
     writeContract(authorizeSim.data.request as any)
   }
+
+  useEffect(() => {
+    if (!tracking || tracking.action === 'signPermit2' || tracking.trackedHash || !txHash || txHash === tracking.baselineHash)
+      return
+    setTracking(current => current && current.action !== 'signPermit2' ? { ...current, trackedHash: txHash } : current)
+    setTxHash({ flowId: tracking.flowId, attemptId: tracking.attemptId }, txHash, chainId)
+    setStepStatus({ flowId: tracking.flowId, attemptId: tracking.attemptId }, 'wallet', 'completed')
+    setStepStatus({ flowId: tracking.flowId, attemptId: tracking.attemptId }, 'confirm', 'active')
+    setStatus({ flowId: tracking.flowId, attemptId: tracking.attemptId }, 'confirming', 'Confirming onchain')
+  }, [chainId, setStatus, setStepStatus, setTxHash, tracking, txHash])
+
+  useEffect(() => {
+    if (!tracking || !writeError)
+      return
+    const message = (writeError as any)?.shortMessage ?? (writeError as any)?.message ?? 'Transaction failed'
+    setExecuteError(message)
+    failFlow({ flowId: tracking.flowId, attemptId: tracking.attemptId }, message)
+    setTracking(null)
+  }, [failFlow, tracking, writeError])
+
+  useEffect(() => {
+    if (!tracking || !receipt.error)
+      return
+    const message = (receipt.error as any)?.shortMessage ?? (receipt.error as any)?.message ?? 'Transaction confirmation failed'
+    setExecuteError(message)
+    failFlow({ flowId: tracking.flowId, attemptId: tracking.attemptId }, message)
+    setTracking(null)
+  }, [failFlow, receipt.error, tracking])
+
+  useEffect(() => {
+    if (!tracking || !tracking.trackedHash || !receipt.isSuccess)
+      return
+    if (tracking.action === 'authorize') {
+      completeFlow({ flowId: tracking.flowId, attemptId: tracking.attemptId }, {
+        title: 'Morpho adapter authorized',
+        summary: 'You can now continue with optimizer execution.',
+        txHash: tracking.trackedHash,
+        chainId,
+        showModal: false,
+      })
+    }
+    else if (tracking.action === 'approvePermit2') {
+      completeFlow({ flowId: tracking.flowId, attemptId: tracking.attemptId }, {
+        title: `Permit2 approved for ${loanToken.symbol}`,
+        summary: 'You can now continue with optimizer execution.',
+        txHash: tracking.trackedHash,
+        chainId,
+        showModal: false,
+      })
+    }
+    else if (tracking.action === 'executeBundle') {
+      completeFlow({ flowId: tracking.flowId, attemptId: tracking.attemptId }, {
+        title: `Optimized ${fmtToken(bundleSummary?.supplyTotalAssets ?? 0n, loanToken.decimals)} ${loanToken.symbol}`,
+        summary: 'Optimizer execution completed successfully.',
+        txHash: tracking.trackedHash,
+        chainId,
+        facts: optimizerFacts,
+        items: optimizerSuccessItems,
+        showModal: true,
+      })
+      resetExecutionState()
+      return
+    }
+    setTracking(null)
+  }, [bundleSummary, chainId, completeFlow, loanToken.decimals, loanToken.symbol, optimizerFacts, optimizerSuccessItems, receipt.isSuccess, resetExecutionState, tracking])
 
   if (!bundlerCfg)
     return null

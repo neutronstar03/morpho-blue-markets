@@ -9,6 +9,7 @@ import { useCollateralWhitelistPreload } from './collateral-whitelist'
 import { BatchWithdrawProvider } from './contexts/batch-withdraw.context'
 import { NetworkProvider } from './contexts/network'
 import { SupplyAprOptimizerProvider } from './contexts/optimizer.context'
+import { TransactionFeedbackProvider } from './contexts/transaction-feedback.context'
 import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
 import { useMarketBlacklistPreload } from './market-blacklist'
 import { config } from './wagmi'
@@ -39,12 +40,14 @@ export function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <NetworkProvider>
-          <SupplyAprOptimizerProvider>
-            <BatchWithdrawProvider>
-              <HomeMagicOptimizerEffects />
-              <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
-            </BatchWithdrawProvider>
-          </SupplyAprOptimizerProvider>
+          <TransactionFeedbackProvider>
+            <SupplyAprOptimizerProvider>
+              <BatchWithdrawProvider>
+                <HomeMagicOptimizerEffects />
+                <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
+              </BatchWithdrawProvider>
+            </SupplyAprOptimizerProvider>
+          </TransactionFeedbackProvider>
         </NetworkProvider>
       </QueryClientProvider>
     </WagmiProvider>

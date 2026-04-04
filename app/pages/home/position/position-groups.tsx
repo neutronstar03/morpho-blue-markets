@@ -11,6 +11,7 @@ export function PositionGroups({
   riskStatusByKey,
   summaryMode,
   onToggleSummaryMode,
+  onSelectLoanAsset,
 }: {
   groups: PositionGroup[]
   chainId: number
@@ -19,6 +20,7 @@ export function PositionGroups({
   riskStatusByKey: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined>
   summaryMode: 'total' | 'yearly'
   onToggleSummaryMode: () => void
+  onSelectLoanAsset: (group: PositionGroup) => void
 }) {
   return (
     <div className="space-y-5">
@@ -42,7 +44,14 @@ export function PositionGroups({
             <div className="px-1">
               <div className="flex items-center justify-between gap-3" data-testid="positions-asset-group-header">
                 <h3 className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-white sm:text-base">
-                  <span>{group.loanAssetSymbol}</span>
+                  <button
+                    type="button"
+                    onClick={() => onSelectLoanAsset(group)}
+                    className="cursor-pointer rounded-sm text-left transition-colors hover:text-sky-300 focus:outline-none focus:ring-2 focus:ring-white/20"
+                    aria-label={`Open ${group.loanAssetSymbol} in supply APR optimizer`}
+                  >
+                    <span>{group.loanAssetSymbol}</span>
+                  </button>
                   {shouldShowWeight && (
                     <span className="flex items-center gap-1 text-xs font-medium text-gray-300 sm:text-sm">
                       <Scale className="h-3.5 w-3.5 text-slate-300" />

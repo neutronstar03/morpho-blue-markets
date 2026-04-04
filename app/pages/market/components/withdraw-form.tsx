@@ -5,13 +5,14 @@ import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { MarketAprPreview } from '~/components/ui/market-apr-preview'
+import { useTransactionFeedback } from '~/lib/contexts/transaction-feedback.context'
 import { formatTokenAmountShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useTransactionStatus, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { ModeToggleSuffix } from './market-action-form/mode-toggle-suffix'
-import { InlineNotice, SuccessMessage } from './market-action-form/status-message'
+import { InlineNotice } from './market-action-form/status-message'
 import { SubmitButton } from './market-action-form/submit-button'
 
 const WAD = 1_000_000_000_000_000_000n
@@ -23,6 +24,18 @@ interface WithdrawFormProps {
   onSuccess?: () => void
 }
 
+interface PendingWithdrawFlow {
+  baselineHash?: `0x${string}`
+  amountLabel: string
+  marketLabel: string
+}
+
+interface ActiveWithdrawFlow extends PendingWithdrawFlow {
+  flowId: string
+  attemptId: string
+  trackedHash: `0x${string}`
+}
+
 export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: WithdrawFormProps) {
   const isClient = useIsClient()
   const [mode, setMode] = useLocalStorage<'percent' | 'asset'>('market:withdraw:unit', 'percent')
@@ -30,8 +43,10 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
   const [percentage, setPercentage] = useState('')
   // asset amount string (token decimals)
   const [assetAmount, setAssetAmount] = useState('')
-  const [showSuccess, setShowSuccess] = useState(false)
   const { address } = useAccount()
+  const { beginFlow, completeFlow, failFlow, setStatus, setTxHash } = useTransactionFeedback()
+  const [pendingFlow, setPendingFlow] = useState<PendingWithdrawFlow | null>(null)
+  const [activeFlow, setActiveFlow] = useState<ActiveWithdrawFlow | null>(null)
 
   const appliedPrefillKeyRef = useRef<string | null>(null)
   useEffect(() => {
@@ -224,18 +239,54 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
 
   const {
     withdraw,
+    canWithdraw,
     hash: withdrawHash,
     isPending: isWithdrawing,
     error: withdrawError,
     isSimulating: isSimulatingWithdraw,
   } = useWithdraw(market, sharesToWithdrawForTx)
-  const { isSuccess: isWithdrawSuccess, isLoading: isWithdrawLoading } = useTransactionStatus(withdrawHash)
+  const withdrawReceipt = useTransactionStatus(activeFlow?.trackedHash)
+  const { isSuccess: isWithdrawSuccess, isLoading: isWithdrawLoading } = withdrawReceipt
 
   useEffect(() => {
-    if (isWithdrawSuccess) {
-      setShowSuccess(true)
-    }
-  }, [isWithdrawSuccess])
+    if (!pendingFlow || activeFlow || !withdrawHash || withdrawHash === pendingFlow.baselineHash)
+      return
+    const scope = beginFlow({
+      kind: 'withdraw',
+      title: `Withdraw ${pendingFlow.amountLabel} ${loanTokenSymbol}`,
+      summary: 'Confirming withdrawal onchain',
+      steps: [{ key: 'confirm', label: 'Confirming withdrawal onchain' }],
+    })
+    setTxHash(scope, withdrawHash)
+    setStatus(scope, 'confirming', 'Confirming withdrawal onchain')
+    setActiveFlow({ ...pendingFlow, ...scope, trackedHash: withdrawHash })
+    setPendingFlow(null)
+  }, [activeFlow, beginFlow, loanTokenSymbol, pendingFlow, setStatus, setTxHash, withdrawHash])
+
+  useEffect(() => {
+    if (!activeFlow || !withdrawReceipt.error)
+      return
+    const message = (withdrawReceipt.error as any)?.shortMessage ?? (withdrawReceipt.error as any)?.message ?? 'Withdrawal failed'
+    failFlow({ flowId: activeFlow.flowId, attemptId: activeFlow.attemptId }, message)
+    setActiveFlow(null)
+  }, [activeFlow, failFlow, withdrawReceipt.error])
+
+  useEffect(() => {
+    if (!activeFlow || !isWithdrawSuccess)
+      return
+    completeFlow({ flowId: activeFlow.flowId, attemptId: activeFlow.attemptId }, {
+      title: `Withdrew ${activeFlow.amountLabel} ${loanTokenSymbol}`,
+      summary: `Withdrawal completed from ${activeFlow.marketLabel}.`,
+      txHash: activeFlow.trackedHash,
+      facts: [
+        { label: 'Market', value: activeFlow.marketLabel },
+        { label: 'Amount', value: `${activeFlow.amountLabel} ${loanTokenSymbol}` },
+      ],
+      showModal: true,
+    })
+    onSuccess?.()
+    setActiveFlow(null)
+  }, [activeFlow, completeFlow, isWithdrawSuccess, loanTokenSymbol, onSuccess])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -245,9 +296,17 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
       return
 
     try {
+      if (!canWithdraw)
+        throw new Error('Withdrawal transaction is not ready yet')
+      setPendingFlow({
+        baselineHash: withdrawHash,
+        amountLabel: withdrawAssetsShort,
+        marketLabel: `${market.collateralAsset.symbol} / ${loanTokenSymbol}`,
+      })
       withdraw()
     }
     catch (error) {
+      setPendingFlow(null)
       console.error('Withdrawal failed:', error)
     }
   }
@@ -276,7 +335,6 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
 
   const isLoading = isWithdrawing || isWithdrawLoading || isSimulatingWithdraw
   const hasError = withdrawError
-  const isSuccess = isWithdrawSuccess
   const percentNumber = Number.parseFloat(percentage) || 0
   const assetNumber = Number.parseFloat(assetAmount) || 0
   const isPercentInvalid = !percentage || percentNumber <= 0 || percentNumber > 100
@@ -295,18 +353,6 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
   const submitIdleLabel = `Withdraw ${withdrawAssetsShort} ${loanTokenSymbol}`
   const desktopLoadingLabel = isSimulatingWithdraw ? 'Preparing...' : 'Withdraw'
   const mobileLoadingLabel = isSimulatingWithdraw ? 'Preparing withdrawal...' : 'Withdrawing...'
-
-  if (isSuccess && showSuccess) {
-    return (
-      <SuccessMessage
-        message="Withdrawal successful!"
-        onDismiss={() => {
-          setShowSuccess(false)
-          onSuccess?.()
-        }}
-      />
-    )
-  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">

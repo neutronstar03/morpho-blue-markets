@@ -32,6 +32,7 @@ import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
+import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { dumpSupplyOptimizerFixtures, setSupplyOptimizerDebugState } from '~/lib/optimizer/supply-apr-optimizer-debugger'
 import { buildMoveSizeCacheKey, trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
@@ -87,8 +88,13 @@ export function SupplyAprOptimizer() {
   const ownedLoanAssetOptions = useMemo<LoanAssetOption[]>(() => {
     const map = new Map<string, LoanAssetOption>()
     for (const p of (livePositions ?? [])) {
-      if (p.userState.supplyShares <= 0n)
+      if (!hasVisibleSuppliedAssets({
+        userSupplyShares: p.userState.supplyShares,
+        totalSupplyAssets: p.market.state.supplyAssets,
+        totalSupplyShares: p.market.state.supplyShares,
+      })) {
         continue
+      }
       const addr = p.market.loanAsset.address.toLowerCase()
       const symbol = p.market.loanAsset.symbol
       const decimals = p.market.loanAsset.decimals ?? 18
@@ -144,10 +150,11 @@ export function SupplyAprOptimizer() {
   const selectedUserMarketsAll = useMemo(() => {
     if (!selectedLoanAddr)
       return []
-    return (livePositions ?? []).filter((p) => {
-      return p.userState.supplyShares > 0n
-        && p.market.loanAsset.address.toLowerCase() === selectedLoanAddr
-    })
+    return (livePositions ?? []).filter(p => hasVisibleSuppliedAssets({
+      userSupplyShares: p.userState.supplyShares,
+      totalSupplyAssets: p.market.state.supplyAssets,
+      totalSupplyShares: p.market.state.supplyShares,
+    }) && p.market.loanAsset.address.toLowerCase() === selectedLoanAddr)
   }, [livePositions, selectedLoanAddr])
 
   const decisionsVersion = useCollateralDecisionsVersion()

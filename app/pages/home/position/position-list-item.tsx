@@ -6,7 +6,7 @@ import { Badge, BadgeLabel } from '~/components/ui/badge'
 import { MarketRiskText } from '~/components/ui/market-risk-text'
 import { formatBigintShort } from '~/lib/formatters'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
-import { getPositionPrincipalUsd } from './position-utils'
+import { getPositionPrincipalUsd, getPositionSuppliedAssets } from './position-utils'
 
 export function PositionListItem({
   position,
@@ -21,16 +21,14 @@ export function PositionListItem({
   totalValueUsd?: number
   riskStatus?: 'white' | 'blue' | 'yellow' | 'purple' | 'black'
 }) {
-  const marketSupplyAssets = BigInt(position.market.state.supplyAssets)
-  const marketSupplyShares = BigInt(position.market.state.supplyShares)
-  const userSupplyShares = BigInt(position.userState.supplyShares)
   const loanDecimals = position.market.loanAsset.decimals ?? 18
 
   const suppliedAssets = useMemo(() => {
-    if (marketSupplyShares === 0n)
-      return 0n
-    return (userSupplyShares * marketSupplyAssets) / marketSupplyShares
-  }, [userSupplyShares, marketSupplyAssets, marketSupplyShares])
+    return getPositionSuppliedAssets(position)
+  }, [position])
+
+  if (suppliedAssets <= 0n)
+    return null
 
   const apr = liveApr != null ? liveApr * 100 : undefined
 
