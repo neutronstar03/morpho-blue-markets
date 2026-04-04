@@ -5,6 +5,7 @@ import { useNetworkContext } from '~/lib/contexts/network'
 import { formatBigintShort } from '~/lib/formatters'
 import { useMarket, useUserPosition } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
+import { getSuppliedAssetsFromShares } from '~/lib/morpho/position-visibility'
 
 // While having similar name as position.tsx, this component is specific to a single market
 
@@ -42,9 +43,11 @@ export function MarketPosition({ market }: MarketPositionProps) {
   const loanDecimals = market.loanAsset.decimals
 
   const suppliedAssets = useMemo(() => {
-    if (totalSupplyShares === 0n)
-      return 0n
-    return (userSupplyShares * totalSupplyAssets) / totalSupplyShares
+    return getSuppliedAssetsFromShares({
+      userSupplyShares,
+      totalSupplyAssets,
+      totalSupplyShares,
+    })
   }, [userSupplyShares, totalSupplyAssets, totalSupplyShares])
 
   const isLoading = isLoadingPosition || isLoadingMarketState
@@ -69,7 +72,7 @@ export function MarketPosition({ market }: MarketPositionProps) {
   if (
     !isLoading
     && !isWrongNetwork
-    && userSupplyShares === 0n
+    && suppliedAssets <= 0n
   ) {
     return null
   }
@@ -93,7 +96,7 @@ export function MarketPosition({ market }: MarketPositionProps) {
             )
           : (
               <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 space-y-3">
-                {userSupplyShares > 0n && (
+                {suppliedAssets > 0n && (
                   <div className="flex justify-between items-center text-sm">
                     <p className="text-gray-400">Supplied:</p>
                     <div className="text-right">

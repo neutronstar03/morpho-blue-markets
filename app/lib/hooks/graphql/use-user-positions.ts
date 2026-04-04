@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
 import { supportedChainMap } from '~/lib/addresses'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
+import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { graphqlClient } from '../../graphql/client'
 
 // Data returned from the GraphQL query for each position
@@ -55,6 +56,8 @@ export interface CrossChainUserPosition {
   chainId: number
   uniqueKey: string
   supplyShares: string
+  marketSupplyAssets: string
+  marketSupplyShares: string
   warnings?: Array<{
     type: string
     level: 'YELLOW' | 'RED'
@@ -67,6 +70,10 @@ interface QueryCrossChainUserPositionsResult {
       market: {
         marketId: string
         uniqueKey: string
+        state: {
+          supplyAssets: string
+          supplyShares: string
+        }
         warnings?: Array<{
           type: string
           level: 'YELLOW' | 'RED'
@@ -142,6 +149,10 @@ const QUERY_USER_POSITIONS_ALL_CHAINS = gql`
         market {
           marketId
           uniqueKey: marketId
+          state {
+            supplyAssets
+            supplyShares
+          }
           warnings { type level }
           morphoBlue {
             chain {
@@ -172,10 +183,11 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
         },
       )
 
-      const positions = (result.marketPositions.items || []).filter((p) => {
-        const supplyShares = BigInt(p.state.supplyShares || '0')
-        return supplyShares > 0n
-      })
+      const positions = (result.marketPositions.items || []).filter(p => hasVisibleSuppliedAssets({
+        userSupplyShares: p.state.supplyShares,
+        totalSupplyAssets: p.market.state.supplyAssets,
+        totalSupplyShares: p.market.state.supplyShares,
+      }))
       return positions.filter(position => !isOracleMisconfiguredWarning(position.market.warnings))
     },
     enabled: !!userAddress && !!chainId,
@@ -201,14 +213,17 @@ export function useUserPositionsAcrossChains(userAddress?: string) {
       )
 
       return (result.marketPositions.items || [])
-        .filter((position) => {
-          const supplyShares = BigInt(position.state.supplyShares || '0')
-          return supplyShares > 0n && !isOracleMisconfiguredWarning(position.market.warnings)
-        })
+        .filter(position => hasVisibleSuppliedAssets({
+          userSupplyShares: position.state.supplyShares,
+          totalSupplyAssets: position.market.state.supplyAssets,
+          totalSupplyShares: position.market.state.supplyShares,
+        }) && !isOracleMisconfiguredWarning(position.market.warnings))
         .map(position => ({
           chainId: position.market.morphoBlue.chain.id,
           uniqueKey: position.market.uniqueKey,
           supplyShares: position.state.supplyShares,
+          marketSupplyAssets: position.market.state.supplyAssets,
+          marketSupplyShares: position.market.state.supplyShares,
           warnings: position.market.warnings,
         }))
     },

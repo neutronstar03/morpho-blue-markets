@@ -22,7 +22,7 @@ import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { PositionChainPills } from './position-chain-pills'
 import { PositionGroups } from './position-groups'
-import { getMarketSupplyUsd } from './position-utils'
+import { getMarketSupplyUsd, getPositionSuppliedAssets, hasVisibleSupplyPosition } from './position-utils'
 import { usePositionChainPills } from './use-position-chain-pills'
 import { usePositionGroups } from './use-position-groups'
 
@@ -76,7 +76,13 @@ function PositionClient() {
     if (!positions || !chain?.id)
       return positions ?? []
     // Manual market blacklist is the strong local hide list: exclude it from UI, totals, and pills.
-    return positions.filter(position => !isMarketIdManuallyBlacklisted(position.market.uniqueKey, chain.id))
+    return positions.filter((position) => {
+      if (isMarketIdManuallyBlacklisted(position.market.uniqueKey, chain.id))
+        return false
+
+      const hasNonSupplyPosition = position.userState.borrowShares > 0n || position.userState.collateral > 0n
+      return hasNonSupplyPosition || hasVisibleSupplyPosition(position)
+    })
   }, [blacklistVersion, chain?.id, positions])
 
   const [timeAgo, setTimeAgo] = useState('')
@@ -140,11 +146,7 @@ function PositionClient() {
       totalAprWeighted += userPrincipalUsd * marketApr
 
       if (allSameAsset && totalAssets !== undefined) {
-        const marketSupplyAssets = BigInt(p.market.state.supplyAssets)
-        if (marketSupplyShares > 0n) {
-          const suppliedAssets = (userSupplyShares * marketSupplyAssets) / marketSupplyShares
-          totalAssets += suppliedAssets
-        }
+        totalAssets += getPositionSuppliedAssets(p)
       }
     }
 

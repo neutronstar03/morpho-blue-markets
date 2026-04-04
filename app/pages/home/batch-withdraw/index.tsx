@@ -24,6 +24,7 @@ import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-position
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
 import { isMarketIdManuallyBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
+import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
 import { BatchWithdrawExecutionPanel } from './execution-panel'
 import { BatchWithdrawForm } from './form'
@@ -59,8 +60,13 @@ export function BatchWithdraw() {
   const loanAssetOptions = useMemo<LoanAssetOption[]>(() => {
     const map = new Map<string, LoanAssetOption>()
     for (const p of visibleLivePositions) {
-      if (p.userState.supplyShares <= 0n)
+      if (!hasVisibleSuppliedAssets({
+        userSupplyShares: p.userState.supplyShares,
+        totalSupplyAssets: p.market.state.supplyAssets,
+        totalSupplyShares: p.market.state.supplyShares,
+      })) {
         continue
+      }
       const addr = p.market.loanAsset.address.toLowerCase()
       if (!map.has(addr)) {
         map.set(addr, {
@@ -91,9 +97,11 @@ export function BatchWithdraw() {
     if (!selectedOption)
       return []
     const addr = selectedOption.address.toLowerCase()
-    return visibleLivePositions.filter((p) => {
-      return p.userState.supplyShares > 0n && p.market.loanAsset.address.toLowerCase() === addr
-    })
+    return visibleLivePositions.filter(p => hasVisibleSuppliedAssets({
+      userSupplyShares: p.userState.supplyShares,
+      totalSupplyAssets: p.market.state.supplyAssets,
+      totalSupplyShares: p.market.state.supplyShares,
+    }) && p.market.loanAsset.address.toLowerCase() === addr)
   }, [selectedOption, visibleLivePositions])
 
   const morphoAddress = useMemo(() => getMorphoBlueAddress(chainId), [chainId])

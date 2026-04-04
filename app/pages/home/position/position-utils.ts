@@ -1,5 +1,6 @@
 import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
+import { getSuppliedAssetsFromShares, hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 
 export function getMarketSupplyUsd(position: LiveMarketPosition) {
   return getMarketSupplyUsdWithFallback(position.market)
@@ -20,6 +21,22 @@ export function getPositionPrincipalUsd(position: LiveMarketPosition) {
     return undefined
 
   return marketSupplyUsd * shareRatio
+}
+
+export function getPositionSuppliedAssets(position: LiveMarketPosition) {
+  return getSuppliedAssetsFromShares({
+    userSupplyShares: position.userState.supplyShares,
+    totalSupplyAssets: position.market.state.supplyAssets,
+    totalSupplyShares: position.market.state.supplyShares,
+  })
+}
+
+export function hasVisibleSupplyPosition(position: LiveMarketPosition) {
+  return hasVisibleSuppliedAssets({
+    userSupplyShares: position.userState.supplyShares,
+    totalSupplyAssets: position.market.state.supplyAssets,
+    totalSupplyShares: position.market.state.supplyShares,
+  })
 }
 
 export function getPositionYearlyUsd(position: LiveMarketPosition, liveApr?: number) {

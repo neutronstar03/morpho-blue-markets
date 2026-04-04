@@ -12,6 +12,7 @@ import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
+import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { getHomeMagicLastRunMs, setHomeMagicLastRunMs } from '../stores/home-magic-last-run'
@@ -88,10 +89,11 @@ export function useHomeMagicOptimizerScan() {
       return []
 
     const addr = activeAsset.address.toLowerCase()
-    return (livePositions ?? []).filter((p) => {
-      return p.userState.supplyShares > 0n
-        && p.market.loanAsset.address.toLowerCase() === addr
-    })
+    return (livePositions ?? []).filter(p => hasVisibleSuppliedAssets({
+      userSupplyShares: p.userState.supplyShares,
+      totalSupplyAssets: p.market.state.supplyAssets,
+      totalSupplyShares: p.market.state.supplyShares,
+    }) && p.market.loanAsset.address.toLowerCase() === addr)
   }, [activeAsset, livePositions])
 
   const decisionsVersion = useCollateralDecisionsVersion()
@@ -229,8 +231,13 @@ export function useHomeMagicOptimizerScan() {
   const scanAssets = useMemo(() => {
     const assetsMap = new Map<string, ScanAsset>()
     for (const p of (livePositions ?? [])) {
-      if (p.userState.supplyShares <= 0n)
+      if (!hasVisibleSuppliedAssets({
+        userSupplyShares: p.userState.supplyShares,
+        totalSupplyAssets: p.market.state.supplyAssets,
+        totalSupplyShares: p.market.state.supplyShares,
+      })) {
         continue
+      }
       const key = p.market.loanAsset.address.toLowerCase()
       if (!assetsMap.has(key)) {
         assetsMap.set(key, {

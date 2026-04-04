@@ -5,6 +5,7 @@ import { useAccount, useReadContracts } from 'wagmi'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName, morphoAddressOnChain } from '~/lib/addresses'
 import { useUserPositions } from '~/lib/hooks/graphql/use-user-positions'
+import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 
 // This interface maps the GraphQL position data to what position.tsx expects
 export interface LiveMarketPosition {
@@ -164,7 +165,12 @@ export function useLiveMarketPositions() {
         }
 
         // Filter out zero positions (user may have exited since GraphQL indexed)
-        const hasPosition = supplyShares > 0n || borrowShares > 0n || collateral > 0n
+        const hasVisibleSupply = hasVisibleSuppliedAssets({
+          userSupplyShares: supplyShares,
+          totalSupplyAssets: gp.market.state.supplyAssets,
+          totalSupplyShares: gp.market.state.supplyShares,
+        })
+        const hasPosition = hasVisibleSupply || borrowShares > 0n || collateral > 0n
         if (!hasPosition)
           return null
 
