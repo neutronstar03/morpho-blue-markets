@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.16` (2026-04-04): added a shared Transaction Dock + success modal for guided multi-step wallet flows, chained optimizer/batch-withdraw/deposit/withdraw prerequisites behind single CTAs, improved timeout feedback with a warning-state Clear action, and reset the optimizer immediately after successful execution.
 - `v1.2.15` (2026-04-04): added a one-click path from grouped Home Positions into the Supply APR optimizer and filtered zero-derived-asset dust positions out of portfolio and optimizer flows.
 - `v1.2.14` (2026-04-04): made Supply APR optimizer Market APR sticky by asset symbol across asset/chain switches and reloads, reused remembered values when opening optimizer presets, and documented the repo's `prep for release` workflow.
 - `v1.2.13` (2026-04-03): enriched Home Positions asset sections with per-asset weight/APR metadata, a switchable total-vs-yearly summary control across desktop and mobile, and leaner position rows with less redundant labeling.

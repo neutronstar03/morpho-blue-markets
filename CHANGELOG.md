@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.16 - 2026-04-04
+
+### Introduced
+- feat: added a shared Transaction Dock and success modal flow for multi-step wallet actions so optimizer, batch withdraw, deposit, and withdraw can report guided progress in one place.
+
+### Changed
+- ux: Supply APR optimizer and batch withdraw now chain their prerequisite approvals, signatures, and execution steps behind a single guided CTA instead of separate setup buttons.
+- ux: deposit and withdraw forms now use the same dock-based transaction feedback, and optimizer execution clears its result state immediately after a successful run.
+- ux: confirmation timeouts now show a shorter warning-style dock message (`Still pending. Speed up in wallet or view in explorer.`) with a non-error Clear action.
+
 ## v1.2.15 - 2026-04-04
 
 ### Changed
