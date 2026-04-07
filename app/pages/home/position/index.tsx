@@ -6,7 +6,6 @@ import { useAccount, useSwitchChain } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
-import { useNetworkContext } from '~/lib/contexts/network'
 import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
@@ -31,7 +30,6 @@ import { usePositionGroups } from './use-position-groups'
 function PositionClient() {
   const { address: userAddress, isConnected, chain } = useAccount()
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain()
-  const { setRequiredChainId } = useNetworkContext()
   const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
   const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
   const {
@@ -168,7 +166,6 @@ function PositionClient() {
   const handleChainPillClick = (chainId: number) => {
     // Cross-chain pills act like quick navigation: switch chain and bring the user back to the top summary.
     window.scrollTo({ top: 0, behavior: 'smooth' })
-    setRequiredChainId(chainId)
     switchChain({ chainId })
   }
 

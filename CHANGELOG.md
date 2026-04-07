@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.18 - 2026-04-08
+
+### Fixed
+- fix: home-page cross-chain quick-switch actions no longer persist a stale `requiredChainId`, so manually changing networks from the RainbowKit dropdown does not leave the navbar stuck showing an incorrect "Switch to ..." prompt.
+
 ## v1.2.17 - 2026-04-08
 
 ### Changed

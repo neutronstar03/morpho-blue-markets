@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.18` (2026-04-08): fixed home-page chain quick-switch actions so they no longer leave a stale required-network state behind that could make the navbar incorrectly show a "Switch to OTHERCHAIN" prompt after changing networks from RainbowKit.
 - `v1.2.17` (2026-04-08): added a micro manual blacklist for two reported Arbitrum `GVLT` contracts flagged as unreliable/scam so discovery and deposit flows avoid them.
 - `v1.2.16` (2026-04-04): added a shared Transaction Dock + success modal for guided multi-step wallet flows, chained optimizer/batch-withdraw/deposit/withdraw prerequisites behind single CTAs, improved timeout feedback with a warning-state Clear action, and reset the optimizer immediately after successful execution.
 - `v1.2.15` (2026-04-04): added a one-click path from grouped Home Positions into the Supply APR optimizer and filtered zero-derived-asset dust positions out of portfolio and optimizer flows.

@@ -1,7 +1,6 @@
 import { NetworkIcon } from '@web3icons/react/dynamic'
 import { Link } from 'react-router-dom'
 import { useSwitchChain } from 'wagmi'
-import { useNetworkContext } from '~/lib/contexts/network'
 import { formatUsd } from '~/lib/formatters'
 
 const OPPORTUNITY_TARGET_UTILIZATION = 0.9
@@ -128,7 +127,6 @@ function buildOpportunityRecaps(markets: OpportunityRecapMarket[]): OpportunityR
 
 export function OpportunityRecap({ markets }: { markets: OpportunityRecapMarket[] }) {
   const { switchChain } = useSwitchChain()
-  const { setRequiredChainId } = useNetworkContext()
   const recaps = buildOpportunityRecaps(markets)
 
   if (!recaps.length) {
@@ -167,7 +165,6 @@ export function OpportunityRecap({ markets }: { markets: OpportunityRecapMarket[
                   type="button"
                   className="inline-flex cursor-pointer items-center gap-2 text-base font-semibold text-white transition-colors hover:text-blue-300"
                   onClick={() => {
-                    setRequiredChainId(recap.chainId)
                     switchChain({ chainId: recap.chainId })
                   }}
                 >
