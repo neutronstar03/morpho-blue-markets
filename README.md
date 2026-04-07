@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.17` (2026-04-08): added a micro manual blacklist for two reported Arbitrum `GVLT` contracts flagged as unreliable/scam so discovery and deposit flows avoid them.
 - `v1.2.16` (2026-04-04): added a shared Transaction Dock + success modal for guided multi-step wallet flows, chained optimizer/batch-withdraw/deposit/withdraw prerequisites behind single CTAs, improved timeout feedback with a warning-state Clear action, and reset the optimizer immediately after successful execution.
 - `v1.2.15` (2026-04-04): added a one-click path from grouped Home Positions into the Supply APR optimizer and filtered zero-derived-asset dust positions out of portfolio and optimizer flows.
 - `v1.2.14` (2026-04-04): made Supply APR optimizer Market APR sticky by asset symbol across asset/chain switches and reloads, reused remembered values when opening optimizer presets, and documented the repo's `prep for release` workflow.
@@ -90,7 +91,6 @@ See `CHANGELOG.md` for the full release history. Recent updates:
 - `v1.1.28` (2026-02-24): moved optimizer runs to a dedicated web worker (including magic scan), added compact in-button run progress, and reused Clear as Cancel while running.
 - `v1.1.27` (2026-02-24): reduced magic optimizer cooldown to 30 minutes and added a periodic 60-second eligibility check so rescans can restart automatically after cooldown.
 - `v1.1.26` (2026-02-24): background "magic optimizer" scan, opportunity cards, and short-lived precomputed optimizer results for faster click-to-optimize flows.
-- `v1.1.25` (2026-02-24): moved shady/manual blacklist context from market list to asset list and documented policy in `AGENTS.md`.
 
 ## Live Version
 

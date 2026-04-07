@@ -47,6 +47,14 @@
     {
       "assetContract": "0x35e5db674d8e93a03d814fa0ada70731efe8a4b9",
       "comment": "RLP: Resolv exposure manually blacklisted after depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0xf24e1f3a17200a7c8ff8f61bd7a65745ad42d8dd",
+      "comment": "GVLT: reported unreliable/scam Arbitrum asset; avoid new deposits."
+    },
+    {
+      "assetContract": "0x57587e47a0af9d1bb93c0d4b3df671b053ab4366",
+      "comment": "GVLT: reported unreliable/scam Arbitrum asset; avoid new deposits."
     }
   ]
 }

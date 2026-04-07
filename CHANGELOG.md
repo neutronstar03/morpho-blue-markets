@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.17 - 2026-04-08
+
+### Changed
+- blacklist: added a micro manual blacklist for two reported Arbitrum `GVLT` asset contracts flagged as unreliable/scam so the app avoids suggesting fresh deposits there.
+
 ## v1.2.16 - 2026-04-04
 
 ### Introduced
