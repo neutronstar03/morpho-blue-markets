@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.2.19` (2026-04-11): expanded the manual Resolv blacklist to cover direct `USR`, `wstUSR`, and `RLP` token contracts across the currently discovered EVM deployments so optimizer/discovery flows avoid new deposits there.
 - `v1.2.18` (2026-04-08): fixed home-page chain quick-switch actions so they no longer leave a stale required-network state behind that could make the navbar incorrectly show a "Switch to OTHERCHAIN" prompt after changing networks from RainbowKit.
 - `v1.2.17` (2026-04-08): added a micro manual blacklist for two reported Arbitrum `GVLT` contracts flagged as unreliable/scam so discovery and deposit flows avoid them.
 - `v1.2.16` (2026-04-04): added a shared Transaction Dock + success modal for guided multi-step wallet flows, chained optimizer/batch-withdraw/deposit/withdraw prerequisites behind single CTAs, improved timeout feedback with a warning-state Clear action, and reset the optimizer immediately after successful execution.

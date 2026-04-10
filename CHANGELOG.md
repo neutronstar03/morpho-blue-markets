@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.19 - 2026-04-11
+
+### Changed
+- blacklist: expanded the manual Resolv asset blacklist to cover direct `USR`, `wstUSR`, and `RLP` token contracts across the currently discovered supported EVM deployments so optimizer/discovery flows avoid new deposits into the broader Resolv token family.
+
 ## v1.2.18 - 2026-04-08
 
 ### Fixed

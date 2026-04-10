@@ -33,10 +33,74 @@
       "comment": "Clearly scam tokens"
     }
   ],
+  "56": [
+    {
+      "assetContract": "0x2492d0006411af6c8bbb1c8afc1b0197350a79e9",
+      "comment": "USR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x4254813524695def4163a169e901f3d7a1a55429",
+      "comment": "wstUSR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x35e5db674d8e93a03d814fa0ada70731efe8a4b9",
+      "comment": "RLP: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    }
+  ],
+  "999": [
+    {
+      "assetContract": "0x0ad339d66bf4aed5ce31c64bc37b3244b6394a77",
+      "comment": "USR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x46c1c168ca597b9e5423aa7081a0dce782caeaab",
+      "comment": "wstUSR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x0a3d8466f5de586fa5f6de117301e2f90bcc5c48",
+      "comment": "RLP: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    }
+  ],
+  "1868": [
+    {
+      "assetContract": "0xb1b385542b6e80f77b94393ba8342c3af699f15c",
+      "comment": "USR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x2a52b289ba68bbd02676640aa9f605700c9e5699",
+      "comment": "wstUSR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x35533f54740f1f1aa4179e57ba37039dfa16868b",
+      "comment": "RLP: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    }
+  ],
+  "239": [
+    {
+      "assetContract": "0xb1b385542b6e80f77b94393ba8342c3af699f15c",
+      "comment": "USR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x2a52b289ba68bbd02676640aa9f605700c9e5699",
+      "comment": "wstUSR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x35533f54740f1f1aa4179e57ba37039dfa16868b",
+      "comment": "RLP: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    }
+  ],
   "8453": [
     {
       "assetContract": "0x4bcaf180df5b13c0441fe41a66e9638a2a410c6d",
       "comment": "Clearly scam tokens"
+    },
+    {
+      "assetContract": "0x35e5db674d8e93a03d814fa0ada70731efe8a4b9",
+      "comment": "USR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0xb67675158b412d53fe6b68946483ba920b135ba1",
+      "comment": "wstUSR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
     },
     {
       "assetContract": "0xc31389794ffac23331e0d9f611b7953f90aa5fdc",
@@ -49,12 +113,44 @@
       "comment": "RLP: Resolv exposure manually blacklisted after depeg; avoid new deposits."
     },
     {
+      "assetContract": "0x2492d0006411af6c8bbb1c8afc1b0197350a79e9",
+      "comment": "USR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x66cfbd79257dc5217903a36293120282548e2254",
+      "comment": "wstUSR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
       "assetContract": "0xf24e1f3a17200a7c8ff8f61bd7a65745ad42d8dd",
       "comment": "GVLT: reported unreliable/scam Arbitrum asset; avoid new deposits."
     },
     {
       "assetContract": "0x57587e47a0af9d1bb93c0d4b3df671b053ab4366",
       "comment": "GVLT: reported unreliable/scam Arbitrum asset; avoid new deposits."
+    }
+  ],
+  "80094": [
+    {
+      "assetContract": "0x2492d0006411af6c8bbb1c8afc1b0197350a79e9",
+      "comment": "USR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0xcc601605dc5011616934b6fdac8a14d51b791a94",
+      "comment": "wstUSR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x35e5db674d8e93a03d814fa0ada70731efe8a4b9",
+      "comment": "RLP: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    }
+  ],
+  "9745": [
+    {
+      "assetContract": "0x2a52b289ba68bbd02676640aa9f605700c9e5699",
+      "comment": "wstUSR: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0x35533f54740f1f1aa4179e57ba37039dfa16868b",
+      "comment": "RLP: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
     }
   ]
 }
