@@ -1,7 +1,7 @@
 {
   "name": "morpho-blue-markets",
   "type": "module",
-  "version": "1.3.0-beta.1",
+  "version": "1.3.0-beta.2",
   "private": true,
   "description": "An alternative frontend for the Morpho Blue DEFI protocol.",
   "author": {
@@ -20,7 +20,7 @@
     "lint": "eslint . --fix",
     "typecheck": "react-router typegen && tsc",
     "preview:cf": "bun run build && cp -r functions ./build/client/functions && wrangler pages dev ./build/client",
-    "deploy:cf": "bun run build && cp -r functions ./build/client/functions && wrangler pages deploy ./build/client --project-name=morpho-blue-markets",
+    "deploy:cf": "bun run build && cp -r functions ./build/client/functions && wrangler pages deploy ./build/client --project-name=morpho-blue-markets --branch=main",
     "gen:blacklist:markets": "bun scripts/blacklist-generator.ts",
     "gen:whitelist:collaterals": "bun scripts/collateral-whitelist-generator.ts",
     "gen:whitelist:collaterals:reset": "bun scripts/collateral-whitelist-generator.ts --reset-all",

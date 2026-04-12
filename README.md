@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.3.0-beta.2` (2026-04-13): fixed the Cloudflare Pages release workflow to deploy tagged releases to the `main` production branch explicitly, preventing detached-`HEAD` GitHub Actions runs from showing up as Preview deployments.
 - `v1.3.0-beta.1` (2026-04-13): migrated hosting to Cloudflare Pages, added an adblocker-resistant Umami analytics proxy (`POST /__ev` → self-hosted Umami) via a Cloudflare Pages Function, and removed the GitHub Pages subpath base for custom-domain deployment at root path.
 - `v1.2.19` (2026-04-11): expanded the manual Resolv blacklist to cover direct `USR`, `wstUSR`, and `RLP` token contracts across the currently discovered EVM deployments so optimizer/discovery flows avoid new deposits there.
 - `v1.2.18` (2026-04-08): fixed home-page chain quick-switch actions so they no longer leave a stale required-network state behind that could make the navbar incorrectly show a "Switch to OTHERCHAIN" prompt after changing networks from RainbowKit.

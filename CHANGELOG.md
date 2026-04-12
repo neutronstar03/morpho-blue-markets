@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.3.0-beta.2 - 2026-04-13
+
+### Changed
+- infra: force tag-driven Cloudflare Pages deploys onto `main` via `wrangler pages deploy --branch=main` so GitHub Actions releases land in the Production environment instead of detached-`HEAD` Preview deployments.
+
 ## v1.3.0-beta.1 - 2026-04-13
 
 ### Introduced
