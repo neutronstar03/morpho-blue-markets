@@ -1,6 +1,8 @@
 import { CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/20/solid'
 import { ExternalLink, Loader2, X } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { Button } from '~/components/ui/button'
+import { trackEvent } from '~/lib/analytics'
 import { useTransactionFeedback } from '~/lib/contexts/transaction-feedback.context'
 import { getExplorerTransactionUrl } from '~/lib/explorer'
 import { cn } from '~/lib/utils'
@@ -28,6 +30,38 @@ function statusLabel(status: string) {
 
 export function TransactionDock() {
   const { flow, clearFlow } = useTransactionFeedback()
+
+  // Track transaction outcome transitions (success / error / warning) once per flow.
+  const prevStatusRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!flow) {
+      prevStatusRef.current = undefined
+      return
+    }
+    if (prevStatusRef.current === flow.status)
+      return
+    prevStatusRef.current = flow.status
+
+    if (flow.status === 'success') {
+      trackEvent('transaction_success', {
+        kind: flow.kind,
+        chainId: flow.chainId,
+      })
+    }
+    else if (flow.status === 'error') {
+      trackEvent('transaction_error', {
+        kind: flow.kind,
+        chainId: flow.chainId,
+        errorMessage: flow.errorMessage?.slice(0, 200),
+      })
+    }
+    else if (flow.status === 'warning') {
+      trackEvent('transaction_warning', {
+        kind: flow.kind,
+        chainId: flow.chainId,
+      })
+    }
+  }, [flow])
 
   if (!flow)
     return null

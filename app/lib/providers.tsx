@@ -10,6 +10,7 @@ import { BatchWithdrawProvider } from './contexts/batch-withdraw.context'
 import { NetworkProvider } from './contexts/network'
 import { SupplyAprOptimizerProvider } from './contexts/optimizer.context'
 import { TransactionFeedbackProvider } from './contexts/transaction-feedback.context'
+import { useAnalytics } from './hooks/use-analytics'
 import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
 import { useMarketBlacklistPreload } from './market-blacklist'
 import { config } from './wagmi'
@@ -20,6 +21,7 @@ function HomeMagicOptimizerEffects() {
   useCollateralWhitelistPreload()
   useMarketBlacklistPreload()
   useHomeMagicOptimizerScan()
+  useAnalytics()
   return null
 }
 

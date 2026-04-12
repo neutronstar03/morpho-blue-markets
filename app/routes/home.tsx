@@ -7,6 +7,7 @@ import { Header } from '~/components/header'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { Main } from '~/components/ui/main'
+import { trackEvent } from '~/lib/analytics'
 import { useNetworkContext } from '~/lib/contexts/network'
 import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatUsd } from '~/lib/formatters'
@@ -114,6 +115,11 @@ export default function HomePage() {
     loanAssetSymbol: string
     loanAssetDecimals: number
   }) => {
+    trackEvent('opportunity_card_clicked', {
+      loanAsset: opportunity.loanAssetSymbol,
+      chainId: opportunity.chainId,
+    })
+
     setOptimizerPreset({
       chainId: opportunity.chainId,
       loanAssetAddress: opportunity.loanAssetAddress,
@@ -205,6 +211,10 @@ export default function HomePage() {
                           size="sm"
                           onClick={(event) => {
                             event.stopPropagation()
+                            trackEvent('opportunity_card_dismissed', {
+                              loanAsset: opportunity.loanAssetSymbol,
+                              chainId: opportunity.chainId,
+                            })
                             dismissOpportunity(opportunity.id)
                           }}
                           className="h-8 w-8 px-0"

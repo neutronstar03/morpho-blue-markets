@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useSwitchChain } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
+import { trackEvent } from '~/lib/analytics'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
@@ -173,6 +174,11 @@ function PositionClient() {
     const firstPosition = group.positions[0]
     if (!chain?.id || !firstPosition)
       return
+
+    trackEvent('position_optimize_clicked', {
+      loanAsset: group.loanAssetSymbol,
+      chainId: chain?.id,
+    })
 
     setOptimizerPreset({
       chainId: chain.id,

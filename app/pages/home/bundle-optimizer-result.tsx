@@ -15,6 +15,7 @@ import {
 } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { MORPHO_AUTH_ABI, PERMIT2_ALLOWANCE_TRANSFER_ABI } from '~/lib/abis/bundler3'
+import { trackEvent } from '~/lib/analytics'
 import { getBundler3Config, PERMIT2_ADDRESS } from '~/lib/bundler3/addresses'
 import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
 import { buildOptimizerBundle } from '~/lib/bundler3/optimizer-bundle'
@@ -324,6 +325,12 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
     setIsRunningFlow(true)
     setPermit2Sig(undefined)
 
+    trackEvent('optimizer_execution_started', {
+      loanAsset: loanToken.symbol,
+      chainId,
+      marketsTouched: bundleBuild.summary?.marketsTouched ?? displayResult.positions.length,
+    })
+
     const steps = [] as Array<{ key: string, label: string }>
     if (!latestStateRef.current.isMorphoAuthorized) {
       steps.push({ key: 'authorizeWallet', label: 'Confirm adapter authorization in wallet' })
@@ -430,6 +437,11 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
       })
       onExecutedSuccess?.()
       resetExecutionState()
+      trackEvent('optimizer_execution_success', {
+        loanAsset: loanToken.symbol,
+        chainId,
+        marketsTouched: finalState.bundleSummary?.marketsTouched ?? displayResult.positions.length,
+      })
     }
     catch (error) {
       if (isConfirmationDelayedError(error)) {
@@ -439,6 +451,11 @@ export function BundleOptimizerResult(props: BundleOptimizerResultProps) {
       const message = getErrorMessage(error, 'Optimizer execution failed')
       setExecuteError(message)
       failTransactionFlow(scope, message)
+      trackEvent('optimizer_execution_failed', {
+        loanAsset: loanToken.symbol,
+        chainId,
+        error: message.slice(0, 200),
+      })
     }
     finally {
       setIsRunningFlow(false)

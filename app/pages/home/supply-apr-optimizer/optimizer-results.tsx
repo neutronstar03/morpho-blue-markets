@@ -104,6 +104,8 @@ export function SupplyAprOptimizerResults({
                                 search: deepLinkSearch ? `?${deepLinkSearch}` : '',
                               }}
                               className="hover:opacity-90 transition-opacity"
+                              data-umami-event="market_navigate"
+                              data-umami-data-source="optimizer"
                             >
                               <MarketRiskText status={riskStatus}>{marketLabel}</MarketRiskText>
                             </Link>
@@ -118,6 +120,8 @@ export function SupplyAprOptimizerResults({
                           rel="noopener noreferrer"
                           className="text-white hover:text-blue-400 transition-colors flex items-center"
                           title="Open in Morpho official UI"
+                          data-umami-event="external_link"
+                          data-umami-data-target="morpho"
                         >
                           <LinkNewWindow className="w-5 h-5" />
                         </a>

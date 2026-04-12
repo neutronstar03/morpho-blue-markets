@@ -10,6 +10,16 @@
 // Pageviews are type "event" without a name field.
 // Custom events are type "event" with a name field.
 //
+// DECLARATIVE CLICK TRACKING:
+// Add data-umami-event="<event-name>" to any element to auto-track clicks.
+// Add data-umami-data-<key>="<value>" for structured event data.
+// The global listener (initClickTracking) reads these attributes and
+// calls trackEvent() — no JS imports needed in component onClick handlers.
+//
+// IMPERATIVE TRACKING:
+// Import trackEvent() and call it in async flows (transaction outcomes,
+// optimizer results) where the data depends on runtime state.
+//
 // NOTE: Do NOT use /__ prefix paths — Cloudflare Pages reserves /__
 // for internal routes and such requests return 400 before reaching Functions.
 
@@ -112,4 +122,65 @@ export function trackEvent(name: string, data?: Record<string, unknown>): void {
       data,
     },
   })
+}
+
+// ---------------------------------------------------------------------------
+// Declarative click tracking via data-attributes
+// ---------------------------------------------------------------------------
+// Inspired by Umami's official script. Add data-umami-event="<name>" to any
+// element. For structured data, add data-umami-data-<key>="<value>".
+// The closest ancestor with data-umami-event wins (supports nested elements).
+//
+// Example:
+//   <button data-umami-event="deposit-submit"
+//           data-umami-data-loan-asset="USDC"
+//           data-umami-data-chain-id="1">
+//     Deposit
+//   </button>
+
+const UMAMI_EVENT_ATTR = 'data-umami-event'
+const UMAMI_DATA_PREFIX = 'data-umami-data-'
+
+function handleClickTracking(event: MouseEvent): void {
+  if (!WEBSITE_ID)
+    return
+
+  const target = event.target as HTMLElement | null
+  if (!target)
+    return
+
+  // Walk up the DOM tree to find the closest element with data-umami-event
+  const trackedElement = target.closest(`[${UMAMI_EVENT_ATTR}]`) as HTMLElement | null
+  if (!trackedElement)
+    return
+
+  const eventName = trackedElement.getAttribute(UMAMI_EVENT_ATTR)
+  if (!eventName)
+    return
+
+  // Collect data-umami-data-* attributes as event data
+  const data: Record<string, string> = {}
+  for (const attr of trackedElement.attributes) {
+    if (attr.name.startsWith(UMAMI_DATA_PREFIX)) {
+      const key = attr.name.slice(UMAMI_DATA_PREFIX.length)
+      // Convert kebab-case to camelCase: loan-asset → loanAsset
+      const camelKey = key.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
+      data[camelKey] = attr.value
+    }
+  }
+
+  trackEvent(eventName, Object.keys(data).length > 0 ? data : undefined)
+}
+
+let clickListenerAttached = false
+
+/**
+ * Initialize global click tracking for declarative data-umami-event attributes.
+ * Call once in the app root. Safe to call multiple times — will only attach once.
+ */
+export function initClickTracking(): void {
+  if (clickListenerAttached || !WEBSITE_ID)
+    return
+  document.addEventListener('click', handleClickTracking, { passive: true })
+  clickListenerAttached = true
 }

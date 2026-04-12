@@ -89,6 +89,8 @@ export function BatchWithdrawResults({
                                 search: deepLinkSearch ? `?${deepLinkSearch}` : '',
                               }}
                               className="hover:text-blue-400 transition-colors"
+                              data-umami-event="market_navigate"
+                              data-umami-data-source="batch_withdraw"
                             >
                               {marketLabel}
                             </Link>
@@ -103,6 +105,8 @@ export function BatchWithdrawResults({
                           rel="noopener noreferrer"
                           className="text-white hover:text-blue-400 transition-colors flex items-center"
                           title="Open in Morpho official UI"
+                          data-umami-event="external_link"
+                          data-umami-data-target="morpho"
                         >
                           <LinkNewWindow className="w-5 h-5" />
                         </a>

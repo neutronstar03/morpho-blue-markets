@@ -14,7 +14,7 @@ import { Footer } from './components/footer'
 import { TransactionDock } from './components/transaction/transaction-dock'
 import { TransactionSuccessModal } from './components/transaction/transaction-success-modal'
 import { UpdateAvailableToast } from './components/update-available-toast'
-import { trackPageview } from './lib/analytics'
+import { initClickTracking, trackPageview } from './lib/analytics'
 import { Providers } from './lib/providers'
 import './app.css'
 import '@rainbow-me/rainbowkit/styles.css'
@@ -80,6 +80,11 @@ export default function App() {
   useEffect(() => {
     trackPageview(location.pathname + location.search)
   }, [location.pathname, location.search])
+
+  // Initialize declarative click tracking (data-umami-event attributes) once.
+  useEffect(() => {
+    initClickTracking()
+  }, [])
 
   return (
     <Providers>

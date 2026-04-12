@@ -48,7 +48,7 @@ export function PositionListItem({
   })
 
   return (
-    <Link to={`/market/${position.market.uniqueKey}/${chainId}`}>
+    <Link to={`/market/${position.market.uniqueKey}/${chainId}`} data-umami-event="market_navigate" data-umami-data-source="positions">
       <li className="py-3 px-2.5 sm:p-4 bg-gray-900/50 border border-gray-800 rounded-lg hover:bg-gray-900 hover:border-gray-700 transition-all duration-200 cursor-pointer group">
         <div className="flex flex-row justify-between items-center">
           <div className="space-y-0.5 sm:space-y-1">

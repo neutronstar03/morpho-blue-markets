@@ -16,6 +16,7 @@ import { Card } from '~/components/ui/card'
 import { MORPHO_AUTH_ABI } from '~/lib/abis/bundler3'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
+import { trackEvent } from '~/lib/analytics'
 import { getBundler3Config } from '~/lib/bundler3/addresses'
 import { encodeGeneralAdapterMorphoWithdraw } from '~/lib/bundler3/encode'
 import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
@@ -459,6 +460,7 @@ export function BatchWithdraw() {
   const isMorphoAuthorized = (isMorphoAuthorizedRead.data ?? false) as boolean
 
   const clear = () => {
+    trackEvent('batch_withdraw_cleared', { loanAsset: selectedOption?.symbol, chainId })
     ctx.clear()
     setExecuteError(undefined)
     setIsRunningFlow(false)
@@ -580,6 +582,12 @@ export function BatchWithdraw() {
     setExecuteError(undefined)
     setIsRunningFlow(true)
 
+    trackEvent('batch_withdraw_execution_started', {
+      loanAsset: selectedOption.symbol,
+      chainId,
+      marketsUsed: plan.items.length,
+    })
+
     const steps = [] as Array<{ key: string, label: string }>
     if (!latestStateRef.current.isMorphoAuthorized) {
       steps.push({ key: 'authorizeWallet', label: 'Confirm adapter authorization in wallet' })
@@ -641,6 +649,11 @@ export function BatchWithdraw() {
         showModal: true,
       })
       resetAfterSuccess()
+      trackEvent('batch_withdraw_execution_success', {
+        loanAsset: selectedOption.symbol,
+        chainId,
+        marketsUsed: plan.items.length,
+      })
     }
     catch (error) {
       if (isConfirmationDelayedError(error)) {
@@ -650,6 +663,11 @@ export function BatchWithdraw() {
       const message = getErrorMessage(error, 'Batch withdraw failed')
       setExecuteError(message)
       failTransactionFlow(scope, message)
+      trackEvent('batch_withdraw_execution_failed', {
+        loanAsset: selectedOption.symbol,
+        chainId,
+        error: message.slice(0, 200),
+      })
     }
     finally {
       setIsRunningFlow(false)

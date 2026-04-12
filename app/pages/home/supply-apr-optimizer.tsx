@@ -12,6 +12,7 @@ import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
+import { trackEvent } from '~/lib/analytics'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
 import {
@@ -321,6 +322,7 @@ export function SupplyAprOptimizer() {
   const onCancelOptimize = useCallback(() => {
     if (!ctx.run.isRunning)
       return
+    trackEvent('optimizer_run_canceled', { loanAsset: selectedOption?.symbol, chainId: chain?.id })
     stopOptimizerWorker()
     setOptimizeRequest(null)
     setRunProgressLabel(null)
@@ -635,6 +637,12 @@ export function SupplyAprOptimizer() {
       return
     }
 
+    trackEvent('optimizer_run_started', {
+      loanAsset: selectedOption.symbol,
+      chainId: chain?.id,
+      maxMarkets: maxMarketsUsed,
+    })
+
     const cacheKey = buildMoveSizeCacheKey({
       chainId: chain?.id,
       loanAssetAddress: selectedOption.address,
@@ -898,7 +906,12 @@ export function SupplyAprOptimizer() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={ctx.run.isRunning ? onCancelOptimize : () => ctx.clear()}
+            onClick={ctx.run.isRunning
+              ? onCancelOptimize
+              : () => {
+                  trackEvent('optimizer_results_cleared', { loanAsset: selectedOption?.symbol, chainId: chain?.id })
+                  ctx.clear()
+                }}
             className={`ml-auto h-8 px-2.5 text-xs ${ctx.run.isRunning ? 'border-red-500/60 text-red-200 hover:bg-red-500/10 hover:text-red-100' : ''}`}
             title={ctx.run.isRunning ? 'Cancel' : 'Clear'}
           >
