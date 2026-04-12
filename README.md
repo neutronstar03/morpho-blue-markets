@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.3.0-beta.1` (2026-04-13): migrated hosting to Cloudflare Pages, added an adblocker-resistant Umami analytics proxy (`POST /__ev` → self-hosted Umami) via a Cloudflare Pages Function, and removed the GitHub Pages subpath base for custom-domain deployment at root path.
 - `v1.2.19` (2026-04-11): expanded the manual Resolv blacklist to cover direct `USR`, `wstUSR`, and `RLP` token contracts across the currently discovered EVM deployments so optimizer/discovery flows avoid new deposits there.
 - `v1.2.18` (2026-04-08): fixed home-page chain quick-switch actions so they no longer leave a stale required-network state behind that could make the navbar incorrectly show a "Switch to OTHERCHAIN" prompt after changing networks from RainbowKit.
 - `v1.2.17` (2026-04-08): added a micro manual blacklist for two reported Arbitrum `GVLT` contracts flagged as unreliable/scam so discovery and deposit flows avoid them.
@@ -96,6 +97,6 @@ See `CHANGELOG.md` for the full release history. Recent updates:
 
 ## Live Version
 
-A live version of this project can be deployed via GitHub Actions to GitHub Pages (tag-driven releases). You can access it here:
+A live version of this project is deployed to Cloudflare Pages (tag-driven releases via GitHub Actions). You can access it here:
 
-[https://neutronstar03.github.io/morpho-blue-markets/](https://neutronstar03.github.io/morpho-blue-markets/)
+[https://mbm.ns03.dev](https://mbm.ns03.dev)
