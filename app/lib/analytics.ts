@@ -1,12 +1,15 @@
 // Lightweight Umami analytics client — bundled into the SPA.
-// Sends events to a first-party path (/__ev) which is proxied by the
+// Sends events to a first-party path (/ev) which is proxied by the
 // Cloudflare Pages Function to the self-hosted Umami backend.
 //
 // This avoids loading an external script (which adblockers can block)
 // and avoids sending requests to known analytics domains (which adblockers
 // block by domain). The browser only sees same-origin requests.
+//
+// NOTE: Do NOT use /__ prefix paths — Cloudflare Pages reserves /__
+// for internal routes and such requests return 400 before reaching Functions.
 
-const UMAMI_ENDPOINT = '/__ev'
+const UMAMI_ENDPOINT = '/ev'
 const WEBSITE_ID = import.meta.env.VITE_UMAMI_WEBSITE_ID as string | undefined
 
 interface UmamiEventPayload {

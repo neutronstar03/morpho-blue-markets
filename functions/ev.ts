@@ -1,11 +1,14 @@
 // Cloudflare Pages Function — analytics proxy
-// Handles POST /__ev and forwards to the self-hosted Umami backend.
+// Handles POST /ev and forwards to the self-hosted Umami backend.
 //
 // The Umami backend URL is stored as a Cloudflare Pages secret:
 //   wrangler pages secret put UMAMI_BACKEND_URL
 //
 // This proxy makes analytics invisible to adblockers because the browser
-// only sees same-origin requests to /__ev — never the real analytics domain.
+// only sees same-origin requests to /ev — never the real analytics domain.
+//
+// NOTE: Do NOT use /__ prefix paths — Cloudflare Pages reserves /__
+// for internal routes and such requests return 400 before reaching Functions.
 
 interface Env {
   UMAMI_BACKEND_URL: string
