@@ -2,33 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## v1.3.0-beta.3 - 2026-04-13
-
-### Fixed
-- fix: rewrote the bundled Umami analytics client to use the correct v2 API format (`type: "event"` with nested `payload` object, `x-umami-cache` round-trip) instead of the flat `{ type: "pageview" }` structure that the server rejected with 400.
-- fix: renamed the `screen()` helper to `screenResolution()` to avoid shadowing `window.screen`.
-
-### Changed
-- infra: renamed the analytics proxy endpoint from `/__ev` to `/ev` after discovering that Cloudflare Pages reserves the `/__` prefix for internal routes.
-
-## v1.3.0-beta.2 - 2026-04-13
-
-### Changed
-- infra: force tag-driven Cloudflare Pages deploys onto `main` via `wrangler pages deploy --branch=main` so GitHub Actions releases land in the Production environment instead of detached-`HEAD` Preview deployments.
-
-## v1.3.0-beta.1 - 2026-04-13
+## v1.3.0 - 2026-04-13
 
 ### Introduced
-- feat: migrated hosting from GitHub Pages to Cloudflare Pages with push-based CI/CD (tag-driven deploys via `wrangler pages deploy`).
-- feat: added a Cloudflare Pages Function (`functions/__ev.ts`) that proxies `POST /__ev` to a self-hosted Umami analytics backend, making analytics invisible to adblockers (no external script tags, no third-party domain requests).
-- feat: added a bundled analytics client (`app/lib/analytics.ts`) that sends pageviews and custom events to the first-party `/__ev` endpoint; no-op when `VITE_UMAMI_WEBSITE_ID` is not set.
+- feat: migrated hosting to Cloudflare Pages with custom domain `mbm.ns03.dev`.
+- feat: added anonymous analytics via a first-party Umami proxy and bundled v2 client with pageview and custom event tracking (wallet connect/disconnect, network switch, optimizer runs and outcomes, transaction outcomes, opportunity cards, market navigation).
 
 ### Changed
-- infra: removed `/morpho-blue-markets/` base path (custom domain deployment at root path).
-- infra: replaced GitHub Pages deploy workflow with Cloudflare Pages deploy via `wrangler-action`.
-- infra: added `wrangler.toml`, `@cloudflare/workers-types`, and `wrangler` dev dependency.
-- infra: added `preview:cf` and `deploy:cf` scripts to package.json.
-- infra: Dockerfile annotated as local-dev/SSR-only (production deploys via Cloudflare Pages).
+- infra: push-based CI/CD via GitHub Actions with tag-driven Cloudflare deploys.
+- infra: removed `/morpho-blue-markets/` base path for root-path custom domain deployment.
 
 ## v1.2.19 - 2026-04-11
 
