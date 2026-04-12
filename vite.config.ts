@@ -34,10 +34,10 @@ function versionJsonPlugin(gitSha: string | null): Plugin {
 
 export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   const isProduction = mode === 'production'
-  const base = isProduction ? '/morpho-blue-markets/' : ''
+  // Custom domain deployment — no subpath needed. The base is '/' (root) in all environments.
+  // (Previously '/morpho-blue-markets/' for GitHub Pages subpath hosting.)
   const gitSha = (process.env.VITE_GIT_SHA || process.env.GITHUB_SHA || (!isProduction ? '000dev' : null))?.trim() || null
   return {
-    base,
     plugins: [tailwindcss(), reactRouter(), svgr({ svgrOptions: { icon: true } }), versionJsonPlugin(gitSha)],
     resolve: {
       tsconfigPaths: true,

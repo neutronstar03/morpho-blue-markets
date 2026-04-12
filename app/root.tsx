@@ -1,5 +1,6 @@
 import type { Route } from './+types/root'
 
+import { useEffect } from 'react'
 import {
   isRouteErrorResponse,
   Links,
@@ -7,11 +8,13 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from 'react-router'
 import { Footer } from './components/footer'
 import { TransactionDock } from './components/transaction/transaction-dock'
 import { TransactionSuccessModal } from './components/transaction/transaction-success-modal'
 import { UpdateAvailableToast } from './components/update-available-toast'
+import { trackPageview } from './lib/analytics'
 import { Providers } from './lib/providers'
 import './app.css'
 import '@rainbow-me/rainbowkit/styles.css'
@@ -70,6 +73,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const location = useLocation()
+
+  // Track pageviews on navigation changes (initial load + SPA navigations)
+  // The analytics client is no-op when VITE_UMAMI_WEBSITE_ID is not set.
+  useEffect(() => {
+    trackPageview(location.pathname + location.search)
+  }, [location.pathname, location.search])
+
   return (
     <Providers>
       <div className="min-h-screen bg-gray-900 flex flex-col">

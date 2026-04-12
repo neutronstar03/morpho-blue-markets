@@ -1,0 +1,10 @@
+name = "morpho-blue-markets"
+compatibility_date = "2025-04-13"
+pages_build_output_dir = "./build/client"
+
+[placement]
+mode = "smart"
+
+# The Umami backend URL is set as a secret on Cloudflare:
+#   wrangler pages secret put UMAMI_BACKEND_URL
+# (Never put real URLs in this file.)

@@ -1,4 +1,6 @@
-FROM node:20-alpine AS development-dependencies-env
+# Dockerfile for local development / self-hosted Node SSR deployment.
+# Production deploys go through Cloudflare Pages (wrangler), not this Dockerfile.
+# See: bun run preview:cf  or  bun run deploy:cf
 COPY . /app
 WORKDIR /app
 RUN npm ci
