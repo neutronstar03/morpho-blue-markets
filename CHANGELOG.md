@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.3.0-beta.3 - 2026-04-13
+
+### Fixed
+- fix: rewrote the bundled Umami analytics client to use the correct v2 API format (`type: "event"` with nested `payload` object, `x-umami-cache` round-trip) instead of the flat `{ type: "pageview" }` structure that the server rejected with 400.
+- fix: renamed the `screen()` helper to `screenResolution()` to avoid shadowing `window.screen`.
+
+### Changed
+- infra: renamed the analytics proxy endpoint from `/__ev` to `/ev` after discovering that Cloudflare Pages reserves the `/__` prefix for internal routes.
+
 ## v1.3.0-beta.2 - 2026-04-13
 
 ### Changed
