@@ -22,6 +22,7 @@ import {
 
   normalizeMarketAprAssetSymbol,
   resolveMarketAprByAssetSymbol,
+  setMarketAprBySymbolWithGroup,
 } from '~/lib/default-market-apr'
 import { useMarketsByChain } from '~/lib/hooks/graphql/use-markets-by-chain'
 import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loan-assets-by-chain'
@@ -553,21 +554,13 @@ export function SupplyAprOptimizer() {
     if (!normalizedSymbol)
       return
 
-    const trimmed = value.trim()
     setMarketAprBySymbol((prev) => {
-      if (!trimmed) {
-        if (!(normalizedSymbol in prev))
-          return prev
-        const next = { ...prev }
-        delete next[normalizedSymbol]
-        return next
-      }
-
-      if (prev[normalizedSymbol] === trimmed)
+      const next = setMarketAprBySymbolWithGroup(normalizedSymbol, value, prev)
+      if (next === prev)
         return prev
-      return { ...prev, [normalizedSymbol]: trimmed }
+      return next
     })
-  }, [ctx, marketAprBySymbol, selectedOption?.symbol, setMarketAprBySymbol])
+  }, [ctx, selectedOption?.symbol, ctx.selection.loanAssetSymbol, setMarketAprBySymbol])
 
   // Parsed deposit amount used to enable deposit-only optimization when no positions exist.
   const parsedDepositAssetsForGate = useMemo(() => {
