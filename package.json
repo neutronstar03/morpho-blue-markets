@@ -1,7 +1,7 @@
 {
   "name": "morpho-blue-markets",
   "type": "module",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "An alternative frontend for the Morpho Blue DEFI protocol.",
   "author": {
@@ -29,13 +29,7 @@
     "artifacts:pull": "bun scripts/pull-artifacts.ts --whitelist",
     "artifacts:pull:all": "bun scripts/pull-artifacts.ts --whitelist --blacklist",
     "test:ui": "vitest --config vitest.config.ts",
-    "snapshot:usds:24164776": "bun tests/scripts/rpc-snapshot01.ts",
-    "version:patch": "bun pm version patch",
-    "version:minor": "bun pm version minor",
-    "version:major": "bun pm version major",
-    "release:patch": "bun pm version patch && git push --follow-tags",
-    "release:minor": "bun pm version minor && git push --follow-tags",
-    "release:major": "bun pm version major && git push --follow-tags"
+    "snapshot:usds:24164776": "bun tests/scripts/rpc-snapshot01.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

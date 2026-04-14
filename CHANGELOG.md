@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.0 - 2026-04-15
+
+### Introduced
+- feat: edge-cached API endpoints for Morpho market data (Cloudflare Pages Functions) — `/api/popular-loan-assets`, `/api/vault-aprs`, `/api/token-liquidity` — cache public GraphQL and GeckoTerminal data at the Cloudflare edge, serving instant placeholder data to the frontend while live queries refresh in the background.
+- feat: Max Deploy optimizer strategy — hold positions whose APR >= a configurable base rate, only withdraw from markets below the base rate. Available alongside the existing Max Yield strategy via the optimizer strategy selector.
+- feat: Market APR input now has +/- stepper buttons (0.25% step) for easier fine-tuning.
+- feat: stablecoin Market APR grouping — USDC, USDT, USDS, frxUSD, AUSD, and PYUSD share one representative APR value so redundant stablecoin entries don't clutter the optimizer.
+
+### Changed
+- infra: fixed `cp -r` to `cp -R` in `preview:cf` and `deploy:cf` scripts for MSYS/Windows compatibility.
+- infra: removed unused `version:*` and `release:*` npm scripts (manual version bump per AGENTS.md workflow instead).
+- refactor: extracted `aggregatePopularLoanAssets()` from `usePopularLoanAssetsByChain` for shared use by the edge-cache placeholder query.
+
 ## v1.3.0 - 2026-04-13
 
 ### Introduced

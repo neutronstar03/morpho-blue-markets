@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.0` (2026-04-15): added edge-cached API endpoints (popular loan assets, vault APRs, token liquidity) for instant first paint via Cloudflare Cache API, added Max Deploy optimizer strategy (hold above base rate), added +/- stepper buttons to Market APR input, grouped stablecoin APRs, and fixed `cp -R` for Windows compatibility.
 - `v1.3.0` (2026-04-13): migrated to Cloudflare Pages at `mbm.ns03.dev` and added anonymous analytics with custom event tracking.
 - `v1.2.19` (2026-04-11): expanded the manual Resolv blacklist to cover direct `USR`, `wstUSR`, and `RLP` token contracts across the currently discovered EVM deployments so optimizer/discovery flows avoid new deposits there.
 - `v1.2.18` (2026-04-08): fixed home-page chain quick-switch actions so they no longer leave a stale required-network state behind that could make the navbar incorrectly show a "Switch to OTHERCHAIN" prompt after changing networks from RainbowKit.
