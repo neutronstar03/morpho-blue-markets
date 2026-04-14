@@ -149,7 +149,7 @@ export function SupplyAprOptimizerForm({
             size="sm"
             className="h-full rounded-none border-0 border-r border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
             onClick={() => {
-              const current = parseFloat(marketApr ?? '0')
+              const current = Number.parseFloat(marketApr ?? '0')
               if (!Number.isFinite(current) || current <= 0.25)
                 return
               const next = Math.max(0, Math.round((current - 0.25) * 100) / 100)
@@ -176,7 +176,7 @@ export function SupplyAprOptimizerForm({
             size="sm"
             className="h-full rounded-none border-0 border-l border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
             onClick={() => {
-              const current = parseFloat(marketApr ?? '0')
+              const current = Number.parseFloat(marketApr ?? '0')
               const next = Math.round(((Number.isFinite(current) ? current : 0) + 0.25) * 100) / 100
               onChangeMarketApr(String(next))
             }}

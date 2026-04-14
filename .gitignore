@@ -23,3 +23,6 @@ artifacts/
 
 # Optional pull-once datasets (do not commit)
 public/blacklist.markets.json
+
+# Wrangler local dev state
+.wrangler/
