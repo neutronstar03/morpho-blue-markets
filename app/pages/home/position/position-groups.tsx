@@ -1,6 +1,6 @@
 import type { PositionGroup } from './position-types'
-import { DollarSign, HandCoins, PiggyBank, Scale } from 'lucide-react'
-import { formatUsd } from '~/lib/formatters'
+import { Coins, DollarSign, HandCoins, PiggyBank, Scale } from 'lucide-react'
+import { formatBigintShort, formatUsd } from '~/lib/formatters'
 import { PositionListItem } from './position-list-item'
 
 export function PositionGroups({
@@ -18,7 +18,7 @@ export function PositionGroups({
   portfolioTotalAssetsUsd?: number
   aprByMarketKey: Record<string, { apr?: number }>
   riskStatusByKey: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined>
-  summaryMode: 'total' | 'yearly'
+  summaryMode: 'total' | 'native' | 'yearly'
   onToggleSummaryMode: () => void
   onSelectLoanAsset: (group: PositionGroup) => void
 }) {
@@ -32,12 +32,32 @@ export function PositionGroups({
         const assetAprPct = group.totalValueUsd > 0
           ? (group.yearlyUsd / group.totalValueUsd) * 100
           : undefined
-        const isTotalMode = summaryMode === 'total'
-        const SummaryIcon = isTotalMode ? DollarSign : PiggyBank
-        const summaryValue = isTotalMode
-          ? (group.totalValueUsd > 0 ? formatUsd(group.totalValueUsd) : '—')
-          : (group.yearlyUsd > 0 ? `${formatUsd(group.yearlyUsd)} / yr` : '— / yr')
-        const summaryIconClassName = isTotalMode ? 'text-sky-300' : 'text-emerald-300'
+
+        // Determine summary display based on mode
+        let SummaryIcon = DollarSign
+        let summaryValue: string
+        let summaryIconClassName = 'text-sky-300'
+
+        if (summaryMode === 'total') {
+          SummaryIcon = DollarSign
+          summaryValue = group.totalValueUsd > 0 ? formatUsd(group.totalValueUsd) : '—'
+          summaryIconClassName = 'text-sky-300'
+        }
+        else if (summaryMode === 'native') {
+          SummaryIcon = Coins
+          if (group.totalAssets != null && group.totalAssetsSymbol && group.totalAssetsDecimals != null) {
+            summaryValue = `${formatBigintShort(group.totalAssets, group.totalAssetsDecimals)} ${group.totalAssetsSymbol}`
+          }
+          else {
+            summaryValue = '—'
+          }
+          summaryIconClassName = 'text-amber-300'
+        }
+        else { // yearly
+          SummaryIcon = PiggyBank
+          summaryValue = group.yearlyUsd > 0 ? `${formatUsd(group.yearlyUsd)} / yr` : '— / yr'
+          summaryIconClassName = 'text-emerald-300'
+        }
 
         return (
           <div key={group.key} className="space-y-2 sm:space-y-3" data-testid="positions-asset-group">
@@ -76,7 +96,7 @@ export function PositionGroups({
                   className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-white/10 px-2 py-1 text-xs font-medium text-gray-300 transition-colors hover:bg-white/5 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20 sm:text-sm"
                   data-testid="positions-asset-group-summary-toggle"
                   data-summary-mode={summaryMode}
-                  aria-label={isTotalMode ? 'Switch asset summaries to yearly USD' : 'Switch asset summaries to total USD'}
+                  aria-label={summaryMode === 'total' ? 'Switch asset summaries to native token value' : summaryMode === 'native' ? 'Switch asset summaries to yearly USD' : 'Switch asset summaries to total USD'}
                 >
                   <SummaryIcon className={`h-3.5 w-3.5 ${summaryIconClassName}`} />
                   <span data-testid="positions-asset-group-summary">{summaryValue}</span>

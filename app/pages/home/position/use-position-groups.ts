@@ -1,7 +1,7 @@
 import type { PositionGroup } from './position-types'
 import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
 import { useMemo } from 'react'
-import { getPositionPrincipalUsd, getPositionYearlyUsd } from './position-utils'
+import { getPositionPrincipalUsd, getPositionSuppliedAssets, getPositionYearlyUsd } from './position-utils'
 
 export function usePositionGroups(
   visiblePositions: LiveMarketPosition[],
@@ -17,12 +17,16 @@ export function usePositionGroups(
       const key = `${chainId ?? 'unknown'}:${loanAssetAddress}`
       const totalValueUsd = getPositionPrincipalUsd(position) ?? 0
       const yearlyUsd = getPositionYearlyUsd(position, aprByMarketKey[position.market.uniqueKey]?.apr) ?? 0
+      const suppliedAssets = getPositionSuppliedAssets(position)
 
       const existing = groups.get(key)
       if (existing) {
         existing.positions.push(position)
         existing.totalValueUsd += totalValueUsd
         existing.yearlyUsd += yearlyUsd
+        if (existing.totalAssets != null) {
+          existing.totalAssets += suppliedAssets
+        }
         continue
       }
 
@@ -33,6 +37,9 @@ export function usePositionGroups(
         totalValueUsd,
         yearlyUsd,
         positions: [position],
+        totalAssets: suppliedAssets,
+        totalAssetsSymbol: position.market.loanAsset.symbol,
+        totalAssetsDecimals: position.market.loanAsset.decimals ?? 18,
       })
     }
 

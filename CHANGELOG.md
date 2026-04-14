@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.1 - 2026-04-15
+
+### Changed
+- ui: Home Positions asset-group summary now cycles through 3 states on click: total USD value → native token amount → yearly USD return.
+- optimizer: Magic optimizer scan now uses stored Market APR values per asset (WETH defaults to 4%, stables share a grouped value, others default to 10% or user-set preference) instead of a hardcoded 10% for all assets.
+
 ## v1.4.0 - 2026-04-15
 
 ### Introduced

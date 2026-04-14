@@ -1,10 +1,11 @@
+import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import type { UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAccount, usePublicClient } from 'wagmi'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
-import { getDefaultMarketAprByAssetSymbol } from '~/lib/default-market-apr'
+import { getDefaultMarketAprByAssetSymbol, resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress } from '~/lib/hooks/rpc/use-morpho'
 import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
@@ -18,6 +19,7 @@ import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-re
 import { getHomeMagicLastRunMs, setHomeMagicLastRunMs } from '../stores/home-magic-last-run'
 import { useHomeMagicOptimizerStore } from '../stores/home-magic-optimizer.store'
 import { useMarketsByChain } from './graphql/use-markets-by-chain'
+import { useLocalStorage } from './use-local-storage'
 
 interface ScanAsset {
   address: string
@@ -42,11 +44,11 @@ const OPTIMIZER_READ_CACHE_TTL_MS = 30_000
 const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
 const MAX_CANDIDATE_NET_SUPPLY_APY = 6
 const MIN_CANDIDATE_BORROW_USD = 5
-const DEFAULT_MARKET_APR_WAD = 100_000_000_000_000_000n
 
 export function useHomeMagicOptimizerScan() {
   const { isConnected, address: userAddress, chain } = useAccount()
   const publicClient = usePublicClient()
+  const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
   const {
     data: livePositions,
     isLoading: isLoadingPositions,
@@ -439,6 +441,10 @@ export function useHomeMagicOptimizerScan() {
       worker.terminate()
     }
 
+    // Use stored Market APR for this asset (WETH=4%, Stables=shared value, others=10% or stored)
+    const marketAprStr = resolveMarketAprByAssetSymbol(activeAsset.symbol, marketAprBySymbol)
+    const marketAprWad = BigInt(Math.floor(Number.parseFloat(marketAprStr) * 1e16))
+
     worker.postMessage({
       type: 'run',
       runId: request.runId,
@@ -449,8 +455,8 @@ export function useHomeMagicOptimizerScan() {
         timestamp: request.timestamp,
         constraints: {
           maxMarketsUsed: MAX_MARKETS_USED,
-          minSupplyAprWad: DEFAULT_MARKET_APR_WAD,
-          fallbackAprWad: DEFAULT_MARKET_APR_WAD,
+          minSupplyAprWad: marketAprWad,
+          fallbackAprWad: marketAprWad,
           fallbackLabel: 'Withdraw to wallet',
         },
         maxIterations: MAX_OPTIMIZER_ITERATIONS,
@@ -462,7 +468,7 @@ export function useHomeMagicOptimizerScan() {
       active = false
       worker.terminate()
     }
-  }, [activeAsset, addOpportunity, chainId, optimizeReadResult, request, selectedUserMarketsUsd, upsertPrecomputedResult, userAddress])
+  }, [activeAsset, addOpportunity, chainId, marketAprBySymbol, optimizeReadResult, request, selectedUserMarketsUsd, upsertPrecomputedResult, userAddress])
 
   useEffect(() => {
     return () => {

@@ -18,6 +18,9 @@ export interface PositionGroup {
   totalValueUsd: number
   yearlyUsd: number
   positions: LiveMarketPosition[]
+  totalAssets?: bigint
+  totalAssetsSymbol?: string
+  totalAssetsDecimals?: number
 }
 
 export interface ChainPositionPillItem {

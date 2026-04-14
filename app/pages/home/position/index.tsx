@@ -85,7 +85,7 @@ function PositionClient() {
   }, [blacklistVersion, chain?.id, positions])
 
   const [timeAgo, setTimeAgo] = useState('')
-  const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'yearly'>('total')
+  const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'native' | 'yearly'>('total')
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
 
   useEffect(() => {
@@ -269,7 +269,13 @@ function PositionClient() {
                 aprByMarketKey={aprByMarketKey}
                 riskStatusByKey={riskStatusByKey}
                 summaryMode={assetSummaryMode}
-                onToggleSummaryMode={() => setAssetSummaryMode(mode => mode === 'total' ? 'yearly' : 'total')}
+                onToggleSummaryMode={() => setAssetSummaryMode((mode) => {
+                  if (mode === 'total')
+                    return 'native'
+                  if (mode === 'native')
+                    return 'yearly'
+                  return 'total'
+                })}
                 onSelectLoanAsset={handleOpenOptimizerForGroup}
               />
             )}
