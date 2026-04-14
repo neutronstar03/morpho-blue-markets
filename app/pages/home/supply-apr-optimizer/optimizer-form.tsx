@@ -142,18 +142,48 @@ export function SupplyAprOptimizerForm({
             )}
           />
         </div>
-        <div className="relative">
-          <Input
-            type="text"
-            inputMode="decimal"
-            value={marketApr ?? ''}
-            onChange={e => onChangeMarketApr(e.target.value)}
-            placeholder="10"
-            className="w-full h-10 pr-16 border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0"
-          />
-          <span className="absolute inset-y-0 right-3 flex items-center text-sm text-gray-400 pointer-events-none">
-            %
-          </span>
+        <div className="grid h-10 w-full grid-cols-[2.5rem_1fr_2.5rem] overflow-hidden rounded-md border border-gray-700 bg-gray-900">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-full rounded-none border-0 border-r border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
+            onClick={() => {
+              const current = parseFloat(marketApr ?? '0')
+              if (!Number.isFinite(current) || current <= 0.25)
+                return
+              const next = Math.max(0, Math.round((current - 0.25) * 100) / 100)
+              onChangeMarketApr(String(next))
+            }}
+            aria-label="Decrease market APR"
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+          <div className="relative">
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={marketApr ?? ''}
+              onChange={e => onChangeMarketApr(e.target.value)}
+              placeholder={defaultMarketApr}
+              className="h-full rounded-none border-0 px-2 text-center tabular-nums text-white placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset focus-visible:ring-offset-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              aria-label="Market APR percent"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-full rounded-none border-0 border-l border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
+            onClick={() => {
+              const current = parseFloat(marketApr ?? '0')
+              const next = Math.round(((Number.isFinite(current) ? current : 0) + 0.25) * 100) / 100
+              onChangeMarketApr(String(next))
+            }}
+            aria-label="Increase market APR"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
         <div className="text-xs text-gray-500 min-h-0 md:h-4">
           Default:
