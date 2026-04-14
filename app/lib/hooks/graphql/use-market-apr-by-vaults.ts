@@ -230,6 +230,32 @@ export function useMarketAprByVaults(opts: UseVaultAprMapOptions = {}) {
   const enabled = opts.enabled ?? true
   const chainIds = useMemo(() => [...supportedChainMap.keys()], [])
 
+  // Edge-cached placeholder: fetches pre-processed vault data from our edge cache
+  // for instant first paint while the live GraphQL query runs in background.
+  const edgeQuery = useQuery<SupplyVaultData[]>({
+    queryKey: ['edge-cached', 'vault-aprs', minNetApy, minLiquidityUsd],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        minLiquidityUsd: String(minLiquidityUsd),
+      })
+      const res = await fetch(`/api/vault-aprs?${params}`)
+      if (!res.ok)
+        throw new Error(`Edge cache error: ${res.status}`)
+      const raw = await res.json() as {
+        v1: { data: QueryVaultsV1Result }
+        v2: { data: QueryVaultsV2Result }
+      }
+      const allVaults = [
+        ...(raw.v1?.data?.vaults?.items ?? []).map(normalizeVaultV1),
+        ...(raw.v2?.data?.vaultV2s?.items ?? []).map(normalizeVaultV2),
+      ]
+      return filterEligibleVaults(allVaults, { minNetApy, minLiquidityUsd })
+    },
+    enabled,
+    staleTime: STALE_TIME_MEDIUM_MS,
+    refetchOnWindowFocus: false,
+  })
+
   const query = useQuery<SupplyVaultData[]>({
     queryKey: ['vault-apr-map', minNetApy, minLiquidityUsd],
     queryFn: async () => {
@@ -237,6 +263,7 @@ export function useMarketAprByVaults(opts: UseVaultAprMapOptions = {}) {
       return result.eligibleVaults
     },
     enabled,
+    placeholderData: edgeQuery.data,
     staleTime: STALE_TIME_MEDIUM_MS,
     refetchOnWindowFocus: false,
   })

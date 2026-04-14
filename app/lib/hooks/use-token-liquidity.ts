@@ -85,6 +85,27 @@ export function useTokenLiquidity({ chainId, tokenAddress }: UseTokenLiquidityAr
   const isClient = typeof window !== 'undefined'
   const enabled = isClient && !!network && !!tokenAddress
 
+  // Edge-cached placeholder: fetches pre-processed liquidity data from our edge cache
+  // for instant first paint while the live GeckoTerminal query runs in background.
+  // Returns null if the edge cache has no data for this token (cached negative result).
+  const edgeQuery = useQuery<string | null>({
+    queryKey: ['edge-cached', 'token-liquidity', chainId, tokenAddress],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        chainId: String(chainId),
+        address: tokenAddress!,
+      })
+      const res = await fetch(`/api/token-liquidity?${params}`)
+      if (!res.ok)
+        throw new Error(`Edge cache error: ${res.status}`)
+      const data = await res.json() as { liquidityUsd: string | null }
+      return data.liquidityUsd
+    },
+    enabled: !!chainId && !!tokenAddress,
+    staleTime: SIX_HOURS_MS,
+    retry: 1,
+  })
+
   return useQuery<string>({
     queryKey: ['token-liquidity', network, tokenAddress],
     queryFn: async () => {
@@ -135,6 +156,7 @@ export function useTokenLiquidity({ chainId, tokenAddress }: UseTokenLiquidityAr
       throw new Error('Missing GeckoTerminal liquidity')
     },
     enabled,
+    placeholderData: edgeQuery.data ?? undefined,
     staleTime: SIX_HOURS_MS,
     retry: (failureCount, error) => {
       const message = error instanceof Error ? error.message : ''
