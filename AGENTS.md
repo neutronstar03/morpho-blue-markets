@@ -25,6 +25,14 @@ If you are unsure where a bug lives, start from the relevant file in `app/pages/
 - app/lib/hooks/: RPC + GraphQL hooks and business logic (data access + orchestration)
 - app/lib/irm/: IRM math helpers (rates/curves)
 - app/lib/optimizer/: supply optimizer logic and fixtures (APR outputs)
+  - `supply-optimizer.ts`: Max Yield optimizer (original, maximize total portfolio yield)
+  - `supply-optimizer-max-deploy.ts`: Max Deploy optimizer (hold positions above base rate, maximize capital deployed)
+  - `supply-optimizer-runner.ts`: Runner that selects optimizer by strategy and handles auto step-size
+  - `supply-optimizer-worker.ts`: Web Worker wrapper
+  - `supply-optimizer-worker-types.ts`: Worker message protocol (includes `strategy` field)
+  - `move-size-heuristic.ts`: Binary search for optimal step size (respects strategy)
+  - `supply-optimizer-ui-utils.ts`: Formatters and cache key builder (includes strategy in key)
+- app/lib/contexts/optimizer.context.tsx: React context with strategy state (maxYield/maxDeploy)
 - tasks/: plans, checklists, work notes, history (prunable)
 
 ## Invariants / gotchas (keep these true)
@@ -32,6 +40,12 @@ If you are unsure where a bug lives, start from the relevant file in `app/pages/
 - If IRM data is missing, show "----" or an explicit error (do not fake a fallback).
 - All Morpho markets use IRM; do not mention or implement non-IRM fallbacks in market preview logic.
 - Supply optimizer outputs use APR (blendedAprWad/supplyAprAfterWad), not APY; keep labels and calculations on APR.
+- The optimizer has two strategies ('maxYield' and 'maxDeploy'):
+  - Max Yield: maximize total portfolio APR, freely rebalancing across markets.
+  - Max Deploy: hold positions whose APR >= base rate, only withdraw from markets below base rate.
+  - Strategy is stored in `optimizer.context.tsx` (`inputs.strategy`) and passed through the worker.
+  - The `holdAboveAprWad` constraint in `SupplyOptimizerConstraints` controls hold behavior for max-deploy.
+  - Both strategies share the same greedy step-by-step loop and scoring; the difference is in minFinal initialization.
 - Keep `public/blacklist.markets.json` generator-shaped (`{ chainId, uniqueKey }` only); do not add manual notes there.
 - For manual/shady entries with context, prefer `app/lib/blacklist.assets.json` and use the `comment` field.
 

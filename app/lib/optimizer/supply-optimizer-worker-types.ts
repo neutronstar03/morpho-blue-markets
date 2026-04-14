@@ -1,6 +1,10 @@
 import type { SupplyOptimizerProgress, SupplyOptimizerRunArgs, SupplyOptimizerRunResult } from './supply-optimizer-runner'
 
-export type SupplyOptimizerWorkerRunArgs = Omit<SupplyOptimizerRunArgs, 'onProgress'>
+export type OptimizerStrategy = 'maxYield' | 'maxDeploy'
+
+export type SupplyOptimizerWorkerRunArgs = Omit<SupplyOptimizerRunArgs, 'onProgress'> & {
+  strategy?: OptimizerStrategy
+}
 
 export interface SupplyOptimizerWorkerRequest {
   type: 'run'

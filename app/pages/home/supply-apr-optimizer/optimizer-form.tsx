@@ -1,4 +1,5 @@
 import type { LoanAssetOption } from './shared'
+import type { OptimizerStrategy } from '~/lib/optimizer/supply-optimizer-runner'
 import { Minus, Plus } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { InfoTooltip } from '~/components/ui/info-tooltip'
@@ -35,6 +36,8 @@ interface SupplyAprOptimizerFormProps {
   maxMarketsInput: string
   setMaxMarketsInput: (value: string) => void
   parseMaxMarkets: (value: string) => number
+  strategy: OptimizerStrategy
+  onChangeStrategy: (value: OptimizerStrategy) => void
   onOptimize: () => void
   optimizeDisabled: boolean
   optimizeLoading: boolean
@@ -61,6 +64,8 @@ export function SupplyAprOptimizerForm({
   maxMarketsInput,
   setMaxMarketsInput,
   parseMaxMarkets,
+  strategy,
+  onChangeStrategy,
   onOptimize,
   optimizeDisabled,
   optimizeLoading,
@@ -70,7 +75,7 @@ export function SupplyAprOptimizerForm({
     .filter(o => !ownedLoanAssetOptions.some(x => x.address.toLowerCase() === o.address.toLowerCase()))
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 md:gap-4 items-start" data-testid="supply-apr-optimizer-form">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-2 md:gap-4 items-start" data-testid="supply-apr-optimizer-form">
       <div className="flex flex-col gap-1.5 md:gap-2">
         <div className="h-5 flex items-center">
           <Label>Asset to optimize</Label>
@@ -130,7 +135,9 @@ export function SupplyAprOptimizerForm({
             ariaLabel="Market APR info"
             content={(
               <span>
-                If a market ends below this APR, the optimizer can withdraw funds and leave them in your wallet instead.
+                {strategy === 'maxDeploy'
+                  ? 'The base rate for your asset. The optimizer will hold positions earning above this APR and only withdraw from markets below it.'
+                  : 'If a market ends below this APR, the optimizer can withdraw funds and leave them in your wallet instead.'}
               </span>
             )}
           />
@@ -153,6 +160,41 @@ export function SupplyAprOptimizerForm({
           {' '}
           {defaultMarketApr}
           %
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5 md:gap-2">
+        <div className="h-5 flex items-center gap-2">
+          <Label>Strategy</Label>
+          <InfoTooltip
+            ariaLabel="Strategy info"
+            content={(
+              <span>
+                {strategy === 'maxYield'
+                  ? 'Max Yield: maximize total portfolio APR, even if it means withdrawing from profitable positions to chase higher yield.'
+                  : 'Max Deploy: hold positions earning above the Market APR and only withdraw from markets below it. Maximizes capital deployed above base rate.'}
+              </span>
+            )}
+          />
+        </div>
+        <div className="grid grid-cols-2 h-10 overflow-hidden rounded-md border border-gray-700 bg-gray-900">
+          <button
+            type="button"
+            onClick={() => onChangeStrategy('maxYield')}
+            className={`text-sm font-medium transition-colors cursor-pointer ${strategy === 'maxYield' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+          >
+            Max Yield
+          </button>
+          <button
+            type="button"
+            onClick={() => onChangeStrategy('maxDeploy')}
+            className={`text-sm font-medium transition-colors cursor-pointer ${strategy === 'maxDeploy' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+          >
+            Max Deploy
+          </button>
+        </div>
+        <div className="text-xs text-gray-500 min-h-0 md:h-4">
+          {strategy === 'maxYield' ? 'Chase highest APR' : 'Hold above base rate'}
         </div>
       </div>
 

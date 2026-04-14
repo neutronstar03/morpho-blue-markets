@@ -1,5 +1,7 @@
 import type { OptimizeSupplyWithPositionsArgs, OptimizeSupplyWithPositionsResult, UserSupplyPosition } from './supply-optimizer'
+import type { OptimizerStrategy } from './supply-optimizer-runner'
 import { optimizeSupplyAllocationWithPositions } from './supply-optimizer'
+import { optimizeMaxDeployWithPositions } from './supply-optimizer-max-deploy'
 
 const WAD = 10n ** 18n
 const DEFAULT_MIN_PCT_WAD = 10n ** 13n // 0.001%
@@ -76,9 +78,13 @@ export function optimizeSupplyWithMoveSizeHeuristic(args: Omit<OptimizeSupplyWit
   maxIterations: number
   config?: MoveSizeHeuristicConfig
   baseTotalAssets?: bigint
+  strategy?: OptimizerStrategy
   onProgress?: (progress: MoveSizeHeuristicProgress) => void
 }): MoveSizeHeuristicResult {
-  const { maxIterations, config, baseTotalAssets: baseTotalOverride, onProgress, ...optimizerArgs } = args
+  const { maxIterations, config, baseTotalAssets: baseTotalOverride, strategy, onProgress, ...optimizerArgs } = args
+  const runOptimizer = strategy === 'maxDeploy'
+    ? (a: OptimizeSupplyWithPositionsArgs & { stepAssets: bigint }) => optimizeMaxDeployWithPositions(a)
+    : (a: OptimizeSupplyWithPositionsArgs & { stepAssets: bigint }) => optimizeSupplyAllocationWithPositions(a)
   const maxAttempts = config?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS
   const targetIterations = Math.max(1, Math.min(config?.targetIterations ?? DEFAULT_TARGET_ITERATIONS, maxIterations))
 
@@ -109,7 +115,7 @@ export function optimizeSupplyWithMoveSizeHeuristic(args: Omit<OptimizeSupplyWit
   let bestResult: OptimizeSupplyWithPositionsResult | undefined
 
   while (attempts < maxAttempts && stepAssets > 0n) {
-    const result = optimizeSupplyAllocationWithPositions({
+    const result = runOptimizer({
       ...optimizerArgs,
       stepAssets,
       maxIterations,
@@ -162,7 +168,7 @@ export function optimizeSupplyWithMoveSizeHeuristic(args: Omit<OptimizeSupplyWit
       if (mid <= 0n || mid === low || mid === high)
         break
 
-      const result = optimizeSupplyAllocationWithPositions({
+      const result = runOptimizer({
         ...optimizerArgs,
         stepAssets: mid,
         maxIterations,

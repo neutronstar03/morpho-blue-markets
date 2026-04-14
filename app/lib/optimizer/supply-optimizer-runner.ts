@@ -1,6 +1,7 @@
 import type { OptimizeSupplyWithPositionsArgs, OptimizeSupplyWithPositionsResult } from './supply-optimizer'
 import { getMoveSizeBaseTotalAssets, optimizeSupplyWithMoveSizeHeuristic } from './move-size-heuristic'
 import { optimizeSupplyAllocationWithPositions } from './supply-optimizer'
+import { optimizeMaxDeployWithPositions } from './supply-optimizer-max-deploy'
 
 const WAD = 10n ** 18n
 // Default: opening a new market should only be rejected if it is strictly worse (negative marginal benefit).
@@ -10,6 +11,8 @@ const DEFAULT_MIN_NEW_MARKET_BENEFIT_WAD = 0n
 // For rebalance-only runs (no newDeposit), require a tiny edge to open new markets.
 // 2 bps = 0.02%.
 const DEFAULT_REBALANCE_NEW_MARKET_HYSTERESIS_APR_WAD = 200_000_000_000_000n
+
+export type OptimizerStrategy = 'maxYield' | 'maxDeploy'
 
 export interface AutoMoveSizeInfo {
   stepAssets: bigint
@@ -22,6 +25,8 @@ export interface SupplyOptimizerRunArgs extends Omit<OptimizeSupplyWithPositions
   stepAssets?: bigint
   maxIterations: number
   auto: boolean
+  /** Optimization strategy. 'maxYield' = current behavior. 'maxDeploy' = hold positions above base rate. */
+  strategy?: OptimizerStrategy
   onProgress?: (progress: SupplyOptimizerProgress) => void
 }
 
@@ -40,6 +45,7 @@ export interface SupplyOptimizerRunResult {
 }
 
 export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimizerRunResult {
+  const strategy = args.strategy ?? 'maxYield'
   const baseTotalAssets = getMoveSizeBaseTotalAssets(args.positions, args.newDepositAssets)
   let stepAssets = args.stepAssets
   let autoInfo: AutoMoveSizeInfo | undefined
@@ -52,6 +58,8 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
     // Relative gating: only apply (by default) when not adding new capital.
     newMarketHysteresisAprWad: args.constraints?.newMarketHysteresisAprWad
       ?? (args.newDepositAssets > 0n ? 0n : DEFAULT_REBALANCE_NEW_MARKET_HYSTERESIS_APR_WAD),
+    // Max-deploy strategy: hold positions above base rate by default.
+    ...(strategy === 'maxDeploy' ? { holdAboveAprWad: args.constraints?.holdAboveAprWad ?? args.constraints?.fallbackAprWad } : {}),
   }
 
   const runManual = (manualStepAssets: bigint, withIterationProgress: boolean): OptimizeSupplyWithPositionsResult => {
@@ -63,7 +71,7 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
       })
     }
 
-    return optimizeSupplyAllocationWithPositions({
+    const optimizerArgs = {
       markets: args.markets,
       positions: args.positions,
       newDepositAssets: args.newDepositAssets,
@@ -74,7 +82,7 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
       },
       maxIterations: args.maxIterations,
       onIterationProgress: withIterationProgress
-        ? ({ iterations, maxIterations }) => {
+        ? ({ iterations, maxIterations }: { iterations: number, maxIterations: number }) => {
             const pct = Math.min(95, Math.max(10, Math.floor((iterations * 100) / Math.max(1, maxIterations))))
             args.onProgress?.({
               phase: 'optimizing',
@@ -83,7 +91,12 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
             })
           }
         : undefined,
-    })
+    }
+
+    if (strategy === 'maxDeploy') {
+      return optimizeMaxDeployWithPositions(optimizerArgs)
+    }
+    return optimizeSupplyAllocationWithPositions(optimizerArgs)
   }
 
   if (args.auto) {
@@ -116,6 +129,7 @@ export function runSupplyOptimizer(args: SupplyOptimizerRunArgs): SupplyOptimize
         timestamp: args.timestamp,
         constraints: baseConstraints,
         maxIterations: args.maxIterations,
+        strategy,
         onProgress: ({ attempts, maxAttempts }) => {
           const pct = Math.min(80, Math.max(5, Math.floor((attempts * 100) / Math.max(1, maxAttempts))))
           args.onProgress?.({

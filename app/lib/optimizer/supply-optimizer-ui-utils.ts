@@ -1,4 +1,5 @@
 import type { UserSupplyPosition } from './supply-optimizer'
+import type { OptimizerStrategy } from './supply-optimizer-runner'
 import { formatUnits } from 'viem'
 
 export function pctFromWad(wad: bigint, digits = 2): string {
@@ -30,6 +31,7 @@ export function buildMoveSizeCacheKey(args: {
   fallbackAprWad?: bigint
   maxMarketsUsed: number
   positions: UserSupplyPosition[]
+  strategy?: OptimizerStrategy
 }): string {
   const positionsKey = [...args.positions]
     .sort((a, b) => a.marketId.localeCompare(b.marketId))
@@ -41,6 +43,7 @@ export function buildMoveSizeCacheKey(args: {
     args.newDepositAssets.toString(),
     (args.fallbackAprWad ?? 0n).toString(),
     args.maxMarketsUsed.toString(),
+    args.strategy ?? 'maxYield',
     positionsKey,
   ].join('::')
 }

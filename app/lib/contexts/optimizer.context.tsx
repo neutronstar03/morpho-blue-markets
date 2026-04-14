@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react'
 import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
+import type { OptimizerStrategy } from '~/lib/optimizer/supply-optimizer-runner'
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+
+export type { OptimizerStrategy }
 
 export interface SupplyAprOptimizerSelection {
   chainId?: number
@@ -14,6 +17,8 @@ export interface SupplyAprOptimizerInputs {
   marketApr?: string
   /** Optional: additional amount to supply (new deposit), in token units (e.g. "123.45"). */
   newDepositAmount?: string
+  /** Optimization strategy: 'maxYield' (default) or 'maxDeploy' (hold positions above base rate). */
+  strategy?: OptimizerStrategy
 }
 
 const DEFAULT_MARKET_APR = '10'
@@ -45,6 +50,7 @@ interface SupplyAprOptimizerContextValue extends SupplyAprOptimizerState {
   setSelection: (next: SupplyAprOptimizerSelection) => void
   setMarketApr: (v: string | undefined) => void
   setNewDepositAmount: (v: string | undefined) => void
+  setStrategy: (v: OptimizerStrategy) => void
   setDerived: (next: SupplyAprOptimizerDerived) => void
   beginRun: (meta?: { timestamp?: bigint }) => number
   cancelRun: (runId: number) => void
@@ -64,7 +70,7 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
 
   const clear = useCallback(() => {
     setSelectionState({})
-    setInputs({ marketApr: DEFAULT_MARKET_APR })
+    setInputs(prev => ({ ...prev, marketApr: DEFAULT_MARKET_APR }))
     setDerivedState({})
     setRun((prev) => {
       const nextRunId = prev.runId + 1
@@ -88,6 +94,10 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
 
   const setNewDepositAmount = useCallback((v: string | undefined) => {
     setInputs(prev => ({ ...prev, newDepositAmount: v }))
+  }, [])
+
+  const setStrategy = useCallback((v: OptimizerStrategy) => {
+    setInputs(prev => ({ ...prev, strategy: v }))
   }, [])
 
   const setDerived = useCallback((next: SupplyAprOptimizerDerived) => {
@@ -142,13 +152,14 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
       setSelection,
       setMarketApr,
       setNewDepositAmount,
+      setStrategy,
       setDerived,
       beginRun,
       cancelRun,
       finishRun,
       applyPrefetchedResult,
     }
-  }, [selection, inputs, derived, run, result, clear, setSelection, setMarketApr, setNewDepositAmount, setDerived, beginRun, cancelRun, finishRun, applyPrefetchedResult])
+  }, [selection, inputs, derived, run, result, clear, setSelection, setMarketApr, setNewDepositAmount, setStrategy, setDerived, beginRun, cancelRun, finishRun, applyPrefetchedResult])
 
   return (
     <SupplyAprOptimizerContext.Provider value={value}>

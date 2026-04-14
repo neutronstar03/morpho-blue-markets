@@ -76,6 +76,13 @@ export interface SupplyOptimizerConstraints {
   fallbackAprWad?: bigint
   /** Display label for the fallback destination. */
   fallbackLabel?: string
+  /**
+   * If set, do not withdraw from markets whose current supply APR
+   * is >= this value. Typically set to fallbackAprWad so that positions
+   * earning above the base rate are held (not rebalanced away).
+   * Only meaningful for the "max deploy" strategy.
+   */
+  holdAboveAprWad?: bigint
 }
 
 export interface OptimizeSupplyAllocationArgs {

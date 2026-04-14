@@ -1,6 +1,7 @@
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import type { SupplyOptimizerDebugRequest } from '~/lib/optimizer/supply-apr-optimizer-debugger'
 import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
+import type { OptimizerStrategy } from '~/lib/optimizer/supply-optimizer-runner'
 import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
 import type { OptimizerReadResult } from '~/lib/optimizer/use-supply-optimizer-reads'
 import type { AutoStepInfo, LoanAssetOption, OptimizerMarketMeta } from '~/pages/home/supply-apr-optimizer/shared'
@@ -76,6 +77,10 @@ export function SupplyAprOptimizer() {
   const [marketAprBySymbol, setMarketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>(
     'supply-apr-optimizer:market-apr-by-symbol',
     {},
+  )
+  const [strategyInput, setStrategyInput] = useLocalStorage<OptimizerStrategy>(
+    'supply-apr-optimizer:strategy',
+    'maxYield',
   )
   const optimizerPreset = useHomeMagicOptimizerStore(state => state.optimizerPreset)
   const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
@@ -299,6 +304,17 @@ export function SupplyAprOptimizer() {
     ctx.setMarketApr(nextMarketApr)
   }, [ctx, marketAprBySymbol, selectedOption])
 
+  // Sync localStorage strategy into context
+  useEffect(() => {
+    if (ctx.inputs.strategy !== strategyInput)
+      ctx.setStrategy(strategyInput)
+  }, [ctx, strategyInput])
+
+  const onChangeStrategy = useCallback((value: OptimizerStrategy) => {
+    ctx.setStrategy(value)
+    setStrategyInput(value)
+  }, [ctx, setStrategyInput])
+
   const [optimizeRequest, setOptimizeRequest] = useState<null | {
     runId: number
     timestamp: bigint
@@ -310,6 +326,7 @@ export function SupplyAprOptimizer() {
     markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>
     autoStep: boolean
     autoCacheKey?: string
+    strategy: OptimizerStrategy
   }>(null)
 
   const stopOptimizerWorker = useCallback(() => {
@@ -505,6 +522,7 @@ export function SupplyAprOptimizer() {
           maxIterations: MAX_OPTIMIZER_ITERATIONS,
           stepAssets,
           auto: optimizeRequest.autoStep,
+          strategy: optimizeRequest.strategy,
         },
       })
     }
@@ -637,6 +655,8 @@ export function SupplyAprOptimizer() {
       return
     }
 
+    const strategy = strategyInput
+
     trackEvent('optimizer_run_started', {
       loanAsset: selectedOption.symbol,
       chainId: chain?.id,
@@ -650,6 +670,7 @@ export function SupplyAprOptimizer() {
       fallbackAprWad,
       maxMarketsUsed,
       positions,
+      strategy,
     })
 
     const cached = heuristicCacheRef.current.get(cacheKey)
@@ -705,6 +726,7 @@ export function SupplyAprOptimizer() {
       markets: [...universe.values()],
       autoStep: true,
       autoCacheKey: cacheKey,
+      strategy,
     }
 
     const debugRequest: SupplyOptimizerDebugRequest = {
@@ -954,6 +976,8 @@ export function SupplyAprOptimizer() {
               maxMarketsInput={maxMarketsInput ?? ''}
               setMaxMarketsInput={setMaxMarketsInput}
               parseMaxMarkets={parseMaxMarkets}
+              strategy={strategyInput}
+              onChangeStrategy={onChangeStrategy}
               onOptimize={onOptimize}
               optimizeDisabled={ctx.run.isRunning || !canOptimize || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
               optimizeLoading={ctx.run.isRunning || topMarketsQuery.isLoading || topMarketsQuery.isFetching}
