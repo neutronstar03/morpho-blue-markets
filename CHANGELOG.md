@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.2 - 2026-04-15
+
+### Changed
+- infra: removed PWA artifacts (`site.webmanifest`, Android icons) and the manifest link since this is a backend-dependent DeFi webapp, not an installable PWA.
+
 ## v1.4.1 - 2026-04-15
 
 ### Changed

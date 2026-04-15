@@ -49,7 +49,6 @@ export const links: Route.LinksFunction = () => [
     sizes: '16x16',
     href: `${baseUrl}favicon-16x16.png`,
   },
-  { rel: 'manifest', href: `${baseUrl}site.webmanifest` },
   { rel: 'shortcut icon', href: `${baseUrl}favicon.ico` },
 ]
 

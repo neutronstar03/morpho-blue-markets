@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.2` (2026-04-15): removed PWA manifest and Android icons since this is a backend-dependent DeFi webapp, not an installable PWA.
 - `v1.4.1` (2026-04-15): Home Positions asset-group summary now cycles through 3 states (USD → native token → yearly), and magic optimizer scan uses stored per-asset Market APR values instead of hardcoded 10%.
 - `v1.4.0` (2026-04-15): added edge-cached API endpoints (popular loan assets, vault APRs, token liquidity) for instant first paint via Cloudflare Cache API, added Max Deploy optimizer strategy (hold above base rate), added +/- stepper buttons to Market APR input, grouped stablecoin APRs, and fixed `cp -R` for Windows compatibility.
 - `v1.3.0` (2026-04-13): migrated to Cloudflare Pages at `mbm.ns03.dev` and added anonymous analytics with custom event tracking.
