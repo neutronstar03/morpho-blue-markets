@@ -7,7 +7,7 @@ import { useAccount, usePublicClient } from 'wagmi'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { getDefaultMarketAprByAssetSymbol, resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
-import { getMorphoBlueAddress } from '~/lib/hooks/rpc/use-morpho'
+import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
 import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
 import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
@@ -27,7 +27,6 @@ interface ScanAsset {
   decimals: number
 }
 
-const NO_BENEFIT_DELTA_APR_WAD = 2_500_000_000_000_000n
 const MAX_MARKETS_USED = 6
 const MAX_OPTIMIZER_ITERATIONS = 1000
 const OPTIMIZER_READ_CHUNK_SIZE = 50
@@ -49,6 +48,14 @@ export function useHomeMagicOptimizerScan() {
   const { isConnected, address: userAddress, chain } = useAccount()
   const publicClient = usePublicClient()
   const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
+  const [skipThreshold] = useLocalStorage<string>('supply-apr-optimizer:skip-threshold', '0.25')
+  const noBenefitDeltaAprWad = useMemo(() => {
+    const raw = skipThreshold?.trim()
+    if (!raw)
+      return 2_500_000_000_000_000n // default 0.25%
+    const parsed = parseTokenAmount(raw, 16)
+    return parsed >= 0n ? parsed : 2_500_000_000_000_000n
+  }, [skipThreshold])
   const {
     data: livePositions,
     isLoading: isLoadingPositions,
@@ -394,7 +401,7 @@ export function useHomeMagicOptimizerScan() {
       const defaultMarketApr = getDefaultMarketAprByAssetSymbol(activeAsset.symbol)
       if (runResult.status === 'success' && runResult.result) {
         const aprGainWad = runResult.result.optimized.blendedAprWad - runResult.result.current.blendedAprWad
-        if (aprGainWad > NO_BENEFIT_DELTA_APR_WAD) {
+        if (aprGainWad > noBenefitDeltaAprWad) {
           const nowMs = Date.now()
           const pct = Number(aprGainWad) / 1e16
           const currentAprPct = Number(runResult.result.current.blendedAprWad) / 1e16
@@ -480,7 +487,7 @@ export function useHomeMagicOptimizerScan() {
       active = false
       worker.terminate()
     }
-  }, [activeAsset, addOpportunity, chainId, marketAprBySymbol, optimizeReadResult, request, selectedUserMarketsUsd, upsertPrecomputedResult, userAddress])
+  }, [activeAsset, addOpportunity, chainId, marketAprBySymbol, noBenefitDeltaAprWad, optimizeReadResult, request, selectedUserMarketsUsd, upsertPrecomputedResult, userAddress])
 
   useEffect(() => {
     return () => {

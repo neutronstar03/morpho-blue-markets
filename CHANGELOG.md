@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.4 - 2026-04-16
+
+### Changed
+- feat: Added configurable "Skip optimization threshold" in Advanced Settings (default 0.25%, range 0–10%, 0.25% steps). Replaces the hardcoded 25 bps buffer; setting to 0% disables the no-op filter entirely.
+
 ## v1.4.3 - 2026-04-16
 
 ### Changed

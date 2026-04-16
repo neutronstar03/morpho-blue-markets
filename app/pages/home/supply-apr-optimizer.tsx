@@ -45,9 +45,6 @@ import { SupplyAprOptimizerForm } from '~/pages/home/supply-apr-optimizer/optimi
 import { SupplyAprOptimizerResults } from '~/pages/home/supply-apr-optimizer/optimizer-results'
 
 export function SupplyAprOptimizer() {
-  // If the blended APR improvement is <= this threshold, show a "no-op" plan.
-  // 0.25% = 0.0025 in WAD terms (1e18 = 100%).
-  const NO_BENEFIT_DELTA_APR_WAD = 2_500_000_000_000_000n
   const MAX_OPTIMIZER_ITERATIONS = 1000
   const OPTIMIZER_READ_CHUNK_SIZE = 50
   const OPTIMIZER_READ_CACHE_TTL_MS = 60_000
@@ -83,6 +80,14 @@ export function SupplyAprOptimizer() {
     'supply-apr-optimizer:strategy',
     'maxYield',
   )
+  const [skipThreshold] = useLocalStorage<string>('supply-apr-optimizer:skip-threshold', '0.25')
+  const noBenefitDeltaAprWad = useMemo(() => {
+    const raw = skipThreshold?.trim()
+    if (!raw)
+      return 2_500_000_000_000_000n // default 0.25%
+    const parsed = parseTokenAmount(raw, 16)
+    return parsed >= 0n ? parsed : 2_500_000_000_000_000n
+  }, [skipThreshold])
   const optimizerPreset = useHomeMagicOptimizerStore(state => state.optimizerPreset)
   const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
   const consumeFreshPrecomputedResult = useHomeMagicOptimizerStore(state => state.consumeFreshPrecomputedResult)
@@ -753,7 +758,7 @@ export function SupplyAprOptimizer() {
     if (parsedNewDepositAssets > 0n)
       return result
     const aprGainWad = result.optimized.blendedAprWad - result.current.blendedAprWad
-    const noBenefit = aprGainWad <= NO_BENEFIT_DELTA_APR_WAD
+    const noBenefit = aprGainWad <= noBenefitDeltaAprWad
     if (!noBenefit)
       return result
 
@@ -766,7 +771,7 @@ export function SupplyAprOptimizer() {
         deltaAssets: 0n,
       })),
     }
-  }, [NO_BENEFIT_DELTA_APR_WAD, ctx.run.error, parsedNewDepositAssets, result])
+  }, [noBenefitDeltaAprWad, ctx.run.error, parsedNewDepositAssets, result])
 
   const totalAllocatedAssets = useMemo(() => {
     if (!displayResult)

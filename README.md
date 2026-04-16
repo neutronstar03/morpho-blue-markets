@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.4` (2026-04-16): Added configurable "Skip optimization threshold" in Advanced Settings (default 0.25%, range 0–10%) to control when the optimizer treats small APR improvements as no-ops.
 - `v1.4.3` (2026-04-16): Blacklist recap action buttons now use uniform "Enable Asset" green-themed styling with fixed text wrapping; added Advanced Settings section for managing blacklist recap visibility.
 - `v1.4.2` (2026-04-15): removed PWA manifest and Android icons since this is a backend-dependent DeFi webapp, not an installable PWA.
 - `v1.4.1` (2026-04-15): Home Positions asset-group summary now cycles through 3 states (USD → native token → yearly), and magic optimizer scan uses stored per-asset Market APR values instead of hardcoded 10%.
