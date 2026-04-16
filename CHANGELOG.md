@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.5 - 2026-04-17
+
+### Added
+- feat: Liquidations row in the Market page Collateral section showing total liquidation count for the market (0 = red, >0 = green). Sourced from the Morpho Blue GraphQL API transactions endpoint.
+
 ## v1.4.4 - 2026-04-16
 
 ### Changed

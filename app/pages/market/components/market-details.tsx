@@ -2,6 +2,7 @@ import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { useState } from 'react'
 import { formatLltv, formatPercent, formatUsd } from '~/lib/formatters'
+import { useMarketLiquidations } from '~/lib/hooks/graphql/use-market-liquidations'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
@@ -52,6 +53,11 @@ export function MarketDetails({ market }: MarketDetailsProps) {
     chainId: market.morphoBlue.chain.id,
     collateralAddress: market.collateralAsset.address,
   })
+
+  const { data: liquidationCount, isLoading: isLiqCountLoading } = useMarketLiquidations(
+    market.uniqueKey,
+    market.morphoBlue.chain.id,
+  )
 
   const [showLiqInfo, setShowLiqInfo] = useState(false)
   const [showSafuInfo, setShowSafuInfo] = useState(false)
@@ -176,6 +182,20 @@ export function MarketDetails({ market }: MarketDetailsProps) {
             : (
                 <XCircleIcon className="h-5 w-5 text-red-500 inline-block" />
               )
+        }
+      />
+      <DetailRow
+        label="Liquidations"
+        value={
+          isLiqCountLoading
+            ? 'Loading\u2026'
+            : liquidationCount != null
+              ? (
+                  <span className={liquidationCount === 0 ? 'text-red-500' : 'text-green-500'}>
+                    {liquidationCount}
+                  </span>
+                )
+              : '\u2014'
         }
       />
 

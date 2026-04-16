@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.5` (2026-04-17): added Liquidations row to the Market page Collateral section showing total liquidation count per market (0 = red, >0 = green).
 - `v1.4.4` (2026-04-16): Added configurable "Skip optimization threshold" in Advanced Settings (default 0.25%, range 0–10%) to control when the optimizer treats small APR improvements as no-ops.
 - `v1.4.3` (2026-04-16): Blacklist recap action buttons now use uniform "Enable Asset" green-themed styling with fixed text wrapping; added Advanced Settings section for managing blacklist recap visibility.
 - `v1.4.2` (2026-04-15): removed PWA manifest and Android icons since this is a backend-dependent DeFi webapp, not an installable PWA.
