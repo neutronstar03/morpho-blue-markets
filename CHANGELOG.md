@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.3 - 2026-04-16
+
+### Changed
+- ui: Blacklist recap action buttons now show uniform "Enable Asset" text with green-themed styling, and fixed text wrapping in token names and button labels.
+- feat: Added Advanced Settings section to Home for managing the Blacklist Recap visibility and future user preferences.
+
 ## v1.4.2 - 2026-04-15
 
 ### Changed

@@ -1,4 +1,5 @@
 import type { MouseEvent } from 'react'
+import { Settings2 } from 'lucide-react'
 import pkg from '../../package.json'
 import { Container } from './ui/container'
 
@@ -71,18 +72,7 @@ export function Footer() {
   const shouldLinkCommit = !!(repoUrl && gitSha && isLikelyGitSha(gitSha) && repoUrl.includes('github.com/'))
   const commitUrl = shouldLinkCommit ? `${repoUrl.replace(/\/$/, '')}/commit/${gitSha}` : null
 
-  const onWipeCache = (event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault()
-    if (typeof window === 'undefined')
-      return
-    try {
-      window.localStorage.clear()
-    }
-    catch {} // Ignore storage errors and still refresh.
-    window.location.reload()
-  }
-
-  const onOpenBlacklistRecap = (event: MouseEvent<HTMLAnchorElement>) => {
+  const onOpenAdvancedSettings = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault()
     if (typeof window === 'undefined')
       return
@@ -90,10 +80,10 @@ export function Footer() {
     const homePath = new URL(baseUrl && typeof baseUrl === 'string' ? baseUrl : '/', window.location.origin).pathname
     const isHome = window.location.pathname === homePath
     if (isHome) {
-      window.dispatchEvent(new Event('open-blacklist-recap'))
+      window.dispatchEvent(new Event('open-advanced-settings'))
       return
     }
-    window.location.assign(`${homePath}#blacklist-recap`)
+    window.location.assign(`${homePath}#advanced-settings`)
   }
 
   return (
@@ -165,19 +155,12 @@ export function Footer() {
 
             <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
               <a
-                href="#blacklist-recap"
-                onClick={onOpenBlacklistRecap}
-                className="underline underline-offset-2 hover:text-gray-200"
+                href="#advanced-settings"
+                onClick={onOpenAdvancedSettings}
+                className="inline-flex items-center gap-1.5 underline underline-offset-2 hover:text-gray-200"
               >
-                Blacklist recap
-              </a>
-              <a
-                href="#"
-                onClick={onWipeCache}
-                className="underline underline-offset-2 hover:text-gray-200"
-                title="Clear local cache and reload"
-              >
-                Wipe cache & reload
+                <Settings2 className="h-3.5 w-3.5" />
+                Advanced
               </a>
             </div>
           </div>

@@ -41,7 +41,21 @@ interface HomeMagicPrecomputedResult {
   result: OptimizeSupplyWithPositionsResult
 }
 
+const LS_DISABLED_KEY = 'home-magic:disabled'
+
+function readInitialDisabled(): boolean {
+  if (typeof window === 'undefined')
+    return false
+  try {
+    return window.localStorage.getItem(LS_DISABLED_KEY) === '1'
+  }
+  catch {
+    return false
+  }
+}
+
 interface HomeMagicOptimizerState {
+  disabled: boolean
   isScanning: boolean
   scanChainId?: number
   scanCurrentAssetSymbol?: string
@@ -50,6 +64,7 @@ interface HomeMagicOptimizerState {
   opportunities: HomeMagicOpportunity[]
   precomputedResults: HomeMagicPrecomputedResult[]
   optimizerPreset?: HomeMagicOptimizerPreset
+  setDisabled: (value: boolean) => void
   startScan: (args: { chainId: number, totalAssets: number }) => void
   setScanProgress: (args: { assetSymbol: string, index: number }) => void
   finishScan: () => void
@@ -57,6 +72,7 @@ interface HomeMagicOptimizerState {
   addOpportunity: (opportunity: HomeMagicOpportunity) => void
   dismissOpportunity: (id: string) => void
   clearOpportunitiesForChain: (chainId: number) => void
+  clearAllOpportunities: () => void
   pruneExpiredHomeMagicItems: (nowMs?: number) => void
   upsertPrecomputedResult: (entry: HomeMagicPrecomputedResult) => void
   consumeFreshPrecomputedResult: (args: {
@@ -73,6 +89,7 @@ interface HomeMagicOptimizerState {
 }
 
 export const useHomeMagicOptimizerStore = create<HomeMagicOptimizerState>((set, get) => ({
+  disabled: readInitialDisabled(),
   isScanning: false,
   scanChainId: undefined,
   scanCurrentAssetSymbol: undefined,
@@ -81,6 +98,16 @@ export const useHomeMagicOptimizerStore = create<HomeMagicOptimizerState>((set, 
   opportunities: [],
   precomputedResults: [],
   optimizerPreset: undefined,
+  setDisabled: (value: boolean) => {
+    try {
+      if (value)
+        window.localStorage.setItem(LS_DISABLED_KEY, '1')
+      else
+        window.localStorage.removeItem(LS_DISABLED_KEY)
+    }
+    catch { /* ignore storage errors */ }
+    set({ disabled: value })
+  },
   startScan: ({ chainId, totalAssets }) => {
     set({
       isScanning: true,
@@ -129,6 +156,9 @@ export const useHomeMagicOptimizerStore = create<HomeMagicOptimizerState>((set, 
   },
   clearOpportunitiesForChain: (chainId) => {
     set(state => ({ opportunities: state.opportunities.filter(o => o.chainId !== chainId) }))
+  },
+  clearAllOpportunities: () => {
+    set({ opportunities: [] })
   },
   pruneExpiredHomeMagicItems: (nowMs = Date.now()) => {
     set(state => ({

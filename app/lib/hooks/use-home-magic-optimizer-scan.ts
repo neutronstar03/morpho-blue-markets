@@ -55,6 +55,7 @@ export function useHomeMagicOptimizerScan() {
   } = useLiveMarketPositions()
 
   const {
+    disabled,
     isScanning,
     scanChainId,
     startScan,
@@ -215,6 +216,16 @@ export function useHomeMagicOptimizerScan() {
   }, [chainId, clearScan, isConnected, userAddress])
 
   useEffect(() => {
+    if (!disabled)
+      return
+
+    setRequest(null)
+    setQueue([])
+    setQueueIndex(0)
+    clearScan()
+  }, [clearScan, disabled])
+
+  useEffect(() => {
     if (!isConnected || !userAddress || !chainId)
       return
 
@@ -254,13 +265,14 @@ export function useHomeMagicOptimizerScan() {
   }, [livePositions])
 
   const canInitializeScan = useMemo(() => {
-    return isConnected
+    return !disabled
+      && isConnected
       && !!userAddress
       && !!chainId
       && !isLoadingPositions
       && isHomeRoute
       && !isScanning
-  }, [chainId, isConnected, isHomeRoute, isLoadingPositions, isScanning, userAddress])
+  }, [chainId, disabled, isConnected, isHomeRoute, isLoadingPositions, isScanning, userAddress])
 
   useEffect(() => {
     if (!canInitializeScan)

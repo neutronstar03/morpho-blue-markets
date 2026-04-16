@@ -1,7 +1,7 @@
 import type { Route } from './+types/home'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import { X } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
 import { Header } from '~/components/header'
 import { Button } from '~/components/ui/button'
@@ -14,6 +14,7 @@ import { formatUsd } from '~/lib/formatters'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { AdvancedList } from '~/pages/home/advanced-list'
+import { AdvancedSettings } from '~/pages/home/advanced-settings'
 import { BatchWithdraw } from '~/pages/home/batch-withdraw'
 import { BlacklistRecap } from '~/pages/home/blacklist-recap'
 import { Position } from '~/pages/home/position'
@@ -32,10 +33,14 @@ export default function HomePage() {
   const opportunities = useHomeMagicOptimizerStore(state => state.opportunities)
   const dismissOpportunity = useHomeMagicOptimizerStore(state => state.dismissOpportunity)
   const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
+  const [showAdvancedSettings, setShowAdvancedSettings] = useLocalStorage<boolean>('home:show-advanced-settings', false)
   const [showBlacklistRecap, setShowBlacklistRecap] = useLocalStorage<boolean>('home:show-blacklist-recap', false)
   const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
+  const advancedSettingsRef = useRef<HTMLDivElement | null>(null)
   const blacklistRecapRef = useRef<HTMLDivElement | null>(null)
+  const shouldScrollToAdvancedSettingsRef = useRef(false)
   const shouldScrollToBlacklistRecapRef = useRef(false)
+  const showAdvancedSettingsRef = useRef(showAdvancedSettings)
   const showBlacklistRecapRef = useRef(showBlacklistRecap)
 
   const chainOpportunities = opportunities.filter(o => o.chainId === chain?.id)
@@ -45,56 +50,75 @@ export default function HomePage() {
   }, [setRequiredChainId])
 
   useEffect(() => {
+    showAdvancedSettingsRef.current = showAdvancedSettings
+  }, [showAdvancedSettings])
+
+  useEffect(() => {
     showBlacklistRecapRef.current = showBlacklistRecap
   }, [showBlacklistRecap])
 
+  const scrollToElement = useCallback((el: HTMLElement | null) => {
+    if (!el)
+      return
+    const top = el.getBoundingClientRect().top + window.scrollY - 88
+    window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+  }, [])
+
   useEffect(() => {
-    const scrollToBlacklistRecap = () => {
-      const el = blacklistRecapRef.current
-      if (!el)
-        return false
-      const top = el.getBoundingClientRect().top + window.scrollY - 88
-      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
-      return true
+    const openAdvancedSettings = () => {
+      shouldScrollToAdvancedSettingsRef.current = true
+      if (showAdvancedSettingsRef.current) {
+        scrollToElement(advancedSettingsRef.current)
+        return
+      }
+      setShowAdvancedSettings(true)
     }
 
     const openBlacklistRecap = () => {
       shouldScrollToBlacklistRecapRef.current = true
       if (showBlacklistRecapRef.current) {
-        scrollToBlacklistRecap()
+        scrollToElement(blacklistRecapRef.current)
         return
       }
       setShowBlacklistRecap(true)
     }
 
     const onHashChange = () => {
-      if (window.location.hash === '#blacklist-recap')
+      const hash = window.location.hash
+      if (hash === '#advanced-settings')
+        openAdvancedSettings()
+      else if (hash === '#blacklist-recap')
         openBlacklistRecap()
     }
 
+    window.addEventListener('open-advanced-settings', openAdvancedSettings)
     window.addEventListener('open-blacklist-recap', openBlacklistRecap)
     window.addEventListener('hashchange', onHashChange)
-    if (window.location.hash === '#blacklist-recap')
+
+    const hash = window.location.hash
+    if (hash === '#advanced-settings')
+      openAdvancedSettings()
+    else if (hash === '#blacklist-recap')
       openBlacklistRecap()
 
     return () => {
+      window.removeEventListener('open-advanced-settings', openAdvancedSettings)
       window.removeEventListener('open-blacklist-recap', openBlacklistRecap)
       window.removeEventListener('hashchange', onHashChange)
     }
-  }, [setShowBlacklistRecap])
+  }, [scrollToElement, setShowAdvancedSettings, setShowBlacklistRecap])
 
   useEffect(() => {
-    if (!showBlacklistRecap || !shouldScrollToBlacklistRecapRef.current)
+    if (!showAdvancedSettings || !shouldScrollToAdvancedSettingsRef.current)
       return
 
     let raf2 = 0
     const tryScroll = () => {
-      const el = blacklistRecapRef.current
+      const el = advancedSettingsRef.current
       if (!el)
         return
-      shouldScrollToBlacklistRecapRef.current = false
-      const top = el.getBoundingClientRect().top + window.scrollY - 88
-      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+      shouldScrollToAdvancedSettingsRef.current = false
+      scrollToElement(el)
     }
 
     const raf1 = window.requestAnimationFrame(() => {
@@ -106,7 +130,40 @@ export default function HomePage() {
       if (raf2)
         window.cancelAnimationFrame(raf2)
     }
-  }, [showBlacklistRecap])
+  }, [scrollToElement, showAdvancedSettings])
+
+  useEffect(() => {
+    if (!showBlacklistRecap || !shouldScrollToBlacklistRecapRef.current)
+      return
+
+    let raf2 = 0
+    const tryScroll = () => {
+      const el = blacklistRecapRef.current
+      if (!el)
+        return
+      shouldScrollToBlacklistRecapRef.current = false
+      scrollToElement(el)
+    }
+
+    const raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(tryScroll)
+    })
+
+    return () => {
+      window.cancelAnimationFrame(raf1)
+      if (raf2)
+        window.cancelAnimationFrame(raf2)
+    }
+  }, [scrollToElement, showBlacklistRecap])
+
+  const handleShowBlacklistRecap = useCallback(() => {
+    shouldScrollToBlacklistRecapRef.current = true
+    if (showBlacklistRecapRef.current) {
+      scrollToElement(blacklistRecapRef.current)
+      return
+    }
+    setShowBlacklistRecap(true)
+  }, [scrollToElement, setShowBlacklistRecap])
 
   const handleOpenOptimizer = (opportunity: {
     id: string
@@ -154,6 +211,21 @@ export default function HomePage() {
       {/* Main Content */}
       <Main>
         <div className="w-full">
+          {showAdvancedSettings && (
+            <div ref={advancedSettingsRef} id="advanced-settings" className="mb-8">
+              <AdvancedSettings
+                onClose={() => setShowAdvancedSettings(false)}
+                onShowBlacklistRecap={handleShowBlacklistRecap}
+              />
+            </div>
+          )}
+
+          {showBlacklistRecap && (
+            <div ref={blacklistRecapRef} id="blacklist-recap" className="mb-8">
+              <BlacklistRecap onClose={() => setShowBlacklistRecap(false)} />
+            </div>
+          )}
+
           {chainOpportunities.length > 0 && (
             <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               {chainOpportunities.map((opportunity, index) => {
@@ -240,11 +312,6 @@ export default function HomePage() {
           <div className="mt-8">
             <AdvancedList />
           </div>
-          {showBlacklistRecap && (
-            <div ref={blacklistRecapRef} id="blacklist-recap" className="mt-8">
-              <BlacklistRecap onClose={() => setShowBlacklistRecap(false)} />
-            </div>
-          )}
         </div>
       </Main>
     </>

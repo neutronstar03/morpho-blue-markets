@@ -54,7 +54,7 @@ function buildBlacklistRecapRows(): BlacklistRecapRow[] {
     .filter(entry => entry.decision === 'ban')
     .map(entry => ({
       kind: 'manual_ban' as const,
-      reasonLabel: 'Unsafe collateral',
+      reasonLabel: 'Unsafe asset',
       chainId: entry.chainId,
       collateralAddress: entry.collateralAddress,
       ts: entry.ts,
@@ -151,7 +151,7 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
                           <td className="px-6 py-4 align-top text-sm text-white">
                             <div className="min-w-0">
                               <div className="font-medium text-white">{row.symbol || formatAddress(row.collateralAddress)}</div>
-                              <div className="mt-1 text-sm text-gray-300">{row.name || 'Unknown token'}</div>
+                              <div className="mt-1 whitespace-nowrap text-sm text-gray-300">{row.name || 'Unknown token'}</div>
                             </div>
                           </td>
                           <td className="px-6 py-4 align-top text-sm text-gray-300">{getSupportedChainName(row.chainId)}</td>
@@ -182,9 +182,9 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
                               variant="outline"
                               size="sm"
                               onClick={() => onRemove(row)}
-                              className="border-gray-600 text-gray-200 hover:bg-gray-700/50"
+                              className="whitespace-nowrap border-green-700/30 bg-green-900/10 text-green-300 hover:bg-green-900/20"
                             >
-                              {row.kind === 'local_blacklist' ? 'Remove blacklist' : 'Remove ban'}
+                              Enable Asset
                             </Button>
                           </td>
                         </tr>
@@ -232,9 +232,10 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
                           type="button"
                           variant="outline"
                           size="sm"
+                          className="whitespace-nowrap border-green-700/30 bg-green-900/10 text-green-300 hover:bg-green-900/20"
                           onClick={() => onRemove(row)}
                         >
-                          {row.kind === 'local_blacklist' ? 'Remove blacklist' : 'Remove ban'}
+                          Enable Asset
                         </Button>
                       </div>
                     </div>
