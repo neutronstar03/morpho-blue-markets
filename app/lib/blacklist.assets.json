@@ -31,6 +31,16 @@
     {
       "assetContract": "0x3d4762b4bb4b4c922377fe5b887e900d7fb64cdf",
       "comment": "Clearly scam tokens"
+    },
+    {
+      "assetContract": "0xa1290d69c65a6fe4df752f95823fae25cb99e5a7",
+      "comment": "rsETH: blacklisted after KelpDAO bridge exploit of 18 April"
+    }
+  ],
+  "10": [
+    {
+      "assetContract": "0x4186bfc76e2e237523cbc30fd220fe055156b41f",
+      "comment": "rsETH: blacklisted after KelpDAO bridge exploit of 18 April"
     }
   ],
   "56": [
@@ -59,6 +69,16 @@
     {
       "assetContract": "0x0a3d8466f5de586fa5f6de117301e2f90bcc5c48",
       "comment": "RLP: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
+    },
+    {
+      "assetContract": "0xa321d2a72db265c04d5c1318ed69a719681bbade",
+      "comment": "rsETH: blacklisted after KelpDAO bridge exploit of 18 April"
+    }
+  ],
+  "130": [
+    {
+      "assetContract": "0xc3eacf0612346366db554c991d7858716db09f58",
+      "comment": "rsETH: blacklisted after KelpDAO bridge exploit of 18 April"
     }
   ],
   "1868": [
@@ -105,6 +125,10 @@
     {
       "assetContract": "0xc31389794ffac23331e0d9f611b7953f90aa5fdc",
       "comment": "RLP: Resolv exposure manually blacklisted after hack; avoid new deposits."
+    },
+    {
+      "assetContract": "0x1bc71130a0e39942a7658878169764bbd8a45993",
+      "comment": "rsETH: blacklisted after KelpDAO bridge exploit of 18 April"
     }
   ],
   "42161": [
@@ -127,6 +151,10 @@
     {
       "assetContract": "0x57587e47a0af9d1bb93c0d4b3df671b053ab4366",
       "comment": "GVLT: reported unreliable/scam Arbitrum asset; avoid new deposits."
+    },
+    {
+      "assetContract": "0x4186bfc76e2e237523cbc30fd220fe055156b41f",
+      "comment": "rsETH: blacklisted after KelpDAO bridge exploit of 18 April"
     }
   ],
   "80094": [

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.6 - 2026-04-19
+
+### Changed
+- blacklist: added manual rsETH blacklist entries on supported app chains with known token deployments after the KelpDAO bridge exploit of 18 April, so discovery and deposit flows avoid suggesting those markets.
+
 ## v1.4.5 - 2026-04-17
 
 ### Added

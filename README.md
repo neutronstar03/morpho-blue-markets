@@ -70,6 +70,7 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.6` (2026-04-19): added manual rsETH blacklist entries across supported app chains with known deployments after the KelpDAO bridge exploit of 18 April so discovery and deposit flows avoid new deposits there.
 - `v1.4.5` (2026-04-17): added Liquidations row to the Market page Collateral section showing total liquidation count per market (0 = red, >0 = green).
 - `v1.4.4` (2026-04-16): Added configurable "Skip optimization threshold" in Advanced Settings (default 0.25%, range 0–10%) to control when the optimizer treats small APR improvements as no-ops.
 - `v1.4.3` (2026-04-16): Blacklist recap action buttons now use uniform "Enable Asset" green-themed styling with fixed text wrapping; added Advanced Settings section for managing blacklist recap visibility.
