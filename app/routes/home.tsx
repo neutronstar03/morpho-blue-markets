@@ -204,7 +204,7 @@ export default function HomePage() {
       {/* Header */}
       <Header>
         <h1 className="text-xl font-semibold text-white">
-          Morpho Blue Markets
+          mbm
         </h1>
       </Header>
 

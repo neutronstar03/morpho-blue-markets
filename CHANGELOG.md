@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.7 - 2026-04-22
+
+### Changed
+- refactor: split the oversized Home optimizer, bundle execution, and batch-withdraw entry components into page-local controller hooks so the TSX entrypoints stay presentation-focused while preserving existing behavior.
+- refactor: added a shared `useMarketParamsById()` Bundler3 hook under `app/lib/` so optimizer and batch-withdraw execution flows reuse the same Morpho market-params loading path.
+- docs: refreshed `AGENTS.md`, added `AGENTS.technology.md`, and added a form-writing companion doc to better document repo workflow, architecture, and agent-facing conventions.
+
 ## v1.4.6 - 2026-04-19
 
 ### Changed

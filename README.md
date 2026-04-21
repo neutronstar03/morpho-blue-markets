@@ -70,37 +70,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.7` (2026-04-22): refactored the Home optimizer, bundle execution, and batch-withdraw flows into page-local controller hooks and a shared Bundler3 market-params hook, and refreshed the repo agent docs for the current workflow/architecture.
 - `v1.4.6` (2026-04-19): added manual rsETH blacklist entries across supported app chains with known deployments after the KelpDAO bridge exploit of 18 April so discovery and deposit flows avoid new deposits there.
 - `v1.4.5` (2026-04-17): added Liquidations row to the Market page Collateral section showing total liquidation count per market (0 = red, >0 = green).
-- `v1.4.4` (2026-04-16): Added configurable "Skip optimization threshold" in Advanced Settings (default 0.25%, range 0–10%) to control when the optimizer treats small APR improvements as no-ops.
-- `v1.4.3` (2026-04-16): Blacklist recap action buttons now use uniform "Enable Asset" green-themed styling with fixed text wrapping; added Advanced Settings section for managing blacklist recap visibility.
-- `v1.4.2` (2026-04-15): removed PWA manifest and Android icons since this is a backend-dependent DeFi webapp, not an installable PWA.
-- `v1.4.1` (2026-04-15): Home Positions asset-group summary now cycles through 3 states (USD → native token → yearly), and magic optimizer scan uses stored per-asset Market APR values instead of hardcoded 10%.
-- `v1.4.0` (2026-04-15): added edge-cached API endpoints (popular loan assets, vault APRs, token liquidity) for instant first paint via Cloudflare Cache API, added Max Deploy optimizer strategy (hold above base rate), added +/- stepper buttons to Market APR input, grouped stablecoin APRs, and fixed `cp -R` for Windows compatibility.
-- `v1.3.0` (2026-04-13): migrated to Cloudflare Pages at `mbm.ns03.dev` and added anonymous analytics with custom event tracking.
-- `v1.2.19` (2026-04-11): expanded the manual Resolv blacklist to cover direct `USR`, `wstUSR`, and `RLP` token contracts across the currently discovered EVM deployments so optimizer/discovery flows avoid new deposits there.
-- `v1.2.18` (2026-04-08): fixed home-page chain quick-switch actions so they no longer leave a stale required-network state behind that could make the navbar incorrectly show a "Switch to OTHERCHAIN" prompt after changing networks from RainbowKit.
-- `v1.2.17` (2026-04-08): added a micro manual blacklist for two reported Arbitrum `GVLT` contracts flagged as unreliable/scam so discovery and deposit flows avoid them.
-- `v1.2.16` (2026-04-04): added a shared Transaction Dock + success modal for guided multi-step wallet flows, chained optimizer/batch-withdraw/deposit/withdraw prerequisites behind single CTAs, improved timeout feedback with a warning-state Clear action, and reset the optimizer immediately after successful execution.
-- `v1.2.15` (2026-04-04): added a one-click path from grouped Home Positions into the Supply APR optimizer and filtered zero-derived-asset dust positions out of portfolio and optimizer flows.
-- `v1.2.14` (2026-04-04): made Supply APR optimizer Market APR sticky by asset symbol across asset/chain switches and reloads, reused remembered values when opening optimizer presets, and documented the repo's `prep for release` workflow.
-- `v1.2.13` (2026-04-03): enriched Home Positions asset sections with per-asset weight/APR metadata, a switchable total-vs-yearly summary control across desktop and mobile, and leaner position rows with less redundant labeling.
-- `v1.2.12` (2026-04-02): updated Morpho GraphQL usage for the newer private API (`marketId`, `loanAsset.price.usd`), restored Position USD/weight calculations when `supplyAssetsUsd` is null, and hardened related optimizer data flows against missing GraphQL USD fields.
-- `v1.2.11` (2026-04-02): added a manual market blacklist overlay, hid those markets from portfolio/withdraw recaps, grouped Positions by lent asset with cross-chain quick-switch pills, and added a lower default Market APR override for `WETH`.
-- `v1.2.10` (2026-04-01): made the Supply APR optimizer always open, removed the Start gate, and restored a visible asset placeholder.
-- `v1.2.9` (2026-04-01): added the missing Base `RLP` Resolv-related asset to the permanent blacklist.
-- `v1.2.8` (2026-04-01): enabled Monad collateral quick links across explorer/GeckoTerminal/CoinGecko and permanently blacklisted two reported scam-token assets on mainnet and Base.
-- `v1.2.7` (2026-03-28): blacklisted direct Resolv assets and related wrapper families after the depeg so optimizer/discovery flows avoid new deposits there.
-- `v1.2.6` (2026-03-25): simplified optimizer wallet fallback to a fixed 10% APR baseline, colored Market risk vault counts, and refreshed patch-level routing/build/test dependencies.
-- `v1.2.5` (2026-03-23): added a Blacklist Recap review panel for user blacklist + unsafe collateral decisions, improved recap mobile UX, and restored the mobile `Bef 90%` Markets column.
-- `v1.2.4` (2026-03-21): added local collateral blacklist controls, denser mobile market-page UI, richer optimizer opportunity cards, and refreshed app/tooling dependencies.
-- `v1.2.3` (2026-03-16): optimizer now uses a Market APR threshold with wallet fallback, supports vault-informed baseline yield suggestions with Morpho deep links, and includes live tests for vault-derived APR selection.
-- `v1.2.2` (2026-03-15): added a Markets Opportunity Recap, modularized major home/market feature files into page-local submodules, and unified shared deposit/withdraw form UI pieces.
-- `v1.1.30` (2026-02-25): added baseline all-chain optimizer candidate filters (`netSupplyApy >= 1%`, `netSupplyApy <= 600%`, `borrowAssetsUsd >= $5`) for faster optimizer and Home Magic scan runs.
-- `v1.1.29` (2026-02-24): magic scan now starts only from home, continues across route changes, records cooldown on completed scans, and keeps the magic header visible while background scanning is active.
-- `v1.1.28` (2026-02-24): moved optimizer runs to a dedicated web worker (including magic scan), added compact in-button run progress, and reused Clear as Cancel while running.
-- `v1.1.27` (2026-02-24): reduced magic optimizer cooldown to 30 minutes and added a periodic 60-second eligibility check so rescans can restart automatically after cooldown.
-- `v1.1.26` (2026-02-24): background "magic optimizer" scan, opportunity cards, and short-lived precomputed optimizer results for faster click-to-optimize flows.
 
 ## Live Version
 
