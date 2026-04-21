@@ -13,6 +13,23 @@
 - app/lib/contexts/optimizer.context.tsx: React context with strategy state (maxYield/maxDeploy)
 - tasks/: plans, checklists, work notes, history (prunable)
 
+## Deployment (Cloudflare Pages)
+- Production is deployed on Cloudflare Pages at `https://mbm.ns03.dev`.
+- Static build output is `build/client` (`wrangler.toml` sets `pages_build_output_dir = "./build/client"`).
+- Main build command is `bun run build` (`react-router build`).
+- Cloudflare Pages Functions live in `functions/` and must be copied into the deploy artifact before preview/deploy:
+  - local preview: `bun run preview:cf`
+  - deploy: `bun run deploy:cf`
+- The deploy scripts copy `functions/` into `build/client/functions` and then run `wrangler pages ...`.
+- Current Pages-secret dependency: `UMAMI_BACKEND_URL` for the `/ev` analytics proxy.
+- React Router is built as SPA (`ssr: false`) and served from the domain root (`/`), not a subpath.
+- Generated whitelist/blacklist datasets are not part of the Cloudflare Pages deploy artifact.
+- Runtime dataset lookup order is:
+  1. optional local `public/*.json` files for local dev/pull-once workflows
+  2. canonical published datasets on GitHub Pages under `https://neutronstar03.github.io/mbm-artifacts/v1/`
+  3. browser localStorage cache
+- Do not commit `public/whitelist.collaterals.json` or `public/blacklist.markets.json`; they are local generated/pulled files only.
+
 ## Invariants / gotchas (keep these true)
 - Market APY previews must use IRM math only; no coarse utilization estimates.
 - If IRM data is missing, show "----" or an explicit error (do not fake a fallback).
@@ -24,7 +41,7 @@
   - Strategy is stored in `optimizer.context.tsx` (`inputs.strategy`) and passed through the worker.
   - The `holdAboveAprWad` constraint in `SupplyOptimizerConstraints` controls hold behavior for max-deploy.
   - Both strategies share the same greedy step-by-step loop and scoring; the difference is in minFinal initialization.
-- Keep `public/blacklist.markets.json` generator-shaped (`{ chainId, uniqueKey }` only); do not add manual notes there.
+- Keep generated `public/blacklist.markets.json` generator-shaped (`{ chainId, uniqueKey }` only); do not add manual notes there.
 - For manual/shady entries with context, prefer `app/lib/blacklist.assets.json` and use the `comment` field.
 
 ## Debugging (UI via MCP DevTools)

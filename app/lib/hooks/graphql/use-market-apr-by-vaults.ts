@@ -1,9 +1,5 @@
 import type { QueryVaultsV1Result, QueryVaultsV2Result, SupplyVaultV1Data, SupplyVaultV2Data } from '~/lib/graphql/queries/vaults-by-asset'
-import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
-import { supportedChainMap } from '~/lib/addresses'
 import { OrderDirection, QUERY_VAULTS_V1, QUERY_VAULTS_V2, VaultOrderBy, VaultV2OrderBy } from '~/lib/graphql/queries/vaults-by-asset'
-import { STALE_TIME_MEDIUM_MS } from '~/lib/hooks/query-stale-times'
 import { trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
 import { graphqlClient } from '../../graphql/client'
 
@@ -54,12 +50,6 @@ export interface EffectiveVaultApr {
   vaultAddress: string
   vaultName: string
   vaultChainId: number
-}
-
-export interface UseVaultAprMapOptions {
-  minNetApy?: number
-  minLiquidityUsd?: number
-  enabled?: boolean
 }
 
 function toAprInput(netApy: number): string {
@@ -221,60 +211,5 @@ export async function fetchMarketAprByVaults(chainIds: number[], config: MarketA
     eligibleVaults,
     effectiveByChainId: buildEffectiveVaultAprMap(eligibleVaults, chainIds),
     popularAssets: listPopularVaultAssetSymbols(eligibleVaults),
-  }
-}
-
-export function useMarketAprByVaults(opts: UseVaultAprMapOptions = {}) {
-  const minNetApy = opts.minNetApy ?? 0.07
-  const minLiquidityUsd = opts.minLiquidityUsd ?? 50_000
-  const enabled = opts.enabled ?? true
-  const chainIds = useMemo(() => [...supportedChainMap.keys()], [])
-
-  // Edge-cached placeholder: fetches pre-processed vault data from our edge cache
-  // for instant first paint while the live GraphQL query runs in background.
-  const edgeQuery = useQuery<SupplyVaultData[]>({
-    queryKey: ['edge-cached', 'vault-aprs', minNetApy, minLiquidityUsd],
-    queryFn: async () => {
-      const params = new URLSearchParams({
-        minLiquidityUsd: String(minLiquidityUsd),
-      })
-      const res = await fetch(`/api/vault-aprs?${params}`)
-      if (!res.ok)
-        throw new Error(`Edge cache error: ${res.status}`)
-      const raw = await res.json() as {
-        v1: { data: QueryVaultsV1Result }
-        v2: { data: QueryVaultsV2Result }
-      }
-      const allVaults = [
-        ...(raw.v1?.data?.vaults?.items ?? []).map(normalizeVaultV1),
-        ...(raw.v2?.data?.vaultV2s?.items ?? []).map(normalizeVaultV2),
-      ]
-      return filterEligibleVaults(allVaults, { minNetApy, minLiquidityUsd })
-    },
-    enabled,
-    staleTime: STALE_TIME_MEDIUM_MS,
-    refetchOnWindowFocus: false,
-  })
-
-  const query = useQuery<SupplyVaultData[]>({
-    queryKey: ['vault-apr-map', minNetApy, minLiquidityUsd],
-    queryFn: async () => {
-      const result = await fetchMarketAprByVaults(chainIds, { minNetApy, minLiquidityUsd })
-      return result.eligibleVaults
-    },
-    enabled,
-    placeholderData: edgeQuery.data,
-    staleTime: STALE_TIME_MEDIUM_MS,
-    refetchOnWindowFocus: false,
-  })
-
-  const effectiveByChainId = useMemo(() => {
-    return buildEffectiveVaultAprMap(query.data ?? [], chainIds)
-  }, [chainIds, query.data])
-
-  return {
-    ...query,
-    vaults: query.data ?? [],
-    effectiveByChainId,
   }
 }

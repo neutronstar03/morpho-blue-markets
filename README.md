@@ -34,10 +34,10 @@ This app can run without any precomputed whitelist.
 
 If a market's collateral is unknown, it is highlighted in `yellow` and you can approve/ban it directly on the Market page.
 
-In production, the app will try to load a precomputed whitelist from (in order):
+The app will try to load a precomputed whitelist from (in order):
 
 1) a local static file: `public/whitelist.collaterals.json`
-2) the artifacts repo: `https://neutronstar03.github.io/mbm-artifacts/v1/whitelist.collaterals.json`
+2) the canonical published dataset: `https://neutronstar03.github.io/mbm-artifacts/v1/whitelist.collaterals.json`
 3) a local browser cache (if previously fetched)
 
 If none are available, the whitelist is treated as empty.
@@ -50,7 +50,7 @@ To download the current whitelist from the artifacts repo into your local `publi
 bun run artifacts:pull
 ```
 
-This is a one-time step; after that, `bun dev` can run fully offline.
+This is a one-time local-only step; after that, `bun dev` can run fully offline. These downloaded files are ignored by git and should not be committed.
 
 To also pull the latest market blacklist dataset (optional):
 
@@ -70,9 +70,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.8` (2026-04-22): removed the unused `/api/vault-aprs` edge-cache path, made whitelist/blacklist runtime fallback use the canonical `mbm-artifacts` GitHub Pages datasets, and stopped tracking pulled/generated dataset JSON in this repo.
 - `v1.4.7` (2026-04-22): refactored the Home optimizer, bundle execution, and batch-withdraw flows into page-local controller hooks and a shared Bundler3 market-params hook, and refreshed the repo agent docs for the current workflow/architecture.
 - `v1.4.6` (2026-04-19): added manual rsETH blacklist entries across supported app chains with known deployments after the KelpDAO bridge exploit of 18 April so discovery and deposit flows avoid new deposits there.
-- `v1.4.5` (2026-04-17): added Liquidations row to the Market page Collateral section showing total liquidation count per market (0 = red, >0 = green).
 
 ## Live Version
 

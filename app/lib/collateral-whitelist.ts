@@ -16,7 +16,7 @@ interface WhitelistState {
 const CHANGE_EVENT = 'collateral-whitelist:changed'
 
 const LOCAL_URL_PATH = 'whitelist.collaterals.json'
-const ARTIFACTS_URL = '/mbm-artifacts/v1/whitelist.collaterals.json'
+const ARTIFACTS_URL = 'https://neutronstar03.github.io/mbm-artifacts/v1/whitelist.collaterals.json'
 
 const LS_CACHE_KEY = 'collateral-whitelist-cache:v1'
 
@@ -124,7 +124,7 @@ export function ensureCollateralWhitelistLoaded() {
   setState({ ...whitelistState, status: 'loading' })
   loadPromise = (async () => {
     try {
-      // First try local static file (supports dev "pull-once").
+      // First try a local static file (supports local pull/generate workflows).
       const localUrl = `${baseUrlPrefix()}${LOCAL_URL_PATH}`
       const localRes = await fetchWhitelist(localUrl)
 
@@ -135,7 +135,7 @@ export function ensureCollateralWhitelistLoaded() {
         return
       }
 
-      // If local file is missing, try the artifacts repo (same-origin on GitHub Pages).
+      // If the local file is missing, fall back to the canonical published dataset.
       if (localRes.status === 404) {
         const artifactsRes = await fetchWhitelist(ARTIFACTS_URL)
         if (artifactsRes.ok) {

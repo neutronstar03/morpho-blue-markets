@@ -22,7 +22,7 @@ const CHANGE_EVENT = 'market-blacklist:changed'
 
 const LOCAL_URL_PATH = 'blacklist.markets.json'
 const LOCAL_MANUAL_URL_PATH = 'blacklist.markets.manual.json'
-const ARTIFACTS_URL = '/mbm-artifacts/v1/blacklist.markets.json'
+const ARTIFACTS_URL = 'https://neutronstar03.github.io/mbm-artifacts/v1/blacklist.markets.json'
 
 const LS_CACHE_KEY = 'market-blacklist-cache:v1'
 

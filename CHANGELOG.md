@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.8 - 2026-04-22
+
+### Changed
+- infra: removed the unused `/api/vault-aprs` Cloudflare Pages Function and the dead frontend hook path that depended on it.
+- data: whitelist and market-blacklist loaders now fall back directly to the canonical `https://neutronstar03.github.io/mbm-artifacts/v1/` datasets instead of a stale same-origin `/mbm-artifacts/...` path.
+- repo: stopped tracking pulled/generated `public/whitelist.collaterals.json` and `public/blacklist.markets.json` files in this repo, while keeping local dev support via optional local files and browser cache fallback.
+- docs: documented the Cloudflare Pages deploy flow and the separate runtime dataset/artifact flow in `AGENTS.technology.md` and `README.md`.
+
 ## v1.4.7 - 2026-04-22
 
 ### Changed
