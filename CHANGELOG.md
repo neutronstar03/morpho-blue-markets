@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.9 - 2026-04-22
+
+### Changed
+- blacklist: added manual `wrsETH` blacklist entries on Optimism and Base to extend the earlier post-KelpDAO blacklist coverage for the wrapped rsETH variant.
+
 ## v1.4.8 - 2026-04-22
 
 ### Changed

@@ -70,9 +70,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.9` (2026-04-22): added manual `wrsETH` blacklist entries on Optimism and Base to extend the earlier post-KelpDAO blacklist coverage for the wrapped rsETH variant.
 - `v1.4.8` (2026-04-22): removed the unused `/api/vault-aprs` edge-cache path, made whitelist/blacklist runtime fallback use the canonical `mbm-artifacts` GitHub Pages datasets, and stopped tracking pulled/generated dataset JSON in this repo.
 - `v1.4.7` (2026-04-22): refactored the Home optimizer, bundle execution, and batch-withdraw flows into page-local controller hooks and a shared Bundler3 market-params hook, and refreshed the repo agent docs for the current workflow/architecture.
-- `v1.4.6` (2026-04-19): added manual rsETH blacklist entries across supported app chains with known deployments after the KelpDAO bridge exploit of 18 April so discovery and deposit flows avoid new deposits there.
 
 ## Live Version
 

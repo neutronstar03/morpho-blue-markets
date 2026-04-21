@@ -41,6 +41,10 @@
     {
       "assetContract": "0x4186bfc76e2e237523cbc30fd220fe055156b41f",
       "comment": "rsETH: blacklisted after KelpDAO bridge exploit of 18 April"
+    },
+    {
+      "assetContract": "0x87eee96d50fb761ad85b1c982d28a042169d61b1",
+      "comment": "wrsETH: blacklisted after KelpDAO bridge exploit of 18 April"
     }
   ],
   "56": [
@@ -129,6 +133,10 @@
     {
       "assetContract": "0x1bc71130a0e39942a7658878169764bbd8a45993",
       "comment": "rsETH: blacklisted after KelpDAO bridge exploit of 18 April"
+    },
+    {
+      "assetContract": "0xedfa23602d0ec14714057867a78d01e94176bea0",
+      "comment": "wrsETH: blacklisted after KelpDAO bridge exploit of 18 April"
     }
   ],
   "42161": [
