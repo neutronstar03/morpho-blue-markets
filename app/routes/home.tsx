@@ -22,7 +22,7 @@ import { SupplyAprOptimizer } from '~/pages/home/supply-apr-optimizer'
 
 export function meta(_: Route.MetaArgs) {
   return [
-    { title: 'Morpho Blue Markets' },
+    { title: 'mbm' },
     { name: 'description', content: 'MBM - when the greatest frontend meets the greatest protocol' },
   ]
 }

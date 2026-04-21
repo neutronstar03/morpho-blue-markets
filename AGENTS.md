@@ -1,5 +1,7 @@
-# AGENTS.md (Agent Operator Manual)
+# Agent Operator Manual
 Use this file to navigate the repo quickly, run the right commands, and avoid known footguns.
+
+Name of the project: MBM - Morpho Blue Markets
 
 ## Commands (copy/paste)
 Runtime/toolchain: Node 20 + bun

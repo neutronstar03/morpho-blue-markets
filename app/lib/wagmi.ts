@@ -29,7 +29,7 @@ const hyperEvm = defineChain({
 })
 
 export const config = getDefaultConfig({
-  appName: 'Morpho Blue Markets',
+  appName: 'mbm',
   projectId: '0d13744a3dd855198cde1538ca87976d',
   chains: [arbitrum, base, katana, mainnet, monad, optimism, polygon, unichain, hyperEvm],
   transports: {

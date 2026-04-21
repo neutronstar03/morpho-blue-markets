@@ -1,4 +1,4 @@
-name = "morpho-blue-markets"
+name = "mbm"
 compatibility_date = "2025-04-13"
 pages_build_output_dir = "./build/client"
 

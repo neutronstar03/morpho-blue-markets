@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.10 - 2026-04-22
+
+### Changed
+- feat: added an optional Market page Collateral Review section that only appears for unusual collaterals with a matching external review JSON, including review type, protocol, rank, redeem notes, and source links.
+- infra: added a new `/api/collateral-review` Cloudflare Pages Function that fetches and edge-caches per-collateral review files from the `morpho-collateral-reviews` repo, while local dev falls back to direct raw GitHub fetches.
+- ui: shortened the app/window title and wallet-connect app name to `mbm`, and aligned the Cloudflare Pages project name in `wrangler.toml`.
+
 ## v1.4.9 - 2026-04-22
 
 ### Changed

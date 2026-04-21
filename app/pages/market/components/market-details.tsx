@@ -6,6 +6,7 @@ import { useMarketLiquidations } from '~/lib/hooks/graphql/use-market-liquidatio
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
+import { MarketCollateralReview } from './market-collateral-review'
 
 interface MarketDetailsProps {
   market: SingleMorphoMarket
@@ -198,6 +199,8 @@ export function MarketDetails({ market }: MarketDetailsProps) {
               : '\u2014'
         }
       />
+
+      <MarketCollateralReview market={market} />
 
       <SectionTitle title="Risk" />
       <DetailRow label="Bad Debt" value={formatUsd(market.badDebt.usd)} />
