@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.11 - 2026-04-23
+
+### Fixed
+- fix: Home Positions now refresh Morpho market totals from live RPC `market(id)` reads alongside live user positions, so supplied asset balances match the Market page instead of using stale GraphQL supply totals.
+- fix: position visibility and derived supply USD in the home positions flow now use the same live on-chain market-state source, reducing share-value drift across views.
+
 ## v1.4.10 - 2026-04-22
 
 ### Changed

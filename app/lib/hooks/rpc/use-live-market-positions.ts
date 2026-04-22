@@ -5,6 +5,7 @@ import { useAccount, useReadContracts } from 'wagmi'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName, morphoAddressOnChain } from '~/lib/addresses'
 import { useUserPositions } from '~/lib/hooks/graphql/use-user-positions'
+import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 
 // This interface maps the GraphQL position data to what position.tsx expects
@@ -52,6 +53,13 @@ interface PositionCall {
   args: readonly [`0x${string}`, `0x${string}`]
 }
 
+interface MarketCall {
+  address: `0x${string}`
+  abi: typeof SIMPLIFIED_MORPHO_BLUE_ABI
+  functionName: 'market'
+  args: readonly [`0x${string}`]
+}
+
 /**
  * Efficient Live Market Positions Hook
  *
@@ -95,6 +103,18 @@ export function useLiveMarketPositions() {
     }))
   }, [graphPositions, userAddress, morphoAddress])
 
+  const marketContracts = useMemo<MarketCall[]>(() => {
+    if (!graphPositions || !morphoAddress)
+      return []
+
+    return graphPositions.map<MarketCall>(position => ({
+      address: morphoAddress as `0x${string}`,
+      abi: SIMPLIFIED_MORPHO_BLUE_ABI,
+      functionName: 'market',
+      args: [position.market.uniqueKey as `0x${string}`] as const,
+    }))
+  }, [graphPositions, morphoAddress])
+
   // Step 3: Fetch live position data from RPC
   const {
     data: positionResults,
@@ -109,14 +129,31 @@ export function useLiveMarketPositions() {
     },
   })
 
+  const {
+    data: marketResults,
+    isLoading: isLoadingMarkets,
+    refetch: refetchMarkets,
+    dataUpdatedAt: marketsUpdatedAt,
+  } = useReadContracts({
+    contracts: marketContracts,
+    allowFailure: true,
+    query: {
+      enabled: !!graphPositions && graphPositions.length > 0 && !!morphoAddress,
+      refetchInterval: 20_000,
+    },
+  })
+
   // Step 4: Merge GraphQL market data with live RPC position data
   const userPositions = useMemo<LiveMarketPosition[]>(() => {
     if (!graphPositions)
       return []
 
+    const hasPositionResults = !!positionResults && positionResults.length === graphPositions.length
+    const hasMarketResults = !!marketResults && marketResults.length === graphPositions.length
+
     // If RPC data is not ready yet, use GraphQL data for display
     // This gives us immediate feedback while RPC is loading
-    if (!positionResults || positionResults.length !== graphPositions.length) {
+    if (!hasPositionResults && !hasMarketResults) {
       return graphPositions.map((gp): LiveMarketPosition => ({
         market: {
           uniqueKey: gp.market.uniqueKey,
@@ -144,14 +181,19 @@ export function useLiveMarketPositions() {
     // Merge with live RPC data
     return graphPositions
       .map((gp, index): LiveMarketPosition | null => {
-        const result = positionResults[index]
+        const result = hasPositionResults ? positionResults[index] : undefined
+        const marketResult = hasMarketResults ? marketResults[index] : undefined
 
         // Use live RPC data if available, otherwise fall back to GraphQL
         let supplyShares: bigint
         let borrowShares: bigint
         let collateral: bigint
 
-        if (result.status === 'success' && result.result) {
+        let marketSupplyAssets = gp.market.state.supplyAssets
+        let marketSupplyShares = gp.market.state.supplyShares
+        let marketStateSupplyUsd = gp.market.state.supplyAssetsUsd
+
+        if (result?.status === 'success' && result.result) {
           const [ss, bs, col] = result.result as readonly [bigint, bigint, bigint]
           supplyShares = ss
           borrowShares = bs
@@ -164,11 +206,26 @@ export function useLiveMarketPositions() {
           collateral = BigInt(gp.state.collateral || '0')
         }
 
+        if (marketResult?.status === 'success' && marketResult.result) {
+          const marketState = normalizeMorphoMarketState(marketResult.result)
+          if (marketState) {
+            marketSupplyAssets = marketState.totalSupplyAssets.toString()
+            marketSupplyShares = marketState.totalSupplyShares.toString()
+
+            const loanPriceUsd = gp.market.loanAsset.price?.usd
+            if (loanPriceUsd != null) {
+              const decimals = gp.market.loanAsset.decimals ?? 18
+              const scale = 10 ** decimals
+              marketStateSupplyUsd = Number(marketState.totalSupplyAssets) / scale * loanPriceUsd
+            }
+          }
+        }
+
         // Filter out zero positions (user may have exited since GraphQL indexed)
         const hasVisibleSupply = hasVisibleSuppliedAssets({
           userSupplyShares: supplyShares,
-          totalSupplyAssets: gp.market.state.supplyAssets,
-          totalSupplyShares: gp.market.state.supplyShares,
+          totalSupplyAssets: marketSupplyAssets,
+          totalSupplyShares: marketSupplyShares,
         })
         const hasPosition = hasVisibleSupply || borrowShares > 0n || collateral > 0n
         if (!hasPosition)
@@ -185,9 +242,9 @@ export function useLiveMarketPositions() {
             collateralAsset: gp.market.collateralAsset,
             state: {
               netSupplyApy: gp.market.state.netSupplyApy ?? 0,
-              supplyAssets: gp.market.state.supplyAssets,
-              supplyShares: gp.market.state.supplyShares,
-              supplyAssetsUsd: gp.market.state.supplyAssetsUsd,
+              supplyAssets: marketSupplyAssets,
+              supplyShares: marketSupplyShares,
+              supplyAssetsUsd: marketStateSupplyUsd,
             },
           },
           userState: {
@@ -198,18 +255,19 @@ export function useLiveMarketPositions() {
         }
       })
       .filter((p): p is LiveMarketPosition => p !== null)
-  }, [graphPositions, positionResults])
+  }, [graphPositions, marketResults, positionResults])
 
   // Combined refetch function
   const refetch = async () => {
     await refetchGraph()
     await refetchPositions()
+    await refetchMarkets()
   }
 
   return {
     data: userPositions,
-    isLoading: isLoadingGraph || isLoadingPositions,
+    isLoading: isLoadingGraph || isLoadingPositions || isLoadingMarkets,
     refetch,
-    dataUpdatedAt: Math.max(graphUpdatedAt, rpcUpdatedAt),
+    dataUpdatedAt: Math.max(graphUpdatedAt, rpcUpdatedAt, marketsUpdatedAt),
   }
 }
