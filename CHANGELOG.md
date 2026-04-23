@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.12 - 2026-04-23
+
+### Changed
+- blacklist: manually hid the dust Ethereum market `0xac357133ae9d12a9507faeeeb5af0087cf83ad17732bdab2abf95781d3b130a9` from the UI via the local manual market blacklist so it no longer shows up in positions and related home flows.
+
 ## v1.4.11 - 2026-04-23
 
 ### Fixed

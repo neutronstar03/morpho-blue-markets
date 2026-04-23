@@ -13,5 +13,10 @@
     "chainId": 1,
     "uniqueKey": "0x83b7ad16905809ea36482f4fbf6cfee9c9f316d128de9a5da1952607d5e4df5e",
     "comment": "borrowers have 0% health ratio. misconfigured"
+  },
+  {
+    "chainId": 1,
+    "uniqueKey": "0xac357133ae9d12a9507faeeeb5af0087cf83ad17732bdab2abf95781d3b130a9",
+    "comment": "dust market manually hidden from UI; not worth surfacing"
   }
 ]

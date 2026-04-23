@@ -70,9 +70,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.12` (2026-04-23): manually hid the dust Ethereum market `0xac357133ae9d12a9507faeeeb5af0087cf83ad17732bdab2abf95781d3b130a9` from the UI via the local manual market blacklist.
 - `v1.4.11` (2026-04-23): made Home Positions read live on-chain Morpho market totals via RPC so supplied balances stay consistent with the Market page instead of drifting behind GraphQL snapshots.
 - `v1.4.10` (2026-04-22): added an optional Market page Collateral Review section for unusual assets backed by external review JSON files, plus an edge-cached `/api/collateral-review` path and local-dev raw GitHub fallback.
-- `v1.4.9` (2026-04-22): added manual `wrsETH` blacklist entries on Optimism and Base to extend the earlier post-KelpDAO blacklist coverage for the wrapped rsETH variant.
 
 ## Live Version
 
