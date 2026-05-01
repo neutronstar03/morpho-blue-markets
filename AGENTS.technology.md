@@ -42,7 +42,8 @@
   - The `holdAboveAprWad` constraint in `SupplyOptimizerConstraints` controls hold behavior for max-deploy.
   - Both strategies share the same greedy step-by-step loop and scoring; the difference is in minFinal initialization.
 - Keep generated `public/blacklist.markets.json` generator-shaped (`{ chainId, uniqueKey }` only); do not add manual notes there.
-- For manual/shady entries with context, prefer `app/lib/blacklist.assets.json` and use the `comment` field.
+- Manual market-id exceptions with context live in committed `public/blacklist.markets.manual.json`; `scripts/blacklist-generator.ts` merges them into the generated blacklist without comments for the artifacts workflow.
+- For manual/shady asset-wide entries with context, prefer `app/lib/blacklist.assets.json` and use the `comment` field.
 
 ## Debugging (UI via MCP DevTools)
 When debugging the Supply APR optimizer UI, use stable `data-testid` hooks:

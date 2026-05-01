@@ -3,6 +3,7 @@ import process from 'node:process'
 const MORPHO_GRAPHQL_URL = 'https://blue-api.morpho.org/graphql'
 
 const OUTPUT_PATH = 'public/blacklist.markets.json'
+const MANUAL_INPUT_PATH = 'public/blacklist.markets.manual.json'
 const PAGE_SIZE = 200
 
 interface MarketCandidate {
@@ -28,6 +29,11 @@ interface MarketsResponse {
       }>
     }>
   }
+}
+
+interface BlacklistEntry {
+  chainId: number
+  uniqueKey: string
 }
 
 function slugify(input: string) {
@@ -87,6 +93,41 @@ async function fetchMarkets(skip: number) {
   return payload.data.markets.items
 }
 
+async function readManualBlacklist() {
+  const file = Bun.file(MANUAL_INPUT_PATH)
+  if (!(await file.exists()))
+    return [] satisfies BlacklistEntry[]
+
+  const parsed = await file.json()
+  const entries = Array.isArray(parsed) ? parsed : []
+
+  return entries.flatMap((entry): BlacklistEntry[] => {
+    if (!entry || typeof entry !== 'object')
+      return []
+
+    const candidate = entry as Partial<BlacklistEntry>
+    const chainId = Number(candidate.chainId)
+    const uniqueKey = candidate.uniqueKey?.toLowerCase()
+
+    if (!Number.isFinite(chainId) || chainId <= 0 || !uniqueKey)
+      return []
+
+    return [{ chainId, uniqueKey }]
+  })
+}
+
+function mergeBlacklistEntries(...groups: BlacklistEntry[][]) {
+  const entriesByKey = new Map<string, BlacklistEntry>()
+
+  for (const entries of groups) {
+    for (const entry of entries)
+      entriesByKey.set(`${entry.chainId}:${entry.uniqueKey}`, entry)
+  }
+
+  return [...entriesByKey.values()]
+    .sort((a, b) => a.chainId - b.chainId || a.uniqueKey.localeCompare(b.uniqueKey))
+}
+
 async function main() {
   const candidates: MarketCandidate[] = []
   let skip = 0
@@ -114,17 +155,19 @@ async function main() {
     skip += PAGE_SIZE
   }
 
-  const blacklist = candidates
+  const generatedBlacklist = candidates
     .filter(candidate => candidate.warnings.some(warning => (
       warning.type === 'incorrect_oracle_configuration'
       || warning.type === 'bad_debt_unrealized'
       || warning.type === 'bad_debt_unrealized_market'
     )))
     .map(candidate => ({ chainId: candidate.chainId, uniqueKey: candidate.uniqueKey }))
-    .sort((a, b) => a.chainId - b.chainId || a.uniqueKey.localeCompare(b.uniqueKey))
+
+  const manualBlacklist = await readManualBlacklist()
+  const blacklist = mergeBlacklistEntries(generatedBlacklist, manualBlacklist)
 
   await Bun.write(OUTPUT_PATH, JSON.stringify(blacklist, null, 2))
-  console.log(`Wrote ${blacklist.length} markets to ${OUTPUT_PATH}.`)
+  console.log(`Wrote ${blacklist.length} markets to ${OUTPUT_PATH} (${generatedBlacklist.length} generated, ${manualBlacklist.length} manual).`)
 }
 
 main().catch((error) => {
