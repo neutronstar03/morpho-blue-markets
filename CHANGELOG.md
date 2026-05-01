@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.13 - 2026-05-02
+
+### Fixed
+- data: production now loads generated whitelist and market-blacklist datasets directly from the canonical GitHub Pages artifacts instead of probing same-origin `/public` files that Cloudflare serves as the SPA HTML fallback.
+
 ## v1.4.12 - 2026-04-23
 
 ### Changed

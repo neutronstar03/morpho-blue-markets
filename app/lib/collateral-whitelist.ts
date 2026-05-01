@@ -106,11 +106,29 @@ function baseUrlPrefix() {
   return base && typeof base === 'string' ? base : '/'
 }
 
+function shouldTryLocalStaticFile() {
+  return Boolean((import.meta as any).env?.DEV)
+}
+
 async function fetchWhitelist(url: string) {
   const res = await fetch(url, {
     headers: { accept: 'application/json' },
   })
   return res
+}
+
+async function readJsonResponse(res: Response) {
+  if (!res.ok)
+    return undefined
+  const contentType = res.headers.get('content-type') ?? ''
+  if (contentType.includes('text/html'))
+    return undefined
+  try {
+    return await res.json()
+  }
+  catch {
+    return undefined
+  }
 }
 
 export function ensureCollateralWhitelistLoaded() {
@@ -124,24 +142,24 @@ export function ensureCollateralWhitelistLoaded() {
   setState({ ...whitelistState, status: 'loading' })
   loadPromise = (async () => {
     try {
-      // First try a local static file (supports local pull/generate workflows).
-      const localUrl = `${baseUrlPrefix()}${LOCAL_URL_PATH}`
-      const localRes = await fetchWhitelist(localUrl)
+      const localRes = shouldTryLocalStaticFile()
+        ? await fetchWhitelist(`${baseUrlPrefix()}${LOCAL_URL_PATH}`)
+        : undefined
+      const localJson = localRes ? await readJsonResponse(localRes) : undefined
 
-      if (localRes.ok) {
-        const json = await localRes.json()
-        safeWriteCache(json)
-        setState({ status: 'loaded', byChain: buildByChain(json) })
+      if (localJson !== undefined) {
+        safeWriteCache(localJson)
+        setState({ status: 'loaded', byChain: buildByChain(localJson) })
         return
       }
 
-      // If the local file is missing, fall back to the canonical published dataset.
-      if (localRes.status === 404) {
+      // Production uses the canonical artifact. Local files are only for dev pull/generate workflows.
+      if (!localRes || localRes.status === 404 || localRes.ok) {
         const artifactsRes = await fetchWhitelist(ARTIFACTS_URL)
-        if (artifactsRes.ok) {
-          const json = await artifactsRes.json()
-          safeWriteCache(json)
-          setState({ status: 'loaded', byChain: buildByChain(json) })
+        const artifactsJson = await readJsonResponse(artifactsRes)
+        if (artifactsJson !== undefined) {
+          safeWriteCache(artifactsJson)
+          setState({ status: 'loaded', byChain: buildByChain(artifactsJson) })
           return
         }
 

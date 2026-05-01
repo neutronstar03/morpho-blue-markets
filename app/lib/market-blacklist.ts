@@ -117,17 +117,33 @@ function baseUrlPrefix() {
   return base && typeof base === 'string' ? base : '/'
 }
 
+function shouldTryLocalStaticFile() {
+  return Boolean((import.meta as any).env?.DEV)
+}
+
 async function fetchJson(url: string) {
   const res = await fetch(url, { headers: { accept: 'application/json' } })
   return res
 }
 
+async function readJsonResponse(res: Response) {
+  if (!res.ok)
+    return undefined
+  const contentType = res.headers.get('content-type') ?? ''
+  if (contentType.includes('text/html'))
+    return undefined
+  try {
+    return await res.json()
+  }
+  catch {
+    return undefined
+  }
+}
+
 async function fetchOptionalJson(url: string) {
   try {
     const res = await fetchJson(url)
-    if (!res.ok)
-      return undefined
-    return await res.json()
+    return await readJsonResponse(res)
   }
   catch {
     return undefined
@@ -147,14 +163,17 @@ export function ensureMarketBlacklistLoaded() {
   setState({ ...blacklistState, status: 'loading' })
   loadPromise = (async () => {
     try {
-      const manualEntries = await fetchOptionalJson(`${baseUrlPrefix()}${LOCAL_MANUAL_URL_PATH}`)
+      const manualEntries = shouldTryLocalStaticFile()
+        ? await fetchOptionalJson(`${baseUrlPrefix()}${LOCAL_MANUAL_URL_PATH}`)
+        : undefined
       const manualMarketIdsByChain = buildMarketIdsByChain(manualEntries as ManualBlacklistMarketEntry[] | undefined)
-      const localUrl = `${baseUrlPrefix()}${LOCAL_URL_PATH}`
-      const localRes = await fetchJson(localUrl)
-      if (localRes.ok) {
-        const json = await localRes.json()
-        safeWriteCache(json)
-        const generatedMarketIdsByChain = buildMarketIdsByChain(json)
+      const localRes = shouldTryLocalStaticFile()
+        ? await fetchJson(`${baseUrlPrefix()}${LOCAL_URL_PATH}`)
+        : undefined
+      const localJson = localRes ? await readJsonResponse(localRes) : undefined
+      if (localJson !== undefined) {
+        safeWriteCache(localJson)
+        const generatedMarketIdsByChain = buildMarketIdsByChain(localJson)
         setState({
           status: 'loaded',
           marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
@@ -163,12 +182,12 @@ export function ensureMarketBlacklistLoaded() {
         return
       }
 
-      if (localRes.status === 404) {
+      if (!localRes || localRes.status === 404 || localRes.ok) {
         const artifactsRes = await fetchJson(ARTIFACTS_URL)
-        if (artifactsRes.ok) {
-          const json = await artifactsRes.json()
-          safeWriteCache(json)
-          const generatedMarketIdsByChain = buildMarketIdsByChain(json)
+        const artifactsJson = await readJsonResponse(artifactsRes)
+        if (artifactsJson !== undefined) {
+          safeWriteCache(artifactsJson)
+          const generatedMarketIdsByChain = buildMarketIdsByChain(artifactsJson)
           setState({
             status: 'loaded',
             marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
@@ -205,7 +224,9 @@ export function ensureMarketBlacklistLoaded() {
       })
     }
     catch {
-      const manualEntries = await fetchOptionalJson(`${baseUrlPrefix()}${LOCAL_MANUAL_URL_PATH}`)
+      const manualEntries = shouldTryLocalStaticFile()
+        ? await fetchOptionalJson(`${baseUrlPrefix()}${LOCAL_MANUAL_URL_PATH}`)
+        : undefined
       const manualMarketIdsByChain = buildMarketIdsByChain(manualEntries as ManualBlacklistMarketEntry[] | undefined)
       const cached = safeReadCache()
       if (cached) {
