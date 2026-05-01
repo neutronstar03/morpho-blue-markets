@@ -15,7 +15,7 @@ import { useMarketParamsById } from '~/lib/bundler3/use-market-params-by-id'
 import { useBatchWithdraw } from '~/lib/contexts/batch-withdraw.context'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
-import { isMarketIdManuallyBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { isMarketIdBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
@@ -57,7 +57,7 @@ export function useBatchWithdrawController() {
     if (!livePositions || !chainId)
       return livePositions ?? []
     void blacklistVersion
-    return livePositions.filter(position => !isMarketIdManuallyBlacklisted(position.market.uniqueKey, chainId))
+    return livePositions.filter(position => !isMarketIdBlacklisted(position.market.uniqueKey, chainId))
   }, [blacklistVersion, chainId, livePositions])
 
   const loanAssetOptions = useMemo<LoanAssetOption[]>(() => {

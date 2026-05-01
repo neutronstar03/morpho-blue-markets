@@ -16,7 +16,7 @@ import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
-import { isMarketIdManuallyBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { isMarketIdBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
@@ -74,9 +74,9 @@ function PositionClient() {
   const visiblePositions = useMemo(() => {
     if (!positions || !chain?.id)
       return positions ?? []
-    // Manual market blacklist is the strong local hide list: exclude it from UI, totals, and pills.
+    // System market blacklist is the strong hide list: exclude it from UI, totals, and pills.
     return positions.filter((position) => {
-      if (isMarketIdManuallyBlacklisted(position.market.uniqueKey, chain.id))
+      if (isMarketIdBlacklisted(position.market.uniqueKey, chain.id))
         return false
 
       const hasNonSupplyPosition = position.userState.borrowShares > 0n || position.userState.collateral > 0n
