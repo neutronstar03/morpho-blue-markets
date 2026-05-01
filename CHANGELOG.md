@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.14 - 2026-05-02
+
+### Fixed
+- blacklist: generated market blacklist artifacts now merge committed manual market-id exceptions so production receives the same hard-hide list as local development.
+- ui: Home Positions, cross-chain position pills, and batch withdraw options now use the system market blacklist for hard hiding instead of the dev-only manual blacklist path.
+
 ## v1.4.13 - 2026-05-02
 
 ### Fixed
