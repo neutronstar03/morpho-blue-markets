@@ -70,9 +70,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.15` (2026-05-03): added locally projected accrued position values, a Market page projected amount tooltip with last onchain market update timing, and viewing-wallet support via `#w=<address>`.
 - `v1.4.14` (2026-05-02): merged manual market-id blacklist entries into generated artifacts and made system-blacklisted markets disappear from positions, chain pills, and batch withdraw options.
 - `v1.4.13` (2026-05-02): fixed production runtime dataset loading so whitelist and market blacklist data come directly from canonical GitHub Pages artifacts instead of same-origin SPA fallback HTML.
-- `v1.4.12` (2026-04-23): manually hid the dust Ethereum market `0xac357133ae9d12a9507faeeeb5af0087cf83ad17732bdab2abf95781d3b130a9` from the UI via the local manual market blacklist.
 
 ## Live Version
 

@@ -27,6 +27,10 @@ export function BatchWithdrawExecutionPanel({ execution }: { execution: BatchWit
         <div className="text-xs text-red-300">{execution.executeError}</div>
       )}
 
+      {execution.readOnly && (
+        <div className="text-xs text-yellow-300">Execution disabled while viewing wallet.</div>
+      )}
+
       <div className="flex items-center justify-end gap-2">
         <Button onClick={execution.onExecuteBundle} disabled={!execution.canExecute}>
           {execution.isWriting

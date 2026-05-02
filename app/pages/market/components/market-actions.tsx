@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { StatPill } from '~/components/ui/stat-pill'
+import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatMarketSize, formatPercent } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
@@ -16,6 +17,7 @@ interface MarketActionsProps {
 
 export function MarketActions({ market }: MarketActionsProps) {
   const { address } = useAccount()
+  const { isViewingWallet } = useViewingWallet()
   const [searchParams] = useSearchParams()
 
   const deepLink = useMemo(() => {
@@ -153,7 +155,7 @@ export function MarketActions({ market }: MarketActionsProps) {
               )}
         </div>
 
-        {!address && (
+        {!address && !isViewingWallet && (
           <p className="text-sm text-gray-400 mt-4 text-center">
             Connect your wallet to interact with this market
           </p>

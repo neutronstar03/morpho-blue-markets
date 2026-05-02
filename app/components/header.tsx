@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { X } from 'lucide-react'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { getSupportedChainName } from '~/lib/addresses'
 import { useNetworkContext } from '~/lib/contexts/network'
+import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { useForceMagicVisual } from '~/lib/hooks/use-force-magic-visual'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { cn } from '~/lib/utils'
@@ -11,6 +13,7 @@ import { Container } from './ui/container'
 
 export function Header({ children }: { children: ReactNode }) {
   const { requiredChainId } = useNetworkContext()
+  const { viewingAddress, isViewingWallet, clearViewingWallet } = useViewingWallet()
   const { isConnected } = useAccount()
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
@@ -45,6 +48,22 @@ export function Header({ children }: { children: ReactNode }) {
                     Switch Network
                   </span>
                 </Button>
+              </div>
+            )}
+            {isViewingWallet && viewingAddress && (
+              <div className="flex items-center gap-2 rounded-lg border border-cyan-700 bg-cyan-950/30 px-3 py-2 text-sm text-cyan-100">
+                <span className="hidden sm:inline text-cyan-300">Viewing Wallet</span>
+                <span className="font-mono text-xs">
+                  {`${viewingAddress.slice(0, 6)}...${viewingAddress.slice(-4)}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearViewingWallet}
+                  className="rounded p-0.5 text-cyan-200 hover:bg-cyan-800/50 hover:text-white"
+                  title="Stop viewing wallet"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             )}
             <ConnectButton accountStatus={{ smallScreen: 'avatar', largeScreen: 'full' }} />

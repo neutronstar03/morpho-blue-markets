@@ -1,12 +1,14 @@
+import type { Address } from 'viem'
 import type { SupportedChain } from '~/lib/addresses'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useReadContracts } from 'wagmi'
-import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
+import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName, morphoAddressOnChain } from '~/lib/addresses'
 import { useUserPositions } from '~/lib/hooks/graphql/use-user-positions'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
+import { projectMorphoMarketAccrual } from '~/lib/morpho/project-accrual'
 
 // This interface maps the GraphQL position data to what position.tsx expects
 export interface LiveMarketPosition {
@@ -48,6 +50,7 @@ export interface LiveMarketPosition {
 
 interface PositionCall {
   address: `0x${string}`
+  chainId: number
   abi: typeof SIMPLIFIED_MORPHO_BLUE_ABI
   functionName: 'position'
   args: readonly [`0x${string}`, `0x${string}`]
@@ -55,8 +58,17 @@ interface PositionCall {
 
 interface MarketCall {
   address: `0x${string}`
+  chainId: number
   abi: typeof SIMPLIFIED_MORPHO_BLUE_ABI
   functionName: 'market'
+  args: readonly [`0x${string}`]
+}
+
+interface RateAtTargetCall {
+  address: `0x${string}`
+  chainId: number
+  abi: typeof IRM_RATE_AT_TARGET_ABI
+  functionName: 'rateAtTarget'
   args: readonly [`0x${string}`]
 }
 
@@ -69,8 +81,19 @@ interface MarketCall {
  *
  * This avoids iterating over all ~1000 markets on a chain.
  */
-export function useLiveMarketPositions() {
-  const { address: userAddress, chain } = useAccount()
+export function useLiveMarketPositions(options: { address?: Address, chainId?: number } = {}) {
+  const { address: connectedAddress, chain } = useAccount()
+  const userAddress = options.address ?? connectedAddress
+  const chainId = options.chainId ?? chain?.id
+  const [projectionTimestamp, setProjectionTimestamp] = useState(() => Math.floor(Date.now() / 1000))
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setProjectionTimestamp(Math.floor(Date.now() / 1000))
+    }, 30_000)
+
+    return () => window.clearInterval(interval)
+  }, [])
 
   // Step 1: Efficient discovery via GraphQL
   // This returns only markets where user has a position, filtered by chainId
@@ -79,41 +102,58 @@ export function useLiveMarketPositions() {
     isLoading: isLoadingGraph,
     refetch: refetchGraph,
     dataUpdatedAt: graphUpdatedAt,
-  } = useUserPositions(userAddress, chain?.id)
+  } = useUserPositions(userAddress, chainId)
 
   const morphoAddress = useMemo(() => {
-    if (!chain)
+    if (!chainId)
       return undefined
-    const chainName = getSupportedChainName(chain.id)
+    const chainName = getSupportedChainName(chainId)
     if (chainName.startsWith('Chain '))
       return undefined
     return morphoAddressOnChain[chainName as SupportedChain]
-  }, [chain])
+  }, [chainId])
 
   // Step 2: Build RPC calls only for discovered positions
   const multicallContracts = useMemo<PositionCall[]>(() => {
-    if (!graphPositions || !userAddress || !morphoAddress)
+    if (!graphPositions || !userAddress || !morphoAddress || !chainId)
       return []
 
     return graphPositions.map<PositionCall>(position => ({
       address: morphoAddress as `0x${string}`,
+      chainId,
       abi: SIMPLIFIED_MORPHO_BLUE_ABI,
       functionName: 'position',
       args: [position.market.uniqueKey as `0x${string}`, userAddress as `0x${string}`] as const,
     }))
-  }, [graphPositions, userAddress, morphoAddress])
+  }, [chainId, graphPositions, userAddress, morphoAddress])
 
   const marketContracts = useMemo<MarketCall[]>(() => {
-    if (!graphPositions || !morphoAddress)
+    if (!graphPositions || !morphoAddress || !chainId)
       return []
 
     return graphPositions.map<MarketCall>(position => ({
       address: morphoAddress as `0x${string}`,
+      chainId,
       abi: SIMPLIFIED_MORPHO_BLUE_ABI,
       functionName: 'market',
       args: [position.market.uniqueKey as `0x${string}`] as const,
     }))
-  }, [graphPositions, morphoAddress])
+  }, [chainId, graphPositions, morphoAddress])
+
+  const rateAtTargetContracts = useMemo<RateAtTargetCall[]>(() => {
+    if (!graphPositions || !chainId)
+      return []
+
+    return graphPositions
+      .filter(position => !!position.market.irmAddress)
+      .map<RateAtTargetCall>(position => ({
+        address: position.market.irmAddress as `0x${string}`,
+        chainId,
+        abi: IRM_RATE_AT_TARGET_ABI,
+        functionName: 'rateAtTarget',
+        args: [position.market.uniqueKey as `0x${string}`] as const,
+      }))
+  }, [chainId, graphPositions])
 
   // Step 3: Fetch live position data from RPC
   const {
@@ -126,6 +166,20 @@ export function useLiveMarketPositions() {
     allowFailure: true,
     query: {
       enabled: !!graphPositions && graphPositions.length > 0 && !!userAddress && !!morphoAddress,
+    },
+  })
+
+  const {
+    data: rateAtTargetResults,
+    isLoading: isLoadingRateAtTarget,
+    refetch: refetchRateAtTarget,
+    dataUpdatedAt: rateAtTargetUpdatedAt,
+  } = useReadContracts({
+    contracts: rateAtTargetContracts,
+    allowFailure: true,
+    query: {
+      enabled: !!graphPositions && graphPositions.length > 0 && rateAtTargetContracts.length > 0,
+      staleTime: 5 * 60 * 1000,
     },
   })
 
@@ -150,6 +204,20 @@ export function useLiveMarketPositions() {
 
     const hasPositionResults = !!positionResults && positionResults.length === graphPositions.length
     const hasMarketResults = !!marketResults && marketResults.length === graphPositions.length
+    const rateAtTargetByMarketKey = new Map<string, bigint>()
+
+    if (rateAtTargetResults) {
+      let rateIndex = 0
+      for (const gp of graphPositions) {
+        if (!gp.market.irmAddress)
+          continue
+        const rateResult = rateAtTargetResults[rateIndex]
+        rateIndex++
+        if (rateResult?.status !== 'success' || rateResult.result == null)
+          continue
+        rateAtTargetByMarketKey.set(gp.market.uniqueKey, rateResult.result as bigint)
+      }
+    }
 
     // If RPC data is not ready yet, use GraphQL data for display
     // This gives us immediate feedback while RPC is loading
@@ -209,14 +277,24 @@ export function useLiveMarketPositions() {
         if (marketResult?.status === 'success' && marketResult.result) {
           const marketState = normalizeMorphoMarketState(marketResult.result)
           if (marketState) {
-            marketSupplyAssets = marketState.totalSupplyAssets.toString()
-            marketSupplyShares = marketState.totalSupplyShares.toString()
+            const rateAtTarget = rateAtTargetByMarketKey.get(gp.market.uniqueKey)
+            const projectedMarketState = rateAtTarget == null
+              ? marketState
+              : projectMorphoMarketAccrual({
+                  marketId: gp.market.uniqueKey as `0x${string}`,
+                  market: marketState,
+                  rateAtTarget,
+                  timestamp: BigInt(projectionTimestamp),
+                })
+
+            marketSupplyAssets = projectedMarketState.totalSupplyAssets.toString()
+            marketSupplyShares = projectedMarketState.totalSupplyShares.toString()
 
             const loanPriceUsd = gp.market.loanAsset.price?.usd
             if (loanPriceUsd != null) {
               const decimals = gp.market.loanAsset.decimals ?? 18
               const scale = 10 ** decimals
-              marketStateSupplyUsd = Number(marketState.totalSupplyAssets) / scale * loanPriceUsd
+              marketStateSupplyUsd = Number(projectedMarketState.totalSupplyAssets) / scale * loanPriceUsd
             }
           }
         }
@@ -255,19 +333,20 @@ export function useLiveMarketPositions() {
         }
       })
       .filter((p): p is LiveMarketPosition => p !== null)
-  }, [graphPositions, marketResults, positionResults])
+  }, [graphPositions, marketResults, positionResults, projectionTimestamp, rateAtTargetResults])
 
   // Combined refetch function
   const refetch = async () => {
     await refetchGraph()
     await refetchPositions()
     await refetchMarkets()
+    await refetchRateAtTarget()
   }
 
   return {
     data: userPositions,
-    isLoading: isLoadingGraph || isLoadingPositions || isLoadingMarkets,
+    isLoading: isLoadingGraph || isLoadingPositions || isLoadingMarkets || isLoadingRateAtTarget,
     refetch,
-    dataUpdatedAt: Math.max(graphUpdatedAt, rpcUpdatedAt, marketsUpdatedAt),
+    dataUpdatedAt: Math.max(graphUpdatedAt, rpcUpdatedAt, marketsUpdatedAt, rateAtTargetUpdatedAt),
   }
 }

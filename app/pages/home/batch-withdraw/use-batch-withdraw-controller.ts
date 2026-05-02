@@ -3,7 +3,7 @@ import type { BatchWithdrawExecutionState, BatchWithdrawPlanState, LoanAssetOpti
 import type { SupplyOptimizerMarketSnapshot } from '~/lib/optimizer/supply-optimizer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits } from 'viem'
-import { useAccount, useReadContract, useReadContracts, useSimulateContract, useWriteContract } from 'wagmi'
+import { useAccount, useChainId, useReadContract, useReadContracts, useSimulateContract, useWriteContract } from 'wagmi'
 import { MORPHO_AUTH_ABI } from '~/lib/abis/bundler3'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
@@ -13,6 +13,7 @@ import { encodeGeneralAdapterMorphoWithdraw } from '~/lib/bundler3/encode'
 import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
 import { useMarketParamsById } from '~/lib/bundler3/use-market-params-by-id'
 import { useBatchWithdraw } from '~/lib/contexts/batch-withdraw.context'
+import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
 import { isMarketIdBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
@@ -34,7 +35,10 @@ function fmtToken(amount: bigint, decimals: number, digits = 4): string {
 export function useBatchWithdrawController() {
   const ctx = useBatchWithdraw()
   const { address: userAddress, chain } = useAccount()
-  const chainId = chain?.id
+  const walletChainId = useChainId()
+  const { viewingAddress, isViewingWallet } = useViewingWallet()
+  const effectiveUserAddress = viewingAddress ?? userAddress
+  const chainId = chain?.id ?? walletChainId
   const chainNameForLinks = chainId ? getSupportedChainName(chainId) : undefined
 
   const [executeError, setExecuteError] = useState<string | undefined>(undefined)
@@ -50,7 +54,7 @@ export function useBatchWithdrawController() {
       ctx.clear()
   }, [chainId, ctx])
 
-  const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions()
+  const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions({ address: effectiveUserAddress, chainId })
   const blacklistVersion = useMarketBlacklistVersion()
 
   const visibleLivePositions = useMemo(() => {
@@ -420,7 +424,7 @@ export function useBatchWithdrawController() {
     abi: MORPHO_AUTH_ABI,
     functionName: 'isAuthorized',
     args: bundlerCfg && userAddress ? [userAddress as Address, bundlerCfg.generalAdapter1] as const : undefined,
-    query: { enabled: !!bundlerCfg && !!morphoAddress && !!userAddress },
+    query: { enabled: !!bundlerCfg && !!morphoAddress && !!userAddress && !isViewingWallet },
   })
   const isMorphoAuthorized = (isMorphoAuthorizedRead.data ?? false) as boolean
 
@@ -442,7 +446,7 @@ export function useBatchWithdrawController() {
     abi: MORPHO_AUTH_ABI,
     functionName: 'setAuthorization',
     args: bundlerCfg ? [bundlerCfg.generalAdapter1, true] as const : undefined,
-    query: { enabled: !!bundlerCfg && !!morphoAddress && !!userAddress && !isMorphoAuthorized },
+    query: { enabled: !!bundlerCfg && !!morphoAddress && !!userAddress && !isViewingWallet && !isMorphoAuthorized },
   })
 
   const { writeContractAsync, isPending: isWriting } = useWriteContract()
@@ -470,7 +474,7 @@ export function useBatchWithdrawController() {
   }, [hasPlan, plan.items, selectedOption])
 
   const bundle = useMemo(() => {
-    if (!bundlerCfg || !userAddress || !hasPlan)
+    if (!bundlerCfg || !userAddress || isViewingWallet || !hasPlan)
       return undefined
 
     const calls = [] as ReturnType<typeof encodeGeneralAdapterMorphoWithdraw>[]
@@ -490,7 +494,7 @@ export function useBatchWithdrawController() {
       }))
     }
     return calls
-  }, [bundlerCfg, hasPlan, marketParamsById, plan.items, userAddress])
+  }, [bundlerCfg, hasPlan, isViewingWallet, marketParamsById, plan.items, userAddress])
 
   const multicallRequest = useMemo(() => {
     if (!bundlerCfg || !bundle || bundle.length === 0)
@@ -501,7 +505,7 @@ export function useBatchWithdrawController() {
   const multicallSim = useSimulateContract({
     ...(multicallRequest as any),
     query: {
-      enabled: !!multicallRequest && !!bundlerCfg && !!userAddress && isMorphoAuthorized,
+      enabled: !!multicallRequest && !!bundlerCfg && !!userAddress && !isViewingWallet && isMorphoAuthorized,
     },
   })
 
@@ -647,10 +651,12 @@ export function useBatchWithdrawController() {
     authorizeAvailable: !!authorizeSim.data?.request,
     multicallError: (multicallSim.error as any)?.shortMessage ?? (multicallSim.error as any)?.message,
     executeError,
+    readOnly: isViewingWallet,
     canExecute: !!bundle
       && bundle.length > 0
       && !!bundlerCfg
       && !!userAddress
+      && !isViewingWallet
       && !isWriting
       && !isRunningFlow
       && (!isMorphoAuthorized ? !!authorizeSim.data?.request : true)
@@ -663,7 +669,8 @@ export function useBatchWithdrawController() {
   }
 
   return {
-    userAddress,
+    userAddress: effectiveUserAddress,
+    isViewingWallet,
     chainId,
     chainNameForLinks,
     isLoadingPositions,

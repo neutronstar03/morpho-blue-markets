@@ -2,7 +2,7 @@ import type { SupportedChain } from '~/lib/addresses'
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useMemo } from 'react'
 import { erc20Abi, formatUnits, parseUnits } from 'viem'
-import { useAccount, useReadContract, useSimulateContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useAccount, useChainId, useReadContract, useSimulateContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName, morphoAddressOnChain } from '~/lib/addresses'
 import { useNetworkContext } from '~/lib/contexts/network'
@@ -42,8 +42,9 @@ export function formatTokenBalance(balance: bigint | undefined, decimals: number
 }
 
 export function useTokenApproval(tokenAddress: string, amount: string, userAddress: string | undefined, decimals: number) {
-  const { chainId } = useAccount()
+  const walletChainId = useChainId()
   const { requiredChainId } = useNetworkContext()
+  const chainId = requiredChainId ?? walletChainId
   const isWrongNetwork = requiredChainId && chainId !== requiredChainId
   const spender = getMorphoBlueAddress(chainId)
   const isValidAmount = !!amount && Number.parseFloat(amount) > 0
@@ -70,6 +71,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
   const approveWriteAbi = isUsdtMainnet ? USDT_APPROVE_NO_RETURN_ABI : erc20Abi
 
   const { data: allowance, refetch } = useReadContract({
+    chainId,
     address: tokenAddress as `0x${string}`,
     abi: erc20Abi,
     functionName: 'allowance',
@@ -90,6 +92,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     error: simulateError,
     isFetching: isSimulating,
   } = useSimulateContract({
+    chainId,
     address: tokenAddress as `0x${string}`,
     abi: approveSimAbi,
     functionName: 'approve',
@@ -154,10 +157,12 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
 
 // Hook for checking token balance in wallet
 export function useTokenBalance(tokenAddress: string, userAddress?: string) {
-  const { chainId } = useAccount()
+  const walletChainId = useChainId()
   const { requiredChainId } = useNetworkContext()
+  const chainId = requiredChainId ?? walletChainId
   const isWrongNetwork = requiredChainId && chainId !== requiredChainId
   return useReadContract({
+    chainId,
     address: tokenAddress as `0x${string}`,
     abi: erc20Abi,
     functionName: 'balanceOf',
@@ -171,8 +176,10 @@ export function useTokenBalance(tokenAddress: string, userAddress?: string) {
 
 // Hook for supplying to a market
 export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenDecimals: number) {
-  const { chainId, address: userAddress } = useAccount()
+  const { address: userAddress } = useAccount()
+  const walletChainId = useChainId()
   const { requiredChainId } = useNetworkContext()
+  const chainId = requiredChainId ?? walletChainId
   const isWrongNetwork = requiredChainId && chainId !== requiredChainId
   const isValidAmount = !!amount && Number.parseFloat(amount) > 0
 
@@ -199,6 +206,7 @@ export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenD
     error: simulateError,
     isFetching: isSimulating,
   } = useSimulateContract({
+    chainId,
     address: getMorphoBlueAddress(chainId),
     abi: SIMPLIFIED_MORPHO_BLUE_ABI,
     functionName: 'supply',
@@ -236,8 +244,10 @@ export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenD
 
 // Hook for withdrawing from a market
 export function useWithdraw(market: SingleMorphoMarket, sharesIn: string) {
-  const { chainId, address: userAddress } = useAccount()
+  const { address: userAddress } = useAccount()
+  const walletChainId = useChainId()
   const { requiredChainId } = useNetworkContext()
+  const chainId = requiredChainId ?? walletChainId
   const isWrongNetwork = requiredChainId && chainId !== requiredChainId
   const isValidAmount = !!sharesIn && Number.parseFloat(sharesIn) > 0
 
@@ -264,6 +274,7 @@ export function useWithdraw(market: SingleMorphoMarket, sharesIn: string) {
     error: simulateError,
     isFetching: isSimulating,
   } = useSimulateContract({
+    chainId,
     address: getMorphoBlueAddress(chainId),
     abi: SIMPLIFIED_MORPHO_BLUE_ABI,
     functionName: 'withdraw',
@@ -300,11 +311,13 @@ export function useWithdraw(market: SingleMorphoMarket, sharesIn: string) {
 }
 
 export function useUserPosition(marketKey: string, userAddress: string | undefined) {
-  const { chainId } = useAccount()
+  const walletChainId = useChainId()
   const { requiredChainId } = useNetworkContext()
+  const chainId = requiredChainId ?? walletChainId
   const isWrongNetwork = requiredChainId && chainId !== requiredChainId
 
   return useReadContract({
+    chainId,
     address: getMorphoBlueAddress(chainId),
     abi: SIMPLIFIED_MORPHO_BLUE_ABI,
     functionName: 'position',
@@ -319,11 +332,13 @@ export function useUserPosition(marketKey: string, userAddress: string | undefin
 }
 
 export function useMarket(marketKey: string) {
-  const { chainId } = useAccount()
+  const walletChainId = useChainId()
   const { requiredChainId } = useNetworkContext()
+  const chainId = requiredChainId ?? walletChainId
   const isWrongNetwork = requiredChainId && chainId !== requiredChainId
 
   return useReadContract({
+    chainId,
     address: getMorphoBlueAddress(chainId),
     abi: SIMPLIFIED_MORPHO_BLUE_ABI,
     functionName: 'market',

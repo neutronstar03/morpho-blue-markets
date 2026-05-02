@@ -2,11 +2,12 @@ import type { Portfolio } from './position-types'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import { Wallet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useAccount, useSwitchChain } from 'wagmi'
+import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { trackEvent } from '~/lib/analytics'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
+import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
@@ -30,7 +31,11 @@ import { usePositionGroups } from './use-position-groups'
 
 function PositionClient() {
   const { address: userAddress, isConnected, chain } = useAccount()
+  const walletChainId = useChainId()
+  const { viewingAddress, isViewingWallet } = useViewingWallet()
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain()
+  const effectiveAddress = viewingAddress ?? userAddress
+  const chainId = chain?.id ?? walletChainId
   const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
   const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
   const {
@@ -38,8 +43,8 @@ function PositionClient() {
     isLoading,
     refetch,
     dataUpdatedAt,
-  } = useLiveMarketPositions()
-  const { data: crossChainPositions } = useUserPositionsAcrossChains(userAddress)
+  } = useLiveMarketPositions({ address: effectiveAddress, chainId })
+  const { data: crossChainPositions } = useUserPositionsAcrossChains(effectiveAddress)
 
   const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
   const { aprByMarketKey } = useLiveMarketApr(markets)
@@ -54,12 +59,12 @@ function PositionClient() {
     void localBlacklistVersion
     void blacklistVersion
     const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
-    if (!chain?.id)
+    if (!chainId)
       return out
     for (const p of (positions ?? [])) {
-      const key = `${chain.id}:${p.market.uniqueKey.toLowerCase()}`
+      const key = `${chainId}:${p.market.uniqueKey.toLowerCase()}`
       out[key] = getMarketRisk({
-        chainId: chain.id,
+        chainId,
         uniqueKey: p.market.uniqueKey,
         loanAssetAddress: p.market.loanAsset.address,
         collateralAssetAddress: p.market.collateralAsset.address,
@@ -69,20 +74,20 @@ function PositionClient() {
       }).status
     }
     return out
-  }, [blacklistVersion, chain?.id, decisionsVersion, localBlacklistVersion, positions, whitelistVersion])
+  }, [blacklistVersion, chainId, decisionsVersion, localBlacklistVersion, positions, whitelistVersion])
 
   const visiblePositions = useMemo(() => {
-    if (!positions || !chain?.id)
+    if (!positions || !chainId)
       return positions ?? []
     // System market blacklist is the strong hide list: exclude it from UI, totals, and pills.
     return positions.filter((position) => {
-      if (isMarketIdBlacklisted(position.market.uniqueKey, chain.id))
+      if (isMarketIdBlacklisted(position.market.uniqueKey, chainId))
         return false
 
       const hasNonSupplyPosition = position.userState.borrowShares > 0n || position.userState.collateral > 0n
       return hasNonSupplyPosition || hasVisibleSupplyPosition(position)
     })
-  }, [blacklistVersion, chain?.id, positions])
+  }, [blacklistVersion, chainId, positions])
 
   const [timeAgo, setTimeAgo] = useState('')
   const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'native' | 'yearly'>('total')
@@ -161,8 +166,8 @@ function PositionClient() {
     }
   }, [visiblePositions, aprByMarketKey])
 
-  const groupedPositions = usePositionGroups(visiblePositions, chain?.id, aprByMarketKey)
-  const chainPills = usePositionChainPills(crossChainPositions, chain?.id)
+  const groupedPositions = usePositionGroups(visiblePositions, chainId, aprByMarketKey)
+  const chainPills = usePositionChainPills(crossChainPositions, chainId)
 
   const handleChainPillClick = (chainId: number) => {
     // Cross-chain pills act like quick navigation: switch chain and bring the user back to the top summary.
@@ -172,16 +177,16 @@ function PositionClient() {
 
   const handleOpenOptimizerForGroup = (group: typeof groupedPositions[number]) => {
     const firstPosition = group.positions[0]
-    if (!chain?.id || !firstPosition)
+    if (!chainId || !firstPosition)
       return
 
     trackEvent('position_optimize_clicked', {
       loanAsset: group.loanAssetSymbol,
-      chainId: chain?.id,
+      chainId,
     })
 
     setOptimizerPreset({
-      chainId: chain.id,
+      chainId,
       loanAssetAddress: firstPosition.market.loanAsset.address,
       loanAssetSymbol: group.loanAssetSymbol,
       loanAssetDecimals: firstPosition.market.loanAsset.decimals ?? 18,
@@ -200,7 +205,7 @@ function PositionClient() {
     })
   }
 
-  if (!isConnected) {
+  if (!isConnected && !isViewingWallet) {
     return (
       <Card className="mb-8">
         <div className="p-4 border-b border-gray-700">
@@ -261,10 +266,10 @@ function PositionClient() {
                   <p className="text-sm text-gray-500">Supply assets to a market to see your positions here.</p>
                 </div>
               )
-            : chain?.id && (
+            : chainId && (
               <PositionGroups
                 groups={groupedPositions}
-                chainId={chain.id}
+                chainId={chainId}
                 portfolioTotalAssetsUsd={portfolio.totalAssetsUsd}
                 aprByMarketKey={aprByMarketKey}
                 riskStatusByKey={riskStatusByKey}
@@ -283,7 +288,7 @@ function PositionClient() {
           <div className="mx-4 mt-6 flex flex-col gap-3 border-t border-gray-700/50 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <PositionChainPills
               items={chainPills}
-              currentChainId={chain?.id}
+              currentChainId={chainId}
               isSwitching={isSwitchingChain}
               onSelectChain={handleChainPillClick}
             />

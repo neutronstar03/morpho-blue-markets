@@ -5,6 +5,7 @@ import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { MarketAprPreview } from '~/components/ui/market-apr-preview'
+import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatBigintShort, formatDecimalStringShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useSupply, useTokenApproval, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
@@ -53,7 +54,10 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     assetAmount,
     setAssetAmount,
   } = useDepositFormState()
-  const { address } = useAccount()
+  const { address: connectedAddress } = useAccount()
+  const { viewingAddress, isViewingWallet } = useViewingWallet()
+  const address = viewingAddress ?? connectedAddress
+  const executionAddress = isViewingWallet ? undefined : connectedAddress
   const [isSubmittingFlow, setIsSubmittingFlow] = useState(false)
   const { startFlow, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
 
@@ -166,7 +170,9 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     isAllowanceReady,
     approveAsync,
     approveRequest,
-  } = useTokenApproval(market.loanAsset.address, debouncedAmount, address, market.loanAsset.decimals)
+  } = useTokenApproval(market.loanAsset.address, debouncedAmount, executionAddress, market.loanAsset.decimals)
+  const effectiveNeedsApproval = !isViewingWallet && needsApproval
+  const effectiveIsAllowanceReady = isViewingWallet ? true : isAllowanceReady
 
   const hasSufficientBalance = useMemo(() => {
     if (!tokenBalance)
@@ -178,7 +184,7 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
 
   // Gate supply simulation until allowance is known and sufficient
   // Also gate on wallet balance: preview should work for arbitrary amounts, but tx simulation will revert if balance is insufficient.
-  const guardedAmount = (isAllowanceReady && !needsApproval && hasSufficientBalance) ? debouncedAmount : ''
+  const guardedAmount = (!isViewingWallet && effectiveIsAllowanceReady && !effectiveNeedsApproval && hasSufficientBalance) ? debouncedAmount : ''
 
   const {
     canSupply,
@@ -189,12 +195,12 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     supplyRequest,
   } = useSupply(market, guardedAmount, market.loanAsset.decimals!)
 
-  const effectiveSupplyError = (!isAllowanceReady || needsApproval) ? undefined : supplyError
+  const effectiveSupplyError = (!effectiveIsAllowanceReady || effectiveNeedsApproval) ? undefined : supplyError
 
   const latestStateRef = useRef({
-    needsApproval,
+    needsApproval: effectiveNeedsApproval,
     canSupply,
-    isAllowanceReady,
+    isAllowanceReady: effectiveIsAllowanceReady,
     hasSufficientBalance,
     approveRequest,
     supplyRequest,
@@ -202,14 +208,14 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
 
   useEffect(() => {
     latestStateRef.current = {
-      needsApproval,
+      needsApproval: effectiveNeedsApproval,
       canSupply,
-      isAllowanceReady,
+      isAllowanceReady: effectiveIsAllowanceReady,
       hasSufficientBalance,
       approveRequest,
       supplyRequest,
     }
-  }, [approveRequest, canSupply, hasSufficientBalance, isAllowanceReady, needsApproval, supplyRequest])
+  }, [approveRequest, canSupply, effectiveIsAllowanceReady, effectiveNeedsApproval, hasSufficientBalance, supplyRequest])
 
   const handleMaxClick = () => {
     if (mode === 'percent') {
@@ -227,12 +233,12 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!amount || !address || !isClient)
+    if (!amount || !connectedAddress || !isClient || isViewingWallet)
       return
 
     const marketLabel = `${market.collateralAsset.symbol} / ${loanTokenSymbol}`
     const steps = [] as Array<{ key: string, label: string }>
-    if (needsApproval) {
+    if (effectiveNeedsApproval) {
       steps.push({ key: 'approveWallet', label: `Confirm ${loanTokenSymbol} approval in wallet` })
       steps.push({ key: 'approveConfirm', label: 'Confirming approval onchain' })
     }
@@ -248,7 +254,7 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     try {
       setIsSubmittingFlow(true)
 
-      if (needsApproval) {
+      if (effectiveNeedsApproval) {
         await runTransactionStep({
           scope,
           walletStepKey: 'approveWallet',
@@ -309,7 +315,7 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
 
   // Input handled by AmountControl
 
-  const isLoading = isSubmittingFlow || isSupplying || isApprovingToken || isSimulatingSupply || isSimulatingApproval || (!needsApproval && !isAllowanceReady && !!amount)
+  const isLoading = isSubmittingFlow || isSupplying || isApprovingToken || isSimulatingSupply || isSimulatingApproval || (!effectiveNeedsApproval && !effectiveIsAllowanceReady && !!amount)
   const hasError = effectiveSupplyError || approveError
 
   const preview = useMarketPreview({
@@ -324,8 +330,8 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
   const beforeApr = preview.supplyAprBefore
   const afterApr = preview.supplyAprAfter
   const showAprEstimateLabel = afterApr != null
-  const submitDisabled = !amount || isLoading || !address || !isAmountDebounced || (!isAllowanceReady && !!amount) || (!needsApproval && !hasSufficientBalance)
-  const submitLoadingLabel = (!isAllowanceReady && !!amount)
+  const submitDisabled = !amount || isLoading || !connectedAddress || isViewingWallet || !isAmountDebounced || (!effectiveIsAllowanceReady && !!amount) || (!effectiveNeedsApproval && !hasSufficientBalance)
+  const submitLoadingLabel = (!effectiveIsAllowanceReady && !!amount)
     ? 'Checking allowance...'
     : isSimulatingApproval
       ? 'Preparing approval...'
@@ -334,9 +340,9 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
         : isSimulatingSupply
           ? 'Preparing deposit...'
           : 'Depositing...'
-  const submitIdleLabel = needsApproval && hasSufficientBalance
+  const submitIdleLabel = effectiveNeedsApproval && hasSufficientBalance
     ? `Approve + deposit ${displayAmountShort} ${loanTokenSymbol}`
-    : needsApproval
+    : effectiveNeedsApproval
       ? `Approve ${loanTokenSymbol}`
       : `Deposit ${displayAmountShort} ${loanTokenSymbol}`
 
@@ -398,7 +404,7 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
         />
       )}
 
-      {needsApproval && (
+      {effectiveNeedsApproval && (
         <InlineNotice tone="yellow">
           You need to approve the token spending first. This transaction will allow Morpho Blue to use your
           {' '}
@@ -407,12 +413,16 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
         </InlineNotice>
       )}
 
-      {!!amount && !!address && tokenBalance !== undefined && !needsApproval && !hasSufficientBalance && (
+      {!!amount && !!address && tokenBalance !== undefined && !effectiveNeedsApproval && !hasSufficientBalance && (
         <InlineNotice tone="yellow">Insufficient wallet balance for this deposit amount. Preview is shown, but deposit is disabled.</InlineNotice>
       )}
 
       {hasError && (
         <InlineNotice tone="red">{effectiveSupplyError?.message || approveError?.message || 'Transaction failed'}</InlineNotice>
+      )}
+
+      {isViewingWallet && (
+        <InlineNotice tone="yellow">Execution disabled while viewing wallet.</InlineNotice>
       )}
 
       {/* Mobile CTA */}

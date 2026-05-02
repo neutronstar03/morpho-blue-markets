@@ -43,6 +43,7 @@ export interface BatchWithdrawExecutionState {
   authorizeAvailable: boolean
   multicallError?: string
   executeError?: string
+  readOnly?: boolean
   canExecute: boolean
   isWriting: boolean
   isConfirming: boolean

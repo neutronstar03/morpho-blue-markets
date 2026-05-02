@@ -22,6 +22,7 @@ interface SupplyAprOptimizerResultsProps {
   chainId?: number
   morphoAddress?: `0x${string}`
   userSupplySharesByMarketId: Map<string, bigint>
+  readOnly?: boolean
   onExecutedSuccess?: () => void
 }
 
@@ -40,6 +41,7 @@ export function SupplyAprOptimizerResults({
   chainId,
   morphoAddress,
   userSupplySharesByMarketId,
+  readOnly = false,
   onExecutedSuccess,
 }: SupplyAprOptimizerResultsProps) {
   return (
@@ -200,7 +202,13 @@ export function SupplyAprOptimizerResults({
         )}
       </div>
 
-      {userAddress && chainId && morphoAddress && (
+      {readOnly && (
+        <div className="text-sm text-yellow-300 border border-yellow-900/40 bg-yellow-950/20 rounded-md p-3">
+          Execution disabled while viewing wallet.
+        </div>
+      )}
+
+      {!readOnly && userAddress && chainId && morphoAddress && (
         <BundleOptimizerResult
           displayResult={displayResult}
           chainId={chainId}

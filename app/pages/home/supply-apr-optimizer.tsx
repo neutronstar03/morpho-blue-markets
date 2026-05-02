@@ -10,6 +10,7 @@ export function SupplyAprOptimizer() {
   const {
     ctx,
     userAddress,
+    isViewingWallet,
     chain,
     isLoadingPositions,
     ownedLoanAssetOptions,
@@ -129,9 +130,10 @@ export function SupplyAprOptimizer() {
                 autoStepInfo={autoStepInfo}
                 totalAllocatedAssets={totalAllocatedAssets}
                 userAddress={userAddress as `0x${string}` | undefined}
-                chainId={chain?.id}
+                chainId={chainIdForLinks}
                 morphoAddress={morphoAddress as `0x${string}` | undefined}
                 userSupplySharesByMarketId={userSupplySharesByMarketId}
+                readOnly={isViewingWallet}
                 onExecutedSuccess={() => ctx.clear()}
               />
             )}

@@ -7,12 +7,13 @@ import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optim
 import type { OptimizerReadResult } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits } from 'viem'
-import { useAccount, usePublicClient, useReadContracts } from 'wagmi'
+import { useAccount, useChainId, usePublicClient, useReadContracts } from 'wagmi'
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { trackEvent } from '~/lib/analytics'
 import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
+import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import {
   DEFAULT_MARKET_APR,
   getDefaultMarketAprByAssetSymbol,
@@ -49,6 +50,10 @@ export function useSupplyAprOptimizerController() {
   const MIN_CANDIDATE_BORROW_USD = 5
   const ctx = useSupplyAprOptimizer()
   const { address: userAddress, chain } = useAccount()
+  const walletChainId = useChainId()
+  const { viewingAddress, isViewingWallet } = useViewingWallet()
+  const effectiveUserAddress = viewingAddress ?? userAddress
+  const effectiveChainId = chain?.id ?? walletChainId
   const newDepositAmount = ctx.inputs.newDepositAmount
   const setDerived = ctx.setDerived
   const setNewDepositAmount = ctx.setNewDepositAmount
@@ -79,7 +84,7 @@ export function useSupplyAprOptimizerController() {
   const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
   const consumeFreshPrecomputedResult = useHomeMagicOptimizerStore(state => state.consumeFreshPrecomputedResult)
 
-  const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions()
+  const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions({ address: effectiveUserAddress, chainId: effectiveChainId })
 
   const ownedLoanAssetOptions = useMemo<LoanAssetOption[]>(() => {
     const map = new Map<string, LoanAssetOption>()
@@ -100,8 +105,8 @@ export function useSupplyAprOptimizerController() {
     return [...map.values()].sort((a, b) => a.symbol.localeCompare(b.symbol))
   }, [livePositions])
 
-  const { data: popularLoanAssets } = usePopularLoanAssetsByChain(chain?.id, {
-    enabled: !!userAddress && !!chain?.id,
+  const { data: popularLoanAssets } = usePopularLoanAssetsByChain(effectiveChainId, {
+    enabled: !!effectiveUserAddress && !!effectiveChainId,
     topN: 20,
     first: 200,
     minNetSupplyApy: 0.05,
@@ -161,11 +166,11 @@ export function useSupplyAprOptimizerController() {
     void whitelistVersion
     void localBlacklistVersion
     void blacklistVersion
-    if (!chain?.id)
+    if (!effectiveChainId)
       return selectedUserMarketsAll
     return selectedUserMarketsAll.filter((p) => {
       const status = getMarketRisk({
-        chainId: chain.id,
+        chainId: effectiveChainId,
         uniqueKey: p.market.uniqueKey,
         loanAssetAddress: p.market.loanAsset.address,
         collateralAssetAddress: p.market.collateralAsset.address,
@@ -175,7 +180,7 @@ export function useSupplyAprOptimizerController() {
       }).status
       return status !== 'black'
     })
-  }, [blacklistVersion, chain?.id, decisionsVersion, localBlacklistVersion, selectedUserMarketsAll, whitelistVersion])
+  }, [blacklistVersion, decisionsVersion, effectiveChainId, localBlacklistVersion, selectedUserMarketsAll, whitelistVersion])
 
   const userSupplySharesByMarketId = useMemo(() => {
     const map = new Map<string, bigint>()
@@ -184,16 +189,16 @@ export function useSupplyAprOptimizerController() {
     return map
   }, [selectedUserMarkets])
 
-  const topMarketsQuery = useMarketsByChain(selectedLoanAddr ? chain?.id : undefined, selectedLoanAddr, {
+  const topMarketsQuery = useMarketsByChain(selectedLoanAddr ? effectiveChainId : undefined, selectedLoanAddr, {
     minNetSupplyApy: MIN_CANDIDATE_NET_SUPPLY_APY,
     maxNetSupplyApy: MAX_CANDIDATE_NET_SUPPLY_APY,
     minBorrowUsd: MIN_CANDIDATE_BORROW_USD,
   })
   const topMarkets = topMarketsQuery.data
 
-  const { data: walletBalanceRaw } = useTokenBalance(selectedOption?.address ?? ZERO_ADDRESS, selectedOption ? userAddress : undefined)
+  const { data: walletBalanceRaw } = useTokenBalance(selectedOption?.address ?? ZERO_ADDRESS, selectedOption ? effectiveUserAddress : undefined)
 
-  const morphoAddress = useMemo(() => getMorphoBlueAddress(chain?.id), [chain?.id])
+  const morphoAddress = useMemo(() => getMorphoBlueAddress(effectiveChainId), [effectiveChainId])
   const userMarketStateContracts = useMemo(() => {
     if (!selectedOption || selectedUserMarkets.length === 0)
       return []
@@ -307,17 +312,17 @@ export function useSupplyAprOptimizerController() {
   const onCancelOptimize = useCallback(() => {
     if (!ctx.run.isRunning)
       return
-    trackEvent('optimizer_run_canceled', { loanAsset: selectedOption?.symbol, chainId: chain?.id })
+    trackEvent('optimizer_run_canceled', { loanAsset: selectedOption?.symbol, chainId: effectiveChainId })
     stopOptimizerWorker()
     setOptimizeRequest(null)
     setRunProgressLabel(null)
     setRunProgressPercent(null)
     cancelRun(ctx.run.runId)
-  }, [cancelRun, ctx.run.isRunning, ctx.run.runId, selectedOption?.symbol, chain?.id, stopOptimizerWorker])
+  }, [cancelRun, ctx.run.isRunning, ctx.run.runId, effectiveChainId, selectedOption?.symbol, stopOptimizerWorker])
 
-  const lastNonNullChainIdRef = useRef<number | undefined>(chain?.id)
+  const lastNonNullChainIdRef = useRef<number | undefined>(effectiveChainId)
   useEffect(() => {
-    const currentChainId = chain?.id
+    const currentChainId = effectiveChainId
     if (currentChainId == null)
       return
     const previousNonNull = lastNonNullChainIdRef.current
@@ -332,7 +337,7 @@ export function useSupplyAprOptimizerController() {
     setRunProgressLabel(null)
     setRunProgressPercent(null)
     heuristicCacheRef.current.clear()
-  }, [chain?.id, ctx, stopOptimizerWorker])
+  }, [effectiveChainId, ctx, stopOptimizerWorker])
 
   useEffect(() => () => stopOptimizerWorker(), [stopOptimizerWorker])
 
@@ -340,7 +345,7 @@ export function useSupplyAprOptimizerController() {
   const optimizeReadResult = useSupplyOptimizerReads({
     input: optimizeRequest,
     morphoAddress,
-    chainId: chain?.id,
+    chainId: effectiveChainId,
     publicClient,
     config: {
       chunkSize: OPTIMIZER_READ_CHUNK_SIZE,
@@ -475,14 +480,14 @@ export function useSupplyAprOptimizerController() {
   const onChangeLoanAsset = useCallback((addr: string) => {
     const opt = loanAssetOptions.find(o => o.address === addr)
     ctx.setSelection({
-      chainId: chain?.id,
+      chainId: effectiveChainId,
       loanAssetAddress: addr,
       loanAssetSymbol: opt?.symbol,
       loanAssetDecimals: opt?.decimals,
     })
     ctx.setMarketApr(resolveMarketAprByAssetSymbol(opt?.symbol, marketAprBySymbol))
     ctx.setNewDepositAmount(undefined)
-  }, [chain?.id, ctx, loanAssetOptions, marketAprBySymbol])
+  }, [ctx, effectiveChainId, loanAssetOptions, marketAprBySymbol])
 
   const onChangeMarketApr = useCallback((value: string) => {
     ctx.setMarketApr(value)
@@ -507,8 +512,8 @@ export function useSupplyAprOptimizerController() {
       const parsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
       return Number.isFinite(parsed) && parsed >= 1
     })()
-    && !!userAddress
-    && !!chain?.id
+    && !!effectiveUserAddress
+    && !!effectiveChainId
 
   const parseMaxMarkets = useCallback((value: string) => {
     const parsed = Number.parseInt(value.trim(), 10)
@@ -527,7 +532,7 @@ export function useSupplyAprOptimizerController() {
 
   // Run sequence: validate inputs, freeze timestamp/run id, build the risk-filtered market universe, reuse any cached step heuristic, then kick off reads for the worker.
   const onOptimize = useCallback(() => {
-    if (!selectedOption || !userAddress || !chain?.id)
+    if (!selectedOption || !effectiveUserAddress || !effectiveChainId)
       return
     if (topMarketsQuery.isLoading || topMarketsQuery.isFetching)
       return
@@ -578,10 +583,10 @@ export function useSupplyAprOptimizerController() {
     }
 
     const strategy = strategyInput
-    trackEvent('optimizer_run_started', { loanAsset: selectedOption.symbol, chainId: chain?.id, maxMarkets: maxMarketsUsed })
+    trackEvent('optimizer_run_started', { loanAsset: selectedOption.symbol, chainId: effectiveChainId, maxMarkets: maxMarketsUsed })
 
     const cacheKey = buildMoveSizeCacheKey({
-      chainId: chain?.id,
+      chainId: effectiveChainId,
       loanAssetAddress: selectedOption.address,
       newDepositAssets,
       fallbackAprWad,
@@ -597,9 +602,9 @@ export function useSupplyAprOptimizerController() {
     const universe = new Map<string, { uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>()
     for (const m of (topMarkets ?? [])) {
       const id = m.uniqueKey.toLowerCase()
-      const status = chain?.id
+      const status = effectiveChainId
         ? getMarketRisk({
-          chainId: chain.id,
+          chainId: effectiveChainId,
           uniqueKey: m.uniqueKey,
           loanAssetAddress: m.loanAsset?.address,
           collateralAssetAddress: m.collateralAsset?.address,
@@ -614,9 +619,9 @@ export function useSupplyAprOptimizerController() {
     }
     for (const p of selectedUserMarkets) {
       const id = p.market.uniqueKey.toLowerCase()
-      const status = chain?.id
+      const status = effectiveChainId
         ? getMarketRisk({
-          chainId: chain.id,
+          chainId: effectiveChainId,
           uniqueKey: p.market.uniqueKey,
           loanAssetAddress: p.market.loanAsset?.address,
           collateralAssetAddress: p.market.collateralAsset?.address,
@@ -658,7 +663,7 @@ export function useSupplyAprOptimizerController() {
       setSupplyOptimizerDebugState({ request: debugRequest })
 
     setOptimizeRequest(requestPayload)
-  }, [beginRun, chain?.id, ctx, finishRun, maxMarketsInput, selectedOption, selectedUserMarkets, strategyInput, topMarkets, topMarketsQuery, userAddress])
+  }, [beginRun, ctx, effectiveChainId, effectiveUserAddress, finishRun, maxMarketsInput, selectedOption, selectedUserMarkets, strategyInput, topMarkets, topMarketsQuery])
 
   const result = ctx.result
   const parsedNewDepositAssets = useMemo(() => {
@@ -684,7 +689,7 @@ export function useSupplyAprOptimizerController() {
 
   const totalAllocatedAssets = useMemo(() => displayResult ? displayResult.positions.reduce((sum, p) => sum + p.amountAssets, 0n) : 0n, [displayResult])
   const symbol = selectedOption?.symbol ?? ctx.selection.loanAssetSymbol ?? ''
-  const chainIdForLinks = ctx.selection.chainId ?? chain?.id
+  const chainIdForLinks = ctx.selection.chainId ?? effectiveChainId
   const chainNameForLinks = chainIdForLinks ? getSupportedChainName(chainIdForLinks) : undefined
 
   const marketMetaById = useMemo<Map<string, OptimizerMarketMeta>>(() => {
@@ -692,9 +697,9 @@ export function useSupplyAprOptimizerController() {
     for (const m of (topMarkets ?? [])) {
       map.set(m.uniqueKey.toLowerCase(), {
         collateralSymbol: m.collateralAsset?.symbol,
-        status: chain?.id
+        status: effectiveChainId
           ? getMarketRisk({
-            chainId: chain.id,
+            chainId: effectiveChainId,
             uniqueKey: m.uniqueKey,
             loanAssetAddress: m.loanAsset?.address,
             collateralAssetAddress: m.collateralAsset?.address,
@@ -708,9 +713,9 @@ export function useSupplyAprOptimizerController() {
     for (const p of selectedUserMarkets) {
       map.set(p.market.uniqueKey.toLowerCase(), {
         collateralSymbol: p.market.collateralAsset?.symbol,
-        status: chain?.id
+        status: effectiveChainId
           ? getMarketRisk({
-            chainId: chain.id,
+            chainId: effectiveChainId,
             uniqueKey: p.market.uniqueKey,
             loanAssetAddress: p.market.loanAsset?.address,
             collateralAssetAddress: p.market.collateralAsset?.address,
@@ -722,7 +727,7 @@ export function useSupplyAprOptimizerController() {
       })
     }
     return map
-  }, [chain?.id, selectedUserMarkets, topMarkets])
+  }, [effectiveChainId, selectedUserMarkets, topMarkets])
 
   useEffect(() => {
     if (import.meta.env.PROD)
@@ -762,14 +767,14 @@ export function useSupplyAprOptimizerController() {
   }, [])
 
   useEffect(() => {
-    if (!optimizerPreset || !chain?.id || optimizerPreset.chainId !== chain.id)
+    if (!optimizerPreset || !effectiveChainId || optimizerPreset.chainId !== effectiveChainId)
       return
 
     // Reuse a still-fresh precomputed result when possible so clicking an opportunity card can open the optimizer with an answer instead of forcing a rerun.
-    const precomputedResult = optimizerPreset.usePrecomputedIfFresh && userAddress
+    const precomputedResult = optimizerPreset.usePrecomputedIfFresh && effectiveUserAddress
       ? consumeFreshPrecomputedResult({
           chainId: optimizerPreset.chainId,
-          userAddress,
+          userAddress: effectiveUserAddress,
           loanAssetAddress: optimizerPreset.loanAssetAddress,
           maxMarketsUsed: optimizerPreset.maxMarketsUsed,
           marketApr: optimizerPreset.marketApr ?? DEFAULT_MARKET_APR,
@@ -791,7 +796,7 @@ export function useSupplyAprOptimizerController() {
       ctx.applyPrefetchedResult(precomputedResult)
 
     consumeOptimizerPreset()
-  }, [chain?.id, consumeFreshPrecomputedResult, consumeOptimizerPreset, ctx, optimizerPreset, setMaxMarketsInput, userAddress])
+  }, [consumeFreshPrecomputedResult, consumeOptimizerPreset, ctx, effectiveChainId, effectiveUserAddress, optimizerPreset, setMaxMarketsInput])
 
   const hasSomethingToClear = !!ctx.selection.loanAssetAddress || ctx.inputs.newDepositAmount != null || !!ctx.result || !!ctx.run.error || ctx.run.isRunning
   const optimizeLabel = topMarketsQuery.isLoading || topMarketsQuery.isFetching
@@ -802,7 +807,8 @@ export function useSupplyAprOptimizerController() {
 
   return {
     ctx,
-    userAddress,
+    userAddress: effectiveUserAddress,
+    isViewingWallet,
     chain,
     isLoadingPositions,
     ownedLoanAssetOptions,

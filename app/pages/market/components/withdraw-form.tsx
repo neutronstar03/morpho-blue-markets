@@ -5,6 +5,7 @@ import { formatUnits, parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { MarketAprPreview } from '~/components/ui/market-apr-preview'
+import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatTokenAmountShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
@@ -31,7 +32,9 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
   const [percentage, setPercentage] = useState('')
   // asset amount string (token decimals)
   const [assetAmount, setAssetAmount] = useState('')
-  const { address } = useAccount()
+  const { address: connectedAddress } = useAccount()
+  const { viewingAddress, isViewingWallet } = useViewingWallet()
+  const address = viewingAddress ?? connectedAddress
   const [isSubmittingFlow, setIsSubmittingFlow] = useState(false)
   const { startFlow, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
 
@@ -236,7 +239,7 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
     e.preventDefault()
 
     const inputValue = mode === 'percent' ? percentage : assetAmount
-    if (!inputValue || !address || !isClient)
+    if (!inputValue || !connectedAddress || !isClient || isViewingWallet)
       return
 
     const marketLabel = `${market.collateralAsset.symbol} / ${loanTokenSymbol}`
@@ -327,7 +330,7 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
   const beforeApr = preview.supplyAprBefore
   const afterApr = preview.supplyAprAfter
   const showAprEstimateLabel = afterApr != null
-  const submitDisabled = isInputInvalid || isLoading || !address || !isSharesDebounced || isUtilizationAfterAbove100 || isAboveMaxWithdrawShares
+  const submitDisabled = isInputInvalid || isLoading || !connectedAddress || isViewingWallet || !isSharesDebounced || isUtilizationAfterAbove100 || isAboveMaxWithdrawShares
   const submitIdleLabel = `Withdraw ${withdrawAssetsShort} ${loanTokenSymbol}`
   const desktopLoadingLabel = isSimulatingWithdraw ? 'Preparing...' : 'Withdraw'
   const mobileLoadingLabel = isSimulatingWithdraw ? 'Preparing withdrawal...' : 'Withdrawing...'
@@ -395,6 +398,12 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
       {!address && (
         <p className="text-sm text-gray-500 text-center">
           Connect your wallet to withdraw
+        </p>
+      )}
+
+      {isViewingWallet && (
+        <p className="text-sm text-cyan-400 text-center">
+          Execution disabled while viewing wallet
         </p>
       )}
 

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.15 - 2026-05-03
+
+### Changed
+- feat: Home and Market positions can now estimate accrued supply value locally from Morpho market state and AdaptiveCurve IRM data, including a Market page projected amount row with a mobile-friendly tooltip showing how long ago the market was last updated onchain.
+- feat: added viewing-wallet support via `#w=<address>` so position, optimizer, and withdraw flows can inspect another wallet while keeping connected-wallet transaction behavior separate.
+
 ## v1.4.14 - 2026-05-02
 
 ### Fixed

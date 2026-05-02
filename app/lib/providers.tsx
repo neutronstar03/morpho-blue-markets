@@ -10,6 +10,7 @@ import { BatchWithdrawProvider } from './contexts/batch-withdraw.context'
 import { NetworkProvider } from './contexts/network'
 import { SupplyAprOptimizerProvider } from './contexts/optimizer.context'
 import { TransactionFeedbackProvider } from './contexts/transaction-feedback.context'
+import { ViewingWalletProvider } from './contexts/viewing-wallet'
 import { useAnalytics } from './hooks/use-analytics'
 import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
 import { useMarketBlacklistPreload } from './market-blacklist'
@@ -43,12 +44,14 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <NetworkProvider>
           <TransactionFeedbackProvider>
-            <SupplyAprOptimizerProvider>
-              <BatchWithdrawProvider>
-                <HomeMagicOptimizerEffects />
-                <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
-              </BatchWithdrawProvider>
-            </SupplyAprOptimizerProvider>
+            <ViewingWalletProvider>
+              <SupplyAprOptimizerProvider>
+                <BatchWithdrawProvider>
+                  <HomeMagicOptimizerEffects />
+                  <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
+                </BatchWithdrawProvider>
+              </SupplyAprOptimizerProvider>
+            </ViewingWalletProvider>
           </TransactionFeedbackProvider>
         </NetworkProvider>
       </QueryClientProvider>
