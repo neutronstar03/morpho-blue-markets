@@ -34,6 +34,7 @@ export interface UserPosition {
     }>
     state: {
       netSupplyApy: number
+      utilization: number
       supplyAssets: string
       supplyShares: string
       supplyAssetsUsd: number | null
@@ -124,6 +125,7 @@ export const QUERY_USER_POSITIONS = gql`
           warnings { type level }
           state {
             netSupplyApy
+            utilization
             supplyAssets
             supplyShares
             supplyAssetsUsd

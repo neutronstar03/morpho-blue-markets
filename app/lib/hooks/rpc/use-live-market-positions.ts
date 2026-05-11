@@ -36,6 +36,7 @@ export interface LiveMarketPosition {
     }
     state: {
       netSupplyApy: number
+      utilization: number
       supplyAssets: string
       supplyShares: string
       supplyAssetsUsd?: number | null
@@ -233,6 +234,7 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
           collateralAsset: gp.market.collateralAsset,
           state: {
             netSupplyApy: gp.market.state.netSupplyApy ?? 0,
+            utilization: gp.market.state.utilization,
             supplyAssets: gp.market.state.supplyAssets,
             supplyShares: gp.market.state.supplyShares,
             supplyAssetsUsd: gp.market.state.supplyAssetsUsd,
@@ -260,6 +262,7 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
         let marketSupplyAssets = gp.market.state.supplyAssets
         let marketSupplyShares = gp.market.state.supplyShares
         let marketStateSupplyUsd = gp.market.state.supplyAssetsUsd
+        let marketUtilization = gp.market.state.utilization
 
         if (result?.status === 'success' && result.result) {
           const [ss, bs, col] = result.result as readonly [bigint, bigint, bigint]
@@ -289,6 +292,9 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
 
             marketSupplyAssets = projectedMarketState.totalSupplyAssets.toString()
             marketSupplyShares = projectedMarketState.totalSupplyShares.toString()
+            marketUtilization = projectedMarketState.totalSupplyAssets > 0n
+              ? Number(projectedMarketState.totalBorrowAssets) / Number(projectedMarketState.totalSupplyAssets)
+              : 0
 
             const loanPriceUsd = gp.market.loanAsset.price?.usd
             if (loanPriceUsd != null) {
@@ -320,6 +326,7 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
             collateralAsset: gp.market.collateralAsset,
             state: {
               netSupplyApy: gp.market.state.netSupplyApy ?? 0,
+              utilization: marketUtilization,
               supplyAssets: marketSupplyAssets,
               supplyShares: marketSupplyShares,
               supplyAssetsUsd: marketStateSupplyUsd,

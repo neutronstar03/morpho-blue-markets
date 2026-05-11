@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.16 - 2026-05-11
+
+### Changed
+- ui: Home Positions now shows compact market usage beside portfolio weight on each position card, with accessible labels and native tooltips for both indicators.
+- data: user position market state now carries utilization through the GraphQL/RPC live position path so the recap can show current market usage.
+
 ## v1.4.15 - 2026-05-03
 
 ### Changed

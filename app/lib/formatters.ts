@@ -75,14 +75,14 @@ export function formatUsd(value: number): string {
   }).format(value)
 }
 
-export function formatPercent(value: number): string {
+export function formatPercent(value: number, digits = 2): string {
   if (Number.isNaN(value) || typeof value === 'undefined')
-    return '0.00%'
+    return `${(0).toFixed(digits)}%`
 
   return new Intl.NumberFormat('en-US', {
     style: 'percent',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   }).format(value)
 }
 

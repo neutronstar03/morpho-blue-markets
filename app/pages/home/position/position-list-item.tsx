@@ -1,10 +1,10 @@
 import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
-import { Scale } from 'lucide-react'
+import { Gauge, Scale } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge, BadgeLabel } from '~/components/ui/badge'
 import { MarketRiskText } from '~/components/ui/market-risk-text'
-import { formatBigintShort } from '~/lib/formatters'
+import { formatBigintShort, formatPercent } from '~/lib/formatters'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
 import { getPositionPrincipalUsd, getPositionSuppliedAssets } from './position-utils'
 
@@ -42,6 +42,9 @@ export function PositionListItem({
     return (principalUsd / totalValueUsd) * 100
   }, [principalUsd, totalValueUsd])
 
+  const contributionLabel = contributionPct != null ? formatPercent(contributionPct / 100, 1) : '—'
+  const marketUsageLabel = formatPercent(position.market.state.utilization, 1)
+
   const { safuness } = useSafuness({
     chainId,
     collateralAddress: position.market.collateralAsset.address,
@@ -74,10 +77,26 @@ export function PositionListItem({
               <BadgeLabel>Safety</BadgeLabel>
               {safuness != null ? `${safuness.toFixed(2)}x` : '—'}
             </Badge>
-            <Badge variant="subtle" size="sm">
-              <Scale className="h-3.5 w-3.5 text-slate-300" aria-hidden="true" />
-              <span className="text-gray-400">{contributionPct != null ? `${contributionPct.toFixed(1)}%` : '—'}</span>
-            </Badge>
+            <div className="flex items-center gap-1">
+              <Badge
+                variant="subtle"
+                size="sm"
+                title="Portfolio weight"
+                aria-label={`Portfolio weight ${contributionLabel}`}
+              >
+                <Scale className="h-3.5 w-3.5 text-slate-300" aria-hidden="true" />
+                <span className="text-gray-400">{contributionLabel}</span>
+              </Badge>
+              <Badge
+                variant="subtle"
+                size="sm"
+                title="Market usage"
+                aria-label={`Market usage ${marketUsageLabel}`}
+              >
+                <Gauge className="h-3.5 w-3.5 text-cyan-300" aria-hidden="true" />
+                <span className="text-gray-400">{marketUsageLabel}</span>
+              </Badge>
+            </div>
           </div>
         </div>
       </li>
