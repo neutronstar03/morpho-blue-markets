@@ -5,6 +5,7 @@ export type MarketRiskReasonCode
   = | 'ok'
     | 'unknown_collateral'
     | 'local_blacklist'
+    | 'local_market_lost_value'
     | 'manual_approve'
     | 'manual_ban'
     | 'blacklist'

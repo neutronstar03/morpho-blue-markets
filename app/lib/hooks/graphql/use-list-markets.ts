@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
-import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
+import { filterBlacklistedMarkets, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
 
@@ -182,8 +182,9 @@ export function useMarkets({
   skip = 0,
   staleTime = 1 * 60 * 1000, // 1 minute
 }: UseMarketsProps) {
+  const blacklistVersion = useMarketBlacklistVersion()
   return useQuery<QueryMarketsResult>({
-    queryKey: ['markets', where, orderBy, orderDirection, first, skip],
+    queryKey: ['markets', where, orderBy, orderDirection, first, skip, blacklistVersion],
     queryFn: async () => {
       const result = await graphqlClient.request<QueryMarketsResult>(QUERY_LIST_MARKETS, {
         where,

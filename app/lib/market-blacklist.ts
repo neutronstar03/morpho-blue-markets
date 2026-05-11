@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import blacklistAssets from './blacklist.assets.json'
+import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue, subscribeLocalMarketExclusions } from './local-market-exclusions'
 
 interface BlacklistMarketEntry {
   chainId: number
@@ -257,8 +258,16 @@ export function subscribeMarketBlacklist(listener: () => void) {
   if (typeof window === 'undefined')
     return () => {}
   const onEvent = () => listener()
+  const onLocalExclusionChange = () => {
+    blacklistVersion++
+    listener()
+  }
   window.addEventListener(CHANGE_EVENT, onEvent)
-  return () => window.removeEventListener(CHANGE_EVENT, onEvent)
+  const unsubscribeLocalMarketExclusions = subscribeLocalMarketExclusions(onLocalExclusionChange)
+  return () => {
+    window.removeEventListener(CHANGE_EVENT, onEvent)
+    unsubscribeLocalMarketExclusions()
+  }
 }
 
 export function useMarketBlacklistVersion() {
@@ -390,7 +399,7 @@ export function isAssetBlacklisted(address?: string | null, chainId?: number) {
 }
 
 export function isMarketIdBlacklisted(uniqueKey?: string | null, chainId?: number) {
-  return hasValueInChainMap(blacklistState.marketIdsByChain, uniqueKey, chainId)
+  return hasValueInChainMap(blacklistState.marketIdsByChain, uniqueKey, chainId) || isMarketLocallyMarkedLostValue(chainId, uniqueKey)
 }
 
 export function isMarketIdManuallyBlacklisted(uniqueKey?: string | null, chainId?: number) {
@@ -407,6 +416,7 @@ export function isMarketBlacklisted(args: {
 }) {
   return (
     isMarketIdBlacklisted(args.uniqueKey, args.chainId)
+    || isCollateralLocallyExcluded(args.chainId, args.collateralAssetAddress)
     || isAssetBlacklisted(args.loanAssetAddress, args.chainId)
     || isAssetBlacklisted(args.collateralAssetAddress, args.chainId)
     || isManuallyBlacklistedSymbol(args.loanAssetSymbol)

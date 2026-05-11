@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.18 - 2026-05-11
+
+### Changed
+- feat: added local lost-value market exclusions so affected markets can be hidden from portfolio totals, batch withdrawal, and deposit suggestions while remaining restorable from the Market page or Blacklist recap.
+- refactor: consolidated user-managed collateral and market exclusions behind one local market-exclusions store with legacy localStorage key migration, reducing duplicate blacklist/write-off wiring across screens.
+- infra: local `bun run dev` now serves the real Cloudflare Pages Function handlers for `/api/*` through Vite middleware, matching production API behavior more closely.
+
 ## v1.4.17 - 2026-05-11
 
 ### Fixed

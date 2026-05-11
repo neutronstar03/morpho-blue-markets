@@ -16,7 +16,6 @@ import {
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
-import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
 import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
@@ -154,13 +153,11 @@ export function AdvancedList() {
 
   const decisionsVersion = useCollateralDecisionsVersion()
   const whitelistVersion = useCollateralWhitelistVersion()
-  const localBlacklistVersion = useLocalCollateralBlacklistVersion()
   const blacklistVersion = useMarketBlacklistVersion()
 
   const riskStatusByKey = useMemo(() => {
     void decisionsVersion
     void whitelistVersion
-    void localBlacklistVersion
     void blacklistVersion
     const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
     for (const m of markets) {
@@ -176,7 +173,7 @@ export function AdvancedList() {
       }).status
     }
     return out
-  }, [blacklistVersion, decisionsVersion, localBlacklistVersion, markets, whitelistVersion])
+  }, [blacklistVersion, decisionsVersion, markets, whitelistVersion])
 
   const visibleMarkets = useMemo(() => {
     return markets.filter((m) => {

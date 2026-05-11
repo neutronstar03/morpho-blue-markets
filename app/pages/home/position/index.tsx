@@ -16,7 +16,6 @@ import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-position
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
-import { useLocalCollateralBlacklistVersion } from '~/lib/local-collateral-blacklist'
 import { isMarketIdBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 import { getMarketRisk } from '~/lib/market-risk/market-risk'
@@ -51,12 +50,10 @@ function PositionClient() {
 
   const decisionsVersion = useCollateralDecisionsVersion()
   const whitelistVersion = useCollateralWhitelistVersion()
-  const localBlacklistVersion = useLocalCollateralBlacklistVersion()
   const blacklistVersion = useMarketBlacklistVersion()
   const riskStatusByKey = useMemo(() => {
     void decisionsVersion
     void whitelistVersion
-    void localBlacklistVersion
     void blacklistVersion
     const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
     if (!chainId)
@@ -74,7 +71,7 @@ function PositionClient() {
       }).status
     }
     return out
-  }, [blacklistVersion, chainId, decisionsVersion, localBlacklistVersion, positions, whitelistVersion])
+  }, [blacklistVersion, chainId, decisionsVersion, positions, whitelistVersion])
 
   const visiblePositions = useMemo(() => {
     if (!positions || !chainId)

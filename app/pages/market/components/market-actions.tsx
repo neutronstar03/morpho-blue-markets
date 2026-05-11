@@ -7,6 +7,7 @@ import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatMarketSize, formatPercent } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
+import { isMarketBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { DepositForm } from './deposit-form'
 import { MarketPosition } from './market-position'
 import { WithdrawForm } from './withdraw-form'
@@ -19,6 +20,7 @@ export function MarketActions({ market }: MarketActionsProps) {
   const { address } = useAccount()
   const { isViewingWallet } = useViewingWallet()
   const [searchParams] = useSearchParams()
+  const blacklistVersion = useMarketBlacklistVersion()
 
   const deepLink = useMemo(() => {
     const tab = searchParams.get('tab')
@@ -82,6 +84,17 @@ export function MarketActions({ market }: MarketActionsProps) {
   const missingLiquidityTo90Usd = utilization > targetUtilization
     ? Math.max(0, market.state.supplyAssetsUsd * (utilization / targetUtilization - 1))
     : 0
+  const isSupplyBlocked = useMemo(() => {
+    void blacklistVersion
+    return isMarketBlacklisted({
+      chainId: market.morphoBlue.chain.id,
+      uniqueKey: market.uniqueKey,
+      loanAssetAddress: market.loanAsset.address,
+      collateralAssetAddress: market.collateralAsset.address,
+      loanAssetSymbol: market.loanAsset.symbol,
+      collateralAssetSymbol: market.collateralAsset.symbol,
+    })
+  }, [blacklistVersion, market])
 
   return (
     <div className="p-3 sm:p-6">
@@ -118,10 +131,14 @@ export function MarketActions({ market }: MarketActionsProps) {
           <button
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
               activeTab === 'deposit'
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer'
+                ? isSupplyBlocked ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
+                : isSupplyBlocked ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer'
             }`}
-            onClick={() => setActiveTab('deposit')}
+            onClick={() => {
+              if (!isSupplyBlocked)
+                setActiveTab('deposit')
+            }}
+            disabled={isSupplyBlocked}
           >
             Supply
           </button>
@@ -139,13 +156,19 @@ export function MarketActions({ market }: MarketActionsProps) {
 
         <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
           {activeTab === 'deposit'
-            ? (
-                <DepositForm
-                  market={market}
-                  loanTokenSymbol={market.loanAsset.symbol}
-                  prefill={depositPrefill}
-                />
-              )
+            ? isSupplyBlocked
+              ? (
+                  <div className="rounded-lg border border-red-700/30 bg-red-900/10 p-4 text-sm text-red-200">
+                    Supply is blocked for this market because it is blacklisted or marked as lost value. Direct access remains available for inspection and recovery.
+                  </div>
+                )
+              : (
+                  <DepositForm
+                    market={market}
+                    loanTokenSymbol={market.loanAsset.symbol}
+                    prefill={depositPrefill}
+                  />
+                )
             : (
                 <WithdrawForm
                   market={market}

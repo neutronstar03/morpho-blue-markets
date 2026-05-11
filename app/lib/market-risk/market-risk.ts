@@ -1,6 +1,6 @@
 import type { MarketRiskInput, MarketRiskReasonCode, MarketRiskStatusEntry } from './types'
 import { isCollateralWhitelisted } from '../collateral-whitelist'
-import { isCollateralLocallyBlacklisted } from '../local-collateral-blacklist'
+import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue } from '../local-market-exclusions'
 import { isMarketBlacklisted } from '../market-blacklist'
 import { isOracleMisconfiguredWarning } from '../morpho/morpho-warnings'
 import { getCollateralDecision } from './collateral-decisions'
@@ -17,10 +17,17 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     }
   }
 
-  if (isCollateralLocallyBlacklisted(chainId, collateralAddress)) {
+  if (isCollateralLocallyExcluded(chainId, collateralAddress)) {
     return {
       status: 'black',
       reasonCodes: ['local_blacklist'],
+    }
+  }
+
+  if (isMarketLocallyMarkedLostValue(chainId, uniqueKey)) {
+    return {
+      status: 'black',
+      reasonCodes: ['local_market_lost_value'],
     }
   }
 

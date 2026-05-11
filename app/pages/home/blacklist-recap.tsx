@@ -1,14 +1,17 @@
 import { ExternalLink, X } from 'lucide-react'
 import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { getSupportedChainName } from '~/lib/addresses'
 import { getExplorerUrl } from '~/lib/explorer'
 import {
-  clearCollateralLocallyBlacklisted,
-  listLocallyBlacklistedCollaterals,
-  useLocalCollateralBlacklistVersion,
-} from '~/lib/local-collateral-blacklist'
+  clearCollateralLocallyExcluded,
+  clearMarketLocallyMarkedLostValue,
+  listLocallyExcludedCollaterals,
+  listMarketsLocallyMarkedLostValue,
+} from '~/lib/local-market-exclusions'
+import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import {
   clearCollateralDecision,
   listCollateralDecisions,
@@ -16,11 +19,12 @@ import {
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
 
 interface BlacklistRecapRow {
-  kind: 'local_blacklist' | 'manual_ban'
+  kind: 'local_blacklist' | 'manual_ban' | 'market_lost_value'
   reasonLabel: string
   chainId: number
-  collateralAddress: string
   ts: number
+  collateralAddress?: string
+  marketUniqueKey?: string
   symbol?: string
   name?: string
 }
@@ -41,7 +45,7 @@ function formatSavedAt(ts: number) {
 }
 
 function buildBlacklistRecapRows(): BlacklistRecapRow[] {
-  const localBlacklistRows = listLocallyBlacklistedCollaterals().map(entry => ({
+  const localBlacklistRows = listLocallyExcludedCollaterals().map(entry => ({
     kind: 'local_blacklist' as const,
     reasonLabel: 'User Blacklist',
     chainId: entry.chainId,
@@ -61,13 +65,25 @@ function buildBlacklistRecapRows(): BlacklistRecapRow[] {
       symbol: entry.symbol,
       name: entry.name,
     }))
+  const marketWriteoffRows = listMarketsLocallyMarkedLostValue().map(entry => ({
+    kind: 'market_lost_value' as const,
+    reasonLabel: 'Lost value',
+    chainId: entry.chainId,
+    marketUniqueKey: entry.marketUniqueKey,
+    collateralAddress: entry.collateralAssetAddress,
+    ts: entry.ts,
+    symbol: entry.collateralAssetSymbol && entry.loanAssetSymbol
+      ? `${entry.collateralAssetSymbol}/${entry.loanAssetSymbol}`
+      : entry.collateralAssetSymbol || entry.loanAssetSymbol,
+    name: 'Lost value market',
+  }))
 
-  return [...localBlacklistRows, ...manualBanRows].sort((a, b) => b.ts - a.ts)
+  return [...localBlacklistRows, ...manualBanRows, ...marketWriteoffRows].sort((a, b) => b.ts - a.ts)
 }
 
 function ReasonBadge({ kind, label }: { kind: BlacklistRecapRow['kind'], label: string }) {
   return (
-    <span className={kind === 'local_blacklist'
+    <span className={kind === 'local_blacklist' || kind === 'market_lost_value'
       ? 'inline-flex rounded-full border border-red-700/30 bg-red-900/10 px-2 py-0.5 text-[11px] font-medium text-red-300'
       : 'inline-flex rounded-full border border-orange-700/30 bg-orange-900/10 px-2 py-0.5 text-[11px] font-medium text-orange-300'}
     >
@@ -77,20 +93,30 @@ function ReasonBadge({ kind, label }: { kind: BlacklistRecapRow['kind'], label: 
 }
 
 export function BlacklistRecap({ onClose }: { onClose: () => void }) {
-  const localBlacklistVersion = useLocalCollateralBlacklistVersion()
+  const blacklistVersion = useMarketBlacklistVersion()
   const decisionsVersion = useCollateralDecisionsVersion()
 
   const rows = useMemo(() => {
-    void localBlacklistVersion
+    void blacklistVersion
     void decisionsVersion
     return buildBlacklistRecapRows()
-  }, [decisionsVersion, localBlacklistVersion])
+  }, [blacklistVersion, decisionsVersion])
 
   const onRemove = (row: BlacklistRecapRow) => {
     if (row.kind === 'local_blacklist') {
-      clearCollateralLocallyBlacklisted(row.chainId, row.collateralAddress)
+      if (!row.collateralAddress)
+        return
+      clearCollateralLocallyExcluded(row.chainId, row.collateralAddress)
       return
     }
+    if (row.kind === 'market_lost_value') {
+      if (!row.marketUniqueKey)
+        return
+      clearMarketLocallyMarkedLostValue(row.chainId, row.marketUniqueKey)
+      return
+    }
+    if (!row.collateralAddress)
+      return
     clearCollateralDecision(row.chainId, row.collateralAddress)
   }
 
@@ -101,7 +127,7 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
           <div className="min-w-0">
             <h2 className="text-xl font-bold text-white">Blacklist recap</h2>
             <p className="text-xs text-gray-400 sm:text-sm">
-              User-managed hidden collaterals from local blacklist and manual ban actions.
+              User-managed hidden collaterals and lost value markets.
             </p>
             <div className="mt-3 text-xs text-gray-500 sm:text-sm">
               {rows.length}
@@ -126,7 +152,7 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
       {!rows.length
         ? (
             <div className="p-4 text-sm text-gray-400">
-              No local blacklisted collaterals or manual bans yet.
+              No local blacklisted collaterals, manual bans, or lost value markets yet.
             </div>
           )
         : (
@@ -145,12 +171,15 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
                   </thead>
                   <tbody className="divide-y divide-gray-700 bg-gray-800/40">
                     {rows.map((row) => {
-                      const explorerUrl = getExplorerUrl(row.chainId, row.collateralAddress as `0x${string}`)
+                      const explorerUrl = row.collateralAddress
+                        ? getExplorerUrl(row.chainId, row.collateralAddress as `0x${string}`)
+                        : undefined
+                      const displayId = row.marketUniqueKey ?? row.collateralAddress ?? ''
                       return (
-                        <tr key={`${row.kind}:${row.chainId}:${row.collateralAddress}`} className="even:bg-white/[0.02] transition-colors hover:bg-gray-700/50">
+                        <tr key={`${row.kind}:${row.chainId}:${displayId}`} className="even:bg-white/[0.02] transition-colors hover:bg-gray-700/50">
                           <td className="px-6 py-4 align-top text-sm text-white">
                             <div className="min-w-0">
-                              <div className="font-medium text-white">{row.symbol || formatAddress(row.collateralAddress)}</div>
+                              <div className="font-medium text-white">{row.symbol || formatAddress(displayId)}</div>
                               <div className="mt-1 whitespace-nowrap text-sm text-gray-300">{row.name || 'Unknown token'}</div>
                             </div>
                           </td>
@@ -160,7 +189,17 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
                           </td>
                           <td className="px-6 py-4 align-top text-sm text-gray-400">
                             <div className="flex items-start gap-2">
-                              <span className="font-mono text-xs" title={row.collateralAddress}>{row.collateralAddress}</span>
+                              {row.marketUniqueKey
+                                ? (
+                                    <Link
+                                      to={`/market/${row.marketUniqueKey}/${row.chainId}`}
+                                      className="font-mono text-xs text-gray-300 transition-colors hover:text-blue-400"
+                                      title={row.marketUniqueKey}
+                                    >
+                                      {row.marketUniqueKey}
+                                    </Link>
+                                  )
+                                : <span className="font-mono text-xs" title={displayId}>{displayId}</span>}
                               {explorerUrl && (
                                 <a
                                   href={explorerUrl}
@@ -184,7 +223,7 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
                               onClick={() => onRemove(row)}
                               className="whitespace-nowrap border-green-700/30 bg-green-900/10 text-green-300 hover:bg-green-900/20"
                             >
-                              Enable Asset
+                              {row.kind === 'market_lost_value' ? 'Restore Market' : 'Enable Asset'}
                             </Button>
                           </td>
                         </tr>
@@ -196,12 +235,15 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
 
               <div className="divide-y divide-gray-700 lg:hidden">
                 {rows.map((row) => {
-                  const explorerUrl = getExplorerUrl(row.chainId, row.collateralAddress as `0x${string}`)
+                  const explorerUrl = row.collateralAddress
+                    ? getExplorerUrl(row.chainId, row.collateralAddress as `0x${string}`)
+                    : undefined
+                  const displayId = row.marketUniqueKey ?? row.collateralAddress ?? ''
                   return (
-                    <div key={`${row.kind}:${row.chainId}:${row.collateralAddress}`} className="space-y-3 p-4">
+                    <div key={`${row.kind}:${row.chainId}:${displayId}`} className="space-y-3 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-medium text-white">{row.symbol || formatAddress(row.collateralAddress)}</div>
+                          <div className="font-medium text-white">{row.symbol || formatAddress(displayId)}</div>
                           <div className="mt-1 text-sm text-gray-300">{row.name || 'Unknown token'}</div>
                         </div>
                         <ReasonBadge kind={row.kind} label={row.reasonLabel} />
@@ -212,7 +254,16 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-start gap-2">
-                          <span className="font-mono text-xs break-all text-gray-400">{row.collateralAddress}</span>
+                          {row.marketUniqueKey
+                            ? (
+                                <Link
+                                  to={`/market/${row.marketUniqueKey}/${row.chainId}`}
+                                  className="font-mono text-xs break-all text-gray-300 transition-colors hover:text-blue-400"
+                                >
+                                  {row.marketUniqueKey}
+                                </Link>
+                              )
+                            : <span className="font-mono text-xs break-all text-gray-400">{displayId}</span>}
                           {explorerUrl && (
                             <a
                               href={explorerUrl}
@@ -235,7 +286,7 @@ export function BlacklistRecap({ onClose }: { onClose: () => void }) {
                           className="whitespace-nowrap border-green-700/30 bg-green-900/10 text-green-300 hover:bg-green-900/20"
                           onClick={() => onRemove(row)}
                         >
-                          Enable Asset
+                          {row.kind === 'market_lost_value' ? 'Restore Market' : 'Enable Asset'}
                         </Button>
                       </div>
                     </div>

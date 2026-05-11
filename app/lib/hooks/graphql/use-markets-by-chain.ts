@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { MarketOrderBy, OrderDirection, QUERY_MARKETS_BY_CHAIN } from '~/lib/graphql/queries/markets-by-chain'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
-import { filterBlacklistedMarkets } from '~/lib/market-blacklist'
+import { filterBlacklistedMarkets, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
 
@@ -22,6 +22,7 @@ export interface UseMarketsByChainOptions {
 }
 
 export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, opts: UseMarketsByChainOptions = {}) {
+  const blacklistVersion = useMarketBlacklistVersion()
   const loanAssetAddrLower = loanAssetAddress?.toLowerCase()
   const {
     minNetSupplyApy,
@@ -30,7 +31,7 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
   } = opts
 
   const query = useQuery<SupplyMarketData[]>({
-    queryKey: ['markets-by-chain', chainId, loanAssetAddrLower, minNetSupplyApy, maxNetSupplyApy, minBorrowUsd],
+    queryKey: ['markets-by-chain', chainId, loanAssetAddrLower, minNetSupplyApy, maxNetSupplyApy, minBorrowUsd, blacklistVersion],
     queryFn: async () => {
       if (!chainId)
         return []
