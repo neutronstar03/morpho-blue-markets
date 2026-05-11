@@ -9,13 +9,18 @@ export interface CacheResult {
   fromCache: boolean
 }
 
-const cfCache: Cache = (caches as any).default as Cache
+function getCloudflareCache(): Cache | undefined {
+  return (globalThis as any).caches?.default as Cache | undefined
+}
 
 /**
  * Try to match a cached response from the Cloudflare Cache API.
  * Returns the cached Response if found, undefined otherwise.
  */
 export async function getFromCache(url: string): Promise<Response | undefined> {
+  const cfCache = getCloudflareCache()
+  if (!cfCache)
+    return undefined
   const cacheKey = new Request(url, { method: 'GET' })
   return cfCache.match(cacheKey)
 }
@@ -25,6 +30,9 @@ export async function getFromCache(url: string): Promise<Response | undefined> {
  * Uses waitUntil-friendly pattern: call this via context.waitUntil().
  */
 export async function putInCache(url: string, response: Response): Promise<void> {
+  const cfCache = getCloudflareCache()
+  if (!cfCache)
+    return
   const cacheKey = new Request(url, { method: 'GET' })
   await cfCache.put(cacheKey, response.clone())
 }

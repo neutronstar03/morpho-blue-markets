@@ -23,10 +23,11 @@ To run this project locally, follow these steps:
 
 2.  **Start the development server:**
     ```bash
-    bun dev
+    bun run dev
     ```
     The application will usually be available at `http://localhost:5173`.
     If that port is already in use, Vite will automatically choose the next free port.
+    Local `/api/*` calls are handled by a dev-only Vite middleware that mirrors the Cloudflare Pages Functions used in production.
 
 ### Collateral Whitelist (Optional)
 
