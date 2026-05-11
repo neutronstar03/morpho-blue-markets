@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.17 - 2026-05-11
+
+### Fixed
+- ui: Market page risk details now count both Morpho Vault V1 and V2 supplying vaults, fixing markets that incorrectly showed zero supplying vaults when only V2 vaults list them.
+
 ## v1.4.16 - 2026-05-11
 
 ### Changed

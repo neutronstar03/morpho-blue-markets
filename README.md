@@ -70,9 +70,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.4.17` (2026-05-11): fixed Market page supplying-vault counts for markets listed by Morpho Vault V2 vaults.
 - `v1.4.16` (2026-05-11): added compact market usage beside portfolio weight in Home Positions, with accessible labels and native tooltip hints.
 - `v1.4.15` (2026-05-03): added locally projected accrued position values, a Market page projected amount tooltip with last onchain market update timing, and viewing-wallet support via `#w=<address>`.
-- `v1.4.14` (2026-05-02): merged manual market-id blacklist entries into generated artifacts and made system-blacklisted markets disappear from positions, chain pills, and batch withdraw options.
 
 ## Live Version
 

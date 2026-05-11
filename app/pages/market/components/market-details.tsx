@@ -41,6 +41,8 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 export function MarketDetails({ market }: MarketDetailsProps) {
+  const supplyingVaultCount = market.supplyingVaults.length + market.supplyingVaultV2s.length
+
   const { data: marketStateRaw } = useMarket(market.uniqueKey)
   const live = useMarketPreview({ market, marketStateRaw, deltaSupplyAssets: 0n })
   const liveSupplyApr = live.supplyAprBefore
@@ -211,8 +213,8 @@ export function MarketDetails({ market }: MarketDetailsProps) {
       <DetailRow
         label="Supplying Vaults"
         value={(
-          <span className={market.supplyingVaults.length === 0 ? 'text-red-500' : market.supplyingVaults.length > 1 ? 'text-green-500' : undefined}>
-            {market.supplyingVaults.length}
+          <span className={supplyingVaultCount === 0 ? 'text-red-500' : supplyingVaultCount > 1 ? 'text-green-500' : undefined}>
+            {supplyingVaultCount}
           </span>
         )}
       />

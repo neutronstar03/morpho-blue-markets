@@ -17,6 +17,7 @@ const GetMarketDocument = gql`
       loanAsset { address symbol name decimals }
       collateralAsset { address symbol name decimals }
       supplyingVaults { address }
+      supplyingVaultV2s { address }
       morphoBlue { chain { id } }
       badDebt { usd }
       realizedBadDebt { usd }
@@ -76,6 +77,7 @@ export interface SingleMorphoMarket {
     decimals: number
   }
   supplyingVaults: { address: string }[]
+  supplyingVaultV2s: { address: string }[]
   morphoBlue: {
     chain: { id: number }
   }

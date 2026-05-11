@@ -48,6 +48,8 @@ export interface MorphoMarket {
     weeklyNetBorrowApy: number
   }
   whitelisted: boolean
+  supplyingVaults: { address: string }[]
+  supplyingVaultV2s: { address: string }[]
   creationTimestamp: string
   warnings?: Array<{
     type: string
@@ -90,6 +92,7 @@ export const QUERY_LIST_MARKETS = gql`
         loanAsset { address symbol name decimals }
         collateralAsset { address symbol name decimals }
         supplyingVaults { address }
+        supplyingVaultV2s { address }
 
         state {
           supplyAssets
