@@ -9,7 +9,7 @@ This project focuses on practical Morpho market exploration and action tooling, 
 - Batch withdraw flow for lower-APR-first exits
 - Position recap grouped by lent asset, with cross-chain quick-switch pills and market-level deposit/withdraw flows
 - Opportunity recap for coarse chain-level deployable yield evaluation
-- Blacklist recap for reviewing user-hidden and unsafe collaterals
+- Blacklist recap for reviewing user-hidden and unsafe collaterals, with optional wallet-authenticated sync across devices
 
 ## Development
 
@@ -71,9 +71,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.0` (2026-05-13): added wallet-authenticated Cloudflare KV sync for user collateral blacklist and lost-value market exclusions.
 - `v1.4.18` (2026-05-11): added local lost-value market exclusions, consolidated user-managed exclusions, and made local dev serve real Pages Function API handlers.
 - `v1.4.17` (2026-05-11): fixed Market page supplying-vault counts for markets listed by Morpho Vault V2 vaults.
-- `v1.4.16` (2026-05-11): added compact market usage beside portfolio weight in Home Positions, with accessible labels and native tooltip hints.
 
 ## Live Version
 

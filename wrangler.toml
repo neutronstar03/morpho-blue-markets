@@ -8,3 +8,11 @@ mode = "smart"
 # The Umami backend URL is set as a secret on Cloudflare:
 #   wrangler pages secret put UMAMI_BACKEND_URL
 # (Never put real URLs in this file.)
+
+# Create production/preview namespaces before deploying this feature:
+#   wrangler kv namespace create USER_BLACKLIST
+#   wrangler kv namespace create USER_BLACKLIST --preview
+[[kv_namespaces]]
+binding = "USER_BLACKLIST"
+id = "09a4fdf77f6d4b1d962ed2cea725011f"
+preview_id = "1ddc43fca29a4aec81f9a7c202e0b5ef"

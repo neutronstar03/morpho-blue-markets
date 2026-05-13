@@ -1,3 +1,4 @@
+// Stores user-managed local collateral and market exclusions in localStorage.
 export interface LocalCollateralExclusionEntry {
   ts: number
   symbol?: string
@@ -108,6 +109,12 @@ function safeWrite(key: string, value: unknown | undefined) {
   }
 }
 
+// Defaults to Date.now() on invalid input so the sync system's last-writer-wins merge
+// always has a usable timestamp for every entry; a missing sort key would break conflict resolution.
+function normalizeTimestamp(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value) : Date.now()
+}
+
 function emitChange() {
   if (typeof window === 'undefined')
     return
@@ -210,6 +217,20 @@ export function setCollateralLocallyExcluded(
   emitChange()
 }
 
+export function setCollateralLocallyExcludedWithTimestamp(
+  chainId: number,
+  collateralAddress: string,
+  metadata?: { ts?: number, symbol?: string | null, name?: string | null },
+) {
+  migrateLegacyKeys()
+  safeWrite(collateralKey(chainId, collateralAddress), {
+    ts: normalizeTimestamp(metadata?.ts),
+    symbol: typeof metadata?.symbol === 'string' && metadata.symbol.trim() ? metadata.symbol.trim() : undefined,
+    name: typeof metadata?.name === 'string' && metadata.name.trim() ? metadata.name.trim() : undefined,
+  })
+  emitChange()
+}
+
 export function clearCollateralLocallyExcluded(chainId: number, collateralAddress: string) {
   migrateLegacyKeys()
   safeWrite(collateralKey(chainId, collateralAddress), undefined)
@@ -229,6 +250,28 @@ export function setMarketLocallyMarkedLostValue(
   migrateLegacyKeys()
   safeWrite(marketKey(chainId, marketUniqueKey), {
     ts: Date.now(),
+    loanAssetSymbol: typeof metadata?.loanAssetSymbol === 'string' && metadata.loanAssetSymbol.trim() ? metadata.loanAssetSymbol.trim() : undefined,
+    collateralAssetSymbol: typeof metadata?.collateralAssetSymbol === 'string' && metadata.collateralAssetSymbol.trim() ? metadata.collateralAssetSymbol.trim() : undefined,
+    loanAssetAddress: normalizeAddress(metadata?.loanAssetAddress),
+    collateralAssetAddress: normalizeAddress(metadata?.collateralAssetAddress),
+  })
+  emitChange()
+}
+
+export function setMarketLocallyMarkedLostValueWithTimestamp(
+  chainId: number,
+  marketUniqueKey: string,
+  metadata?: {
+    ts?: number
+    loanAssetSymbol?: string | null
+    collateralAssetSymbol?: string | null
+    loanAssetAddress?: string | null
+    collateralAssetAddress?: string | null
+  },
+) {
+  migrateLegacyKeys()
+  safeWrite(marketKey(chainId, marketUniqueKey), {
+    ts: normalizeTimestamp(metadata?.ts),
     loanAssetSymbol: typeof metadata?.loanAssetSymbol === 'string' && metadata.loanAssetSymbol.trim() ? metadata.loanAssetSymbol.trim() : undefined,
     collateralAssetSymbol: typeof metadata?.collateralAssetSymbol === 'string' && metadata.collateralAssetSymbol.trim() ? metadata.collateralAssetSymbol.trim() : undefined,
     loanAssetAddress: normalizeAddress(metadata?.loanAssetAddress),

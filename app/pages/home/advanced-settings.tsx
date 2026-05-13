@@ -1,9 +1,19 @@
-import { AlertTriangle, Eye, Filter, Minus, Plus, Power, X } from 'lucide-react'
+// Renders home-page power-user controls, including local blacklist sync setup.
+import { AlertTriangle, Cloud, Eye, Filter, Minus, Plus, Power, X } from 'lucide-react'
+import { useState } from 'react'
+import { useAccount, useSignMessage } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
+import {
+  createUserBlacklistSyncMessage,
+  disableUserBlacklistSyncOnDevice,
+  enableUserBlacklistSync,
+  syncUserBlacklistNow,
+  useUserBlacklistSync,
+} from '~/lib/user-blacklist-sync'
 
 interface AdvancedSettingsProps {
   onClose: () => void
@@ -11,6 +21,10 @@ interface AdvancedSettingsProps {
 }
 
 export function AdvancedSettings({ onClose, onShowBlacklistRecap }: AdvancedSettingsProps) {
+  const { address, isConnected } = useAccount()
+  const { signMessageAsync } = useSignMessage()
+  const syncState = useUserBlacklistSync(address)
+  const [syncActionError, setSyncActionError] = useState<string>()
   const disabled = useHomeMagicOptimizerStore(state => state.disabled)
   const setDisabled = useHomeMagicOptimizerStore(state => state.setDisabled)
   const clearAllOpportunities = useHomeMagicOptimizerStore(state => state.clearAllOpportunities)
@@ -34,6 +48,42 @@ export function AdvancedSettings({ onClose, onShowBlacklistRecap }: AdvancedSett
     catch { /* ignore storage errors and still refresh */ }
     window.location.reload()
   }
+
+  const onEnableBlacklistSync = async () => {
+    if (!address)
+      return
+    setSyncActionError(undefined)
+    try {
+      // The user signs once, then the backend returns a token for silent sync on this device.
+      const message = createUserBlacklistSyncMessage(address)
+      const signature = await signMessageAsync({ message })
+      await enableUserBlacklistSync(address, message, signature)
+    }
+    catch (error) {
+      setSyncActionError(error instanceof Error ? error.message : 'Failed to enable blacklist sync')
+    }
+  }
+
+  const onSyncBlacklistNow = async () => {
+    if (!address)
+      return
+    setSyncActionError(undefined)
+    try {
+      await syncUserBlacklistNow(address)
+    }
+    catch (error) {
+      setSyncActionError(error instanceof Error ? error.message : 'Failed to sync blacklist')
+    }
+  }
+
+  const onDisableBlacklistSync = () => {
+    if (!address)
+      return
+    disableUserBlacklistSyncOnDevice(address)
+    setSyncActionError(undefined)
+  }
+
+  const syncStatusText = syncState.error ?? syncActionError ?? (syncState.lastSyncAt ? `Last sync: ${new Date(syncState.lastSyncAt).toLocaleString()}` : 'Not synced yet')
 
   return (
     <Card className="border border-gray-700 bg-gray-800">
@@ -164,6 +214,62 @@ export function AdvancedSettings({ onClose, onShowBlacklistRecap }: AdvancedSett
           >
             Show
           </Button>
+        </div>
+
+        <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between md:gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <Cloud className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white">Blacklist sync</p>
+              <p className="mt-0.5 text-xs text-gray-400">
+                {syncState.enabled
+                  ? `Synced for ${address?.slice(0, 6)}...${address?.slice(-4)}. ${syncStatusText}`
+                  : 'Save local blacklist and lost-value market actions across this wallet\'s devices. Requires one wallet signature per device.'}
+              </p>
+              {(syncState.error || syncActionError) && (
+                <p className="mt-1 text-xs text-orange-300">{syncState.error ?? syncActionError}</p>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {syncState.enabled
+              ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={onSyncBlacklistNow}
+                      disabled={syncState.busy}
+                      className="border-gray-600 text-gray-200 hover:bg-gray-700/50"
+                    >
+                      {syncState.busy ? 'Syncing...' : 'Sync now'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={onDisableBlacklistSync}
+                      disabled={syncState.busy}
+                      className="border-gray-600 text-gray-200 hover:bg-gray-700/50"
+                    >
+                      Disable on this device
+                    </Button>
+                  </>
+                )
+              : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onEnableBlacklistSync}
+                    disabled={!isConnected || !address || syncState.busy}
+                    className="border-gray-600 text-gray-200 hover:bg-gray-700/50"
+                  >
+                    {syncState.busy ? 'Enabling...' : 'Enable sync'}
+                  </Button>
+                )}
+          </div>
         </div>
 
         {/* Wipe local cache & reload */}

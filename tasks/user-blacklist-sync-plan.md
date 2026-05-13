@@ -249,18 +249,18 @@ To keep the feature tiny:
 
 ## Checklist
 
-- [ ] Add KV binding to `wrangler.toml` with placeholder IDs and deployment note
-- [ ] Add `USER_BLACKLIST` type to `functions/env.d.ts`
-- [ ] Add `functions/api/user-blacklist.ts` with POST/GET/PUT handlers
-- [ ] Add validation helpers for compact blob shape
-- [ ] Add frontend sync module and local token storage
-- [ ] Add blob serialization/merge for local collateral exclusions
-- [ ] Add blob serialization/merge for local lost-value market exclusions
-- [ ] Add debounced background sync listener after sync is enabled
-- [ ] Add Advanced Settings sync control
-- [ ] Run `bun run typecheck`
-- [ ] Run `bun run lint`
-- [ ] Run `bun run build`
+- [x] Add KV binding to `wrangler.toml` with placeholder IDs and deployment note
+- [x] Add `USER_BLACKLIST` type to `functions/env.d.ts`
+- [x] Add `functions/api/user-blacklist.ts` with POST/GET/PUT handlers
+- [x] Add validation helpers for compact blob shape
+- [x] Add frontend sync module and local token storage
+- [x] Add blob serialization/merge for local collateral exclusions
+- [x] Add blob serialization/merge for local lost-value market exclusions
+- [x] Add debounced background sync listener after sync is enabled
+- [x] Add Advanced Settings sync control
+- [x] Run `bun run typecheck`
+- [x] Run `bun run lint`
+- [x] Run `bun run build`
 
 ## Done criteria
 

@@ -11,6 +11,12 @@ import svgr from 'vite-plugin-svgr'
 import { onRequestGet as collateralReview } from './functions/api/collateral-review'
 import { onRequestGet as popularLoanAssets } from './functions/api/popular-loan-assets'
 import { onRequestGet as tokenLiquidity } from './functions/api/token-liquidity'
+import {
+  onRequestGet as userBlacklistGet,
+  onRequestOptions as userBlacklistOptions,
+  onRequestPost as userBlacklistPost,
+  onRequestPut as userBlacklistPut,
+} from './functions/api/user-blacklist'
 
 function versionJsonPlugin(gitSha: string | null): Plugin {
   let isSsrBuild = false
@@ -39,19 +45,49 @@ function versionJsonPlugin(gitSha: string | null): Plugin {
   }
 }
 
-type PagesFunctionHandler = (context: EventContext<Record<string, unknown>>) => Promise<Response>
+type PagesFunctionHandler = (context: EventContext<Record<string, unknown>>) => Promise<Response> | Response
 
-const DEV_API_HANDLERS: Record<string, PagesFunctionHandler> = {
-  '/api/collateral-review': collateralReview as PagesFunctionHandler,
-  '/api/popular-loan-assets': popularLoanAssets as PagesFunctionHandler,
-  '/api/token-liquidity': tokenLiquidity as PagesFunctionHandler,
+interface DevApiRoute {
+  GET?: PagesFunctionHandler
+  OPTIONS?: PagesFunctionHandler
+  POST?: PagesFunctionHandler
+  PUT?: PagesFunctionHandler
 }
 
-function requestFromIncoming(req: IncomingMessage) {
+const DEV_API_HANDLERS: Record<string, DevApiRoute> = {
+  '/api/collateral-review': { GET: collateralReview as PagesFunctionHandler },
+  '/api/popular-loan-assets': { GET: popularLoanAssets as PagesFunctionHandler },
+  '/api/token-liquidity': { GET: tokenLiquidity as PagesFunctionHandler },
+  '/api/user-blacklist': {
+    GET: userBlacklistGet as unknown as PagesFunctionHandler,
+    OPTIONS: userBlacklistOptions as unknown as PagesFunctionHandler,
+    POST: userBlacklistPost as unknown as PagesFunctionHandler,
+    PUT: userBlacklistPut as unknown as PagesFunctionHandler,
+  },
+}
+
+const devUserBlacklistKv = new Map<string, string>()
+
+const devPagesEnv = {
+  USER_BLACKLIST: {
+    get: async (key: string) => devUserBlacklistKv.get(key) ?? null,
+    put: async (key: string, value: string) => {
+      devUserBlacklistKv.set(key, value)
+    },
+  },
+}
+
+async function requestFromIncoming(req: IncomingMessage) {
   const host = req.headers.host ?? 'localhost'
+  const method = req.method ?? 'GET'
+  const body = method === 'GET' || method === 'HEAD'
+    ? undefined
+    : Buffer.concat(await Array.fromAsync(req))
+
   return new Request(`http://${host}${req.url ?? '/'}`, {
-    method: req.method,
+    method,
     headers: req.headers as HeadersInit,
+    body,
   })
 }
 
@@ -84,15 +120,19 @@ function devPagesFunctionsPlugin(): Plugin {
           return writeNodeResponse(res, new Response(readFileSync(publicPath), { headers: { 'Content-Type': 'application/json' } }))
         }
 
-        const handler = DEV_API_HANDLERS[url.pathname]
-        if (!handler)
+        const route = DEV_API_HANDLERS[url.pathname]
+        const method = (req.method ?? 'GET').toUpperCase() as keyof DevApiRoute
+        const handler = route?.[method]
+        if (!route)
           return next()
+        if (!handler)
+          return writeNodeResponse(res, new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } }))
 
         try {
           const waitUntilPromises: Promise<unknown>[] = []
           const response = await handler({
-            request: requestFromIncoming(req),
-            env: {},
+            request: await requestFromIncoming(req),
+            env: devPagesEnv,
             params: {},
             waitUntil: (promise: Promise<unknown>) => waitUntilPromises.push(promise),
             passThroughOnException: () => {},

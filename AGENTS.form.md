@@ -1,4 +1,6 @@
 # Commenting
+This document is an audit checklist. When asked to "improve", "apply", or "check AGENTS.form.md against staged changes", do NOT rewrite this document. Instead, review every changed file against the rules below and flag (or add) any missing comments. The document itself is the stable standard; the code gets the comments.
+
 The rule: comment only where a future reader would stop and wonder "why?" or "what is this doing?" — and the answer isn't obvious from the code itself.
 Concretely that means:
 1. One top-of-file sentence per file — what the hook orchestrates end-to-end, so you know the purpose before scrolling.

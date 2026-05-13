@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.0 - 2026-05-13
+
+### Introduced
+- feat: added optional wallet-authenticated Cloudflare KV sync for user-managed collateral blacklist and lost-value market exclusions, with one wallet signature per browser/device and silent background sync afterward.
+- feat: Advanced Settings now exposes blacklist sync controls to enable migration, sync now, and disable the local device token without removing remote preferences.
+
+### Changed
+- infra: local `bun run dev` now mirrors the new `/api/user-blacklist` Pages Function with in-memory KV so the sync flow can be tested without Cloudflare.
+- ux: Magic optimizer reduced-motion mode now keeps a static full rainbow header instead of collapsing to the first gradient color.
+
 ## v1.4.18 - 2026-05-11
 
 ### Changed
