@@ -40,6 +40,15 @@ export interface LiveMarketPosition {
       supplyAssets: string
       supplyShares: string
       supplyAssetsUsd?: number | null
+      rewards?: Array<{
+        supplyApr?: number | null
+        id: string
+        asset: {
+          address: string
+          symbol: string
+          decimals?: number | null
+        }
+      }> | null
     }
   }
   userState: {
@@ -238,6 +247,7 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
             supplyAssets: gp.market.state.supplyAssets,
             supplyShares: gp.market.state.supplyShares,
             supplyAssetsUsd: gp.market.state.supplyAssetsUsd,
+            rewards: gp.market.state.rewards,
           },
         },
         userState: {
@@ -330,6 +340,7 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
               supplyAssets: marketSupplyAssets,
               supplyShares: marketSupplyShares,
               supplyAssetsUsd: marketStateSupplyUsd,
+              rewards: gp.market.state.rewards,
             },
           },
           userState: {

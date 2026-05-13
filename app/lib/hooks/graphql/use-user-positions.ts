@@ -38,6 +38,15 @@ export interface UserPosition {
       supplyAssets: string
       supplyShares: string
       supplyAssetsUsd: number | null
+      rewards?: Array<{
+        supplyApr?: number | null
+        id: string
+        asset: {
+          address: string
+          symbol: string
+          decimals?: number | null
+        }
+      }> | null
     }
   }
   state: {
@@ -129,6 +138,11 @@ export const QUERY_USER_POSITIONS = gql`
             supplyAssets
             supplyShares
             supplyAssetsUsd
+            rewards {
+              id
+              supplyApr
+              asset { address symbol decimals }
+            }
           }
         }
         state {

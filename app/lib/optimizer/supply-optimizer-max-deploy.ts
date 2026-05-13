@@ -15,7 +15,7 @@
  */
 
 import type { OptimizedPositionDelta, OptimizeSupplyWithPositionsArgs, OptimizeSupplyWithPositionsResult, SupplyOptimizerConstraints, SupplyOptimizerMarketSnapshot } from './supply-optimizer'
-import { computeSupplyAfterDeltaWad } from './supply-optimizer'
+import { computeRewardsAwareSupplyAfterDeltaWad } from './supply-optimizer'
 import { addDepositProRata, getPerMarketCap, max0, minBigint, normalizeId, sumBigints } from './supply-optimizer-utils'
 
 function blendedRatesFromFinalAllocations(args: {
@@ -48,7 +48,7 @@ function blendedRatesFromFinalAllocations(args: {
         ...markets[i],
         totalSupplyAssets: exUserSupplyAssets[i] + finalUserAllocations[i],
       }
-      const rates = computeSupplyAfterDeltaWad({
+      const rates = computeRewardsAwareSupplyAfterDeltaWad({
         market: modeledMarket,
         deltaSupplyAssets: 0n,
         timestamp,
@@ -95,7 +95,7 @@ function allocationRatesAtIndex(args: {
     ...markets[index],
     totalSupplyAssets: exUserSupplyAssets[index] + finalUserAllocations[index],
   }
-  const { utilizationAfterWad, supplyAprWad, supplyApyWad } = computeSupplyAfterDeltaWad({
+  const { utilizationAfterWad, supplyAprWad, supplyApyWad } = computeRewardsAwareSupplyAfterDeltaWad({
     market: modeledMarket,
     deltaSupplyAssets: 0n,
     timestamp,
@@ -232,12 +232,12 @@ function greedyAllocateUpwards(args: {
         totalSupplyAssets: exUserSupplyAssets[i] + candidateFinalForScore,
       }
 
-      const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad: supplyAprCurrentWad } = computeRewardsAwareSupplyAfterDeltaWad({
         market: currentMarket,
         deltaSupplyAssets: 0n,
         timestamp,
       })
-      const { supplyAprWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad } = computeRewardsAwareSupplyAfterDeltaWad({
         market: modeledMarket,
         deltaSupplyAssets: 0n,
         timestamp,
@@ -407,7 +407,7 @@ export function optimizeMaxDeployWithPositions(args: OptimizeSupplyWithPositions
         ...m,
         totalSupplyAssets: m.totalSupplyAssets, // user is included in totalSupply on-chain
       }
-      const { supplyAprWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad } = computeRewardsAwareSupplyAfterDeltaWad({
         market: currentMarket,
         deltaSupplyAssets: 0n,
         timestamp,
@@ -532,12 +532,12 @@ export function optimizeMaxDeployWithPositions(args: OptimizeSupplyWithPositions
         totalSupplyAssets: exUserSupply[i] + candidateFinalForScore,
       }
 
-      const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad: supplyAprCurrentWad } = computeRewardsAwareSupplyAfterDeltaWad({
         market: currentMarket,
         deltaSupplyAssets: 0n,
         timestamp,
       })
-      const { supplyAprWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad } = computeRewardsAwareSupplyAfterDeltaWad({
         market: modeledMarket,
         deltaSupplyAssets: 0n,
         timestamp,

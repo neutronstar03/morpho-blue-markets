@@ -71,9 +71,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.1` (2026-05-14): supply optimizer and live market APR now include Morpho reward program APRs as "net APR", with base/reward breakdown in the live APR hook.
 - `v1.5.0` (2026-05-13): added wallet-authenticated Cloudflare KV sync for user collateral blacklist and lost-value market exclusions.
 - `v1.4.18` (2026-05-11): added local lost-value market exclusions, consolidated user-managed exclusions, and made local dev serve real Pages Function API handlers.
-- `v1.4.17` (2026-05-11): fixed Market page supplying-vault counts for markets listed by Morpho Vault V2 vaults.
 
 ## Live Version
 

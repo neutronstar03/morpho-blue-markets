@@ -6,6 +6,7 @@ import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 export interface OptimizerMarketMeta {
   uniqueKey: `0x${string}`
   irmAddress: `0x${string}`
+  rewardSupplyAprWad?: bigint
 }
 
 export interface OptimizerReadInput {
@@ -51,8 +52,10 @@ export function useSupplyOptimizerReads(args: {
   const cacheKey = useMemo(() => {
     if (!input || !chainId)
       return undefined
+    // Include rewardSupplyAprWad in the cache key so that incentive program
+    // starts/ends automatically invalidate stale read results.
     const ids = input.markets
-      .map(m => m.uniqueKey.toLowerCase())
+      .map(m => `${m.uniqueKey.toLowerCase()}:${m.rewardSupplyAprWad ?? 0n}`)
       .sort()
       .join('|')
     return `${chainId}::${ids}`
@@ -146,6 +149,8 @@ export function useSupplyOptimizerReads(args: {
             lastUpdate: tuple.lastUpdate,
             feeWad: tuple.fee,
             rateAtTarget,
+            rewardSupplyAprWad: market.rewardSupplyAprWad,
+            rewardSupplyAssetsBase: tuple.totalSupplyAssets,
           })
         }
       }

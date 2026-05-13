@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.1 - 2026-05-14
+
+### Changed
+- feat: supply optimizer and live market APR now include Morpho reward program APRs on top of base IRM rates, displayed as "net APR" (base + rewards) throughout the UI.
+- feat: added reward APR breakdown (baseApr / rewardApr) to the live market APR hook so consumers can disaggregate the net rate.
+- data: GraphQL queries for markets-by-chain and user-positions now fetch per-market reward data (supplyApr, asset identity).
+
 ## v1.5.0 - 2026-05-13
 
 ### Introduced

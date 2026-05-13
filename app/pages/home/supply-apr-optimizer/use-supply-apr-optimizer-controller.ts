@@ -40,6 +40,22 @@ import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.st
 
 // Orchestrates the supply optimizer end-to-end: asset selection, live/onchain reads, worker runs, cached auto-step heuristics, result shaping, and preset/debug wiring.
 
+const REWARD_APR_WAD_SCALE = 1_000_000_000_000n
+
+// Split 1e18 into 1e12 * 1e6 so Math.round works on an integer-scale intermediate,
+// avoiding the floating-point precision loss of BigInt(Math.round(value * 1e18)).
+function decimalAprToWad(value?: number | null): bigint {
+  if (value == null || !Number.isFinite(value) || value <= 0)
+    return 0n
+  return BigInt(Math.round(value * Number(REWARD_APR_WAD_SCALE))) * (10n ** 6n)
+}
+
+function sumSupplyRewardAprWad(rewards?: Array<{ supplyApr?: number | null }> | null): bigint {
+  if (!rewards?.length)
+    return 0n
+  return rewards.reduce((sum, reward) => sum + decimalAprToWad(reward.supplyApr), 0n)
+}
+
 export function useSupplyAprOptimizerController() {
   const MAX_OPTIMIZER_ITERATIONS = 1000
   const OPTIMIZER_READ_CHUNK_SIZE = 50
@@ -293,7 +309,7 @@ export function useSupplyAprOptimizerController() {
     fallbackAprWad: bigint
     maxMarketsUsed: number
     positions: UserSupplyPosition[]
-    markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>
+    markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}`, rewardSupplyAprWad?: bigint }>
     autoStep: boolean
     autoCacheKey?: string
     strategy: OptimizerStrategy
@@ -596,7 +612,7 @@ export function useSupplyAprOptimizerController() {
     if (cached)
       stepAssets = cached.stepAssets
 
-    const universe = new Map<string, { uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>()
+    const universe = new Map<string, { uniqueKey: `0x${string}`, irmAddress: `0x${string}`, rewardSupplyAprWad?: bigint }>()
     for (const m of (topMarkets ?? [])) {
       const id = m.uniqueKey.toLowerCase()
       const status = effectiveChainId
@@ -612,7 +628,8 @@ export function useSupplyAprOptimizerController() {
         : undefined
       if (status === 'black')
         continue
-      universe.set(id, { uniqueKey: m.uniqueKey as `0x${string}`, irmAddress: m.irmAddress as `0x${string}` })
+      const rewardSupplyAprWad = sumSupplyRewardAprWad(m.state?.rewards)
+      universe.set(id, { uniqueKey: m.uniqueKey as `0x${string}`, irmAddress: m.irmAddress as `0x${string}`, rewardSupplyAprWad })
     }
     for (const p of selectedUserMarkets) {
       const id = p.market.uniqueKey.toLowerCase()
@@ -629,7 +646,8 @@ export function useSupplyAprOptimizerController() {
         : undefined
       if (status === 'black')
         continue
-      universe.set(id, { uniqueKey: p.market.uniqueKey as `0x${string}`, irmAddress: p.market.irmAddress as `0x${string}` })
+      const rewardSupplyAprWad = sumSupplyRewardAprWad(p.market.state?.rewards)
+      universe.set(id, { uniqueKey: p.market.uniqueKey as `0x${string}`, irmAddress: p.market.irmAddress as `0x${string}`, rewardSupplyAprWad })
     }
 
     const requestPayload = {

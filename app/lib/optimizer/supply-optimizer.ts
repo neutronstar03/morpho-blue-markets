@@ -29,6 +29,10 @@ export interface SupplyOptimizerMarketSnapshot {
   feeWad: bigint
   /** AdaptiveCurveIRM per-market state: IRM.rateAtTarget(marketId) (int256). */
   rateAtTarget: bigint
+  /** Summed supply reward APR (WAD) from Morpho GraphQL, separate from base IRM APR. */
+  rewardSupplyAprWad?: bigint
+  /** Supply size at which rewardSupplyAprWad was observed; used to dilute fixed emissions. */
+  rewardSupplyAssetsBase?: bigint
 }
 
 export interface UserSupplyPosition {
@@ -243,6 +247,39 @@ export function computeSupplyAfterDeltaWad(args: {
   }
 }
 
+// Morpho reward programs have fixed token emission budgets, so per-unit reward rate
+// decreases as supply grows.  Dilute proportionally: newRate = observedRate * (baseSupply / currentSupply).
+function rewardSupplyAprAfterWad(market: SupplyOptimizerMarketSnapshot, supplyAfter: bigint): bigint {
+  const rewardApr = market.rewardSupplyAprWad ?? 0n
+  if (rewardApr <= 0n || supplyAfter <= 0n)
+    return 0n
+  const rewardBase = market.rewardSupplyAssetsBase ?? market.totalSupplyAssets
+  if (rewardBase <= 0n)
+    return rewardApr
+  return (rewardApr * rewardBase) / supplyAfter
+}
+
+export function computeRewardsAwareSupplyAfterDeltaWad(args: {
+  market: SupplyOptimizerMarketSnapshot
+  /** Total delta supply applied (raw loan token units, >= 0). */
+  deltaSupplyAssets: bigint
+  timestamp: bigint
+}): ReturnType<typeof computeSupplyAfterDeltaWad> {
+  const base = computeSupplyAfterDeltaWad(args)
+  const delta = args.deltaSupplyAssets > 0n ? args.deltaSupplyAssets : 0n
+  const supplyAfter = args.market.totalSupplyAssets + delta
+  const rewardAprWad = rewardSupplyAprAfterWad(args.market, supplyAfter)
+  if (rewardAprWad <= 0n)
+    return base
+
+  return {
+    ...base,
+    supplyAprWad: base.supplyAprWad + rewardAprWad,
+    // Reward APR is already an annualized simple rate; use it as a conservative APY add-on.
+    supplyApyWad: base.supplyApyWad + rewardAprWad,
+  }
+}
+
 const ZERO_WAD = 0n
 
 function allocationRatesAtIndex(args: {
@@ -272,7 +309,7 @@ function allocationRatesAtIndex(args: {
     ...markets[index],
     totalSupplyAssets: exUserSupplyAssets[index] + finalUserAllocations[index],
   }
-  const { utilizationAfterWad, supplyAprWad, supplyApyWad } = computeSupplyAfterDeltaWad({
+  const { utilizationAfterWad, supplyAprWad, supplyApyWad } = computeRewardsAwareSupplyAfterDeltaWad({
     market: modeledMarket,
     deltaSupplyAssets: 0n,
     timestamp,
@@ -448,12 +485,12 @@ function greedyAllocateUpwards(args: {
         totalSupplyAssets: exUserSupplyAssets[i] + candidateFinalForScore,
       }
 
-      const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad: supplyAprCurrentWad } = computeRewardsAwareSupplyAfterDeltaWad({
         market: currentMarket,
         deltaSupplyAssets: 0n,
         timestamp,
       })
-      const { supplyAprWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad } = computeRewardsAwareSupplyAfterDeltaWad({
         market: modeledMarket,
         deltaSupplyAssets: 0n,
         timestamp,
@@ -601,8 +638,8 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
       }
       const candidateAmtForScore = allocated[i] + scoreStep
 
-      const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: currentAmt, timestamp })
-      const { supplyAprWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: candidateAmtForScore, timestamp })
+      const { supplyAprWad: supplyAprCurrentWad } = computeRewardsAwareSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: currentAmt, timestamp })
+      const { supplyAprWad } = computeRewardsAwareSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: candidateAmtForScore, timestamp })
       if (minAprWad != null && supplyAprWad < minAprWad)
         continue
 
@@ -666,7 +703,7 @@ export function optimizeSupplyAllocation(args: OptimizeSupplyAllocationArgs): Op
     if (amt <= 0n)
       continue
     const m = markets[i]
-    const { supplyAprWad, supplyApyWad, utilizationAfterWad } = computeSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: amt, timestamp })
+    const { supplyAprWad, supplyApyWad, utilizationAfterWad } = computeRewardsAwareSupplyAfterDeltaWad({ market: m, deltaSupplyAssets: amt, timestamp })
     allocations.push({
       marketId: m.marketId,
       uniqueKey: m.uniqueKey,
@@ -903,12 +940,12 @@ export function optimizeSupplyAllocationWithPositions(args: OptimizeSupplyWithPo
       }
 
       // Design step (1): recompute the market curve at current and candidate post-step sizes.
-      const { supplyAprWad: supplyAprCurrentWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad: supplyAprCurrentWad } = computeRewardsAwareSupplyAfterDeltaWad({
         market: currentMarket,
         deltaSupplyAssets: 0n,
         timestamp,
       })
-      const { supplyAprWad } = computeSupplyAfterDeltaWad({
+      const { supplyAprWad } = computeRewardsAwareSupplyAfterDeltaWad({
         market: modeledMarket,
         deltaSupplyAssets: 0n,
         timestamp,

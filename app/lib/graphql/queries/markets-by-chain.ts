@@ -31,6 +31,15 @@ export interface SupplyMarketData {
     supplyAssets: string
     supplyShares: string
     supplyAssetsUsd?: number
+    rewards?: Array<{
+      supplyApr?: number | null
+      id: string
+      asset: {
+        address: string
+        symbol: string
+        decimals?: number | null
+      }
+    }> | null
   }
   warnings?: Array<{
     type: string
@@ -90,6 +99,11 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
           supplyAssets
           supplyShares
           supplyAssetsUsd
+          rewards {
+            id
+            supplyApr
+            asset { address symbol decimals }
+          }
         }
         warnings { type level }
       }

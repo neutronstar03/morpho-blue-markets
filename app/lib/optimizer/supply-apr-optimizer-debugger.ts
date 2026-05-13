@@ -11,7 +11,7 @@ export interface SupplyOptimizerDebugRequest {
   newDepositAssets: bigint
   maxMarketsUsed: number
   positions: Array<{ marketId: `0x${string}`, suppliedAssets: bigint }>
-  markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>
+  markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}`, rewardSupplyAprWad?: bigint }>
 }
 
 export interface SupplyOptimizerDebugMarketMeta {

@@ -10,6 +10,8 @@ import { getMorphoBlueAddress } from './use-morpho'
 
 export interface LiveAprResultByMarketKey {
   apr?: number // decimal fraction (e.g. 0.05 = 5%)
+  baseApr?: number // decimal fraction, excluding rewards
+  rewardApr?: number // decimal fraction, rewards only
   borrowApr?: number // decimal fraction (e.g. 0.05 = 5%)
   isLive: boolean
 }
@@ -21,6 +23,20 @@ export interface LiveAprMarketInput {
   lltv?: string
   loanAsset: { address: string, symbol?: string | null }
   collateralAsset: { address: string, symbol?: string | null }
+  state?: {
+    rewards?: Array<{ supplyApr?: number | null }> | null
+  }
+}
+
+function sumSupplyRewardApr(rewards?: Array<{ supplyApr?: number | null }> | null): number {
+  if (!rewards?.length)
+    return 0
+  return rewards.reduce((sum, reward) => {
+    const supplyApr = reward.supplyApr ?? 0
+    if (!Number.isFinite(supplyApr) || supplyApr <= 0)
+      return sum
+    return sum + supplyApr
+  }, 0)
 }
 
 function computeMarketId(p: LiveAprMarketInput): `0x${string}` | undefined {
@@ -271,8 +287,13 @@ export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined) {
         const utilizationWad = wadDivDown(totalBorrowAssets, totalSupplyAssets)
         const supplyRate = supplyRatePerSecondWad({ borrowRatePerSecondWad: borrowRatePerSecondWadClamped, utilizationWad, feeWad })
 
+        const baseApr = displayAprFromRatePerSecondWad(supplyRate)
+        const rewardApr = sumSupplyRewardApr(m.state?.rewards)
+
         out[m.uniqueKey] = {
-          apr: displayAprFromRatePerSecondWad(supplyRate),
+          apr: baseApr + rewardApr,
+          baseApr,
+          rewardApr,
           borrowApr: displayAprFromRatePerSecondWad(borrowRatePerSecondWadClamped),
           isLive: true,
         }
