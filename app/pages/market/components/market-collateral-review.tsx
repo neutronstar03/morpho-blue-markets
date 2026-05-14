@@ -35,86 +35,147 @@ function renderRankBadge(rank?: number | null) {
   )
 }
 
+function SourceLinks({ sources }: { sources: { label: string, url: string }[] }) {
+  return (
+    <div className="flex flex-col items-end gap-1">
+      {sources.map(source => (
+        <a
+          key={`${source.label}:${source.url}`}
+          href={source.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm font-normal text-blue-400 hover:text-blue-300 underline break-all"
+        >
+          {source.label}
+        </a>
+      ))}
+    </div>
+  )
+}
+
 export function MarketCollateralReview({ market }: MarketCollateralReviewProps) {
   const { data: review } = useCollateralReview(
     market.morphoBlue.chain.id,
     market.collateralAsset.address,
+    market.oracleAddress,
   )
+  const collateralReview = review?.collateralReview
+  const oracleReview = review?.oracleReview
 
-  if (!review)
+  if (!collateralReview && !oracleReview)
     return null
 
   return (
     <>
-      <h3 className="text-lg font-semibold text-white mt-6 mb-2 border-b-2 border-blue-500 pb-1">
-        Collateral Review
-      </h3>
+      {collateralReview && (
+        <>
+          <h3 className="text-lg font-semibold text-white mt-6 mb-2 border-b-2 border-blue-500 pb-1">
+            Collateral Review
+          </h3>
 
-      {review.type && (
-        <DetailRow
-          label="Type"
-          value={<Badge variant="neutral">{review.type}</Badge>}
-        />
-      )}
-
-      {(review.protocol || review.protocolUrl) && (
-        <DetailRow
-          label="Protocol"
-          value={review.protocolUrl
-            ? (
-                <a
-                  href={review.protocolUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 underline break-all"
-                >
-                  {review.protocol ?? review.protocolUrl}
-                </a>
-              )
-            : (review.protocol ?? '—')}
-        />
-      )}
-
-      {review.rank != null && (
-        <DetailRow
-          label="Rank"
-          value={renderRankBadge(review.rank)}
-        />
-      )}
-
-      {review.redeem && (
-        <DetailRow
-          label="Redeem"
-          value={<span className="text-sm font-normal text-gray-300 whitespace-normal break-words">{review.redeem}</span>}
-        />
-      )}
-
-      {review.notes && (
-        <DetailRow
-          label="Notes"
-          value={<span className="block pl-3 text-sm font-normal text-gray-400 whitespace-normal break-words">{review.notes}</span>}
-        />
-      )}
-
-      {review.sources.length > 0 && (
-        <DetailRow
-          label="Sources"
-          value={(
-            <div className="flex flex-col items-end gap-1">
-              {review.sources.map(source => (
-                <a
-                  key={`${source.label}:${source.url}`}
-                  href={source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-normal text-blue-400 hover:text-blue-300 underline break-all"
-                >
-                  {source.label}
-                </a>
-              ))}
-            </div>
+          {collateralReview.type && (
+            <DetailRow
+              label="Type"
+              value={<Badge variant="neutral">{collateralReview.type}</Badge>}
+            />
           )}
-        />
+
+          {(collateralReview.protocol || collateralReview.protocolUrl) && (
+            <DetailRow
+              label="Protocol"
+              value={collateralReview.protocolUrl
+                ? (
+                    <a
+                      href={collateralReview.protocolUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 underline break-all"
+                    >
+                      {collateralReview.protocol ?? collateralReview.protocolUrl}
+                    </a>
+                  )
+                : (collateralReview.protocol ?? '—')}
+            />
+          )}
+
+          {collateralReview.rank != null && (
+            <DetailRow
+              label="Rank"
+              value={renderRankBadge(collateralReview.rank)}
+            />
+          )}
+
+          {collateralReview.redeem && (
+            <DetailRow
+              label="Redeem"
+              value={<span className="text-sm font-normal text-gray-300 whitespace-normal break-words">{collateralReview.redeem}</span>}
+            />
+          )}
+
+          {collateralReview.notes && (
+            <DetailRow
+              label="Notes"
+              value={<span className="block pl-3 text-sm font-normal text-gray-400 whitespace-normal break-words">{collateralReview.notes}</span>}
+            />
+          )}
+
+          {collateralReview.sources.length > 0 && (
+            <DetailRow
+              label="Sources"
+              value={<SourceLinks sources={collateralReview.sources} />}
+            />
+          )}
+        </>
+      )}
+
+      {oracleReview && (
+        <>
+          <h3 className="text-lg font-semibold text-white mt-6 mb-2 border-b-2 border-blue-500 pb-1">
+            Oracle Review
+          </h3>
+
+          {oracleReview.type && (
+            <DetailRow
+              label="Type"
+              value={<Badge variant="neutral">{oracleReview.type}</Badge>}
+            />
+          )}
+
+          {oracleReview.provider && (
+            <DetailRow
+              label="Provider"
+              value={oracleReview.provider}
+            />
+          )}
+
+          {oracleReview.rank != null && (
+            <DetailRow
+              label="Rank"
+              value={renderRankBadge(oracleReview.rank)}
+            />
+          )}
+
+          {oracleReview.pricing && (
+            <DetailRow
+              label="Pricing"
+              value={<span className="text-sm font-normal text-gray-300 whitespace-normal break-words">{oracleReview.pricing}</span>}
+            />
+          )}
+
+          {oracleReview.notes && (
+            <DetailRow
+              label="Notes"
+              value={<span className="block pl-3 text-sm font-normal text-gray-400 whitespace-normal break-words">{oracleReview.notes}</span>}
+            />
+          )}
+
+          {oracleReview.sources.length > 0 && (
+            <DetailRow
+              label="Sources"
+              value={<SourceLinks sources={oracleReview.sources} />}
+            />
+          )}
+        </>
       )}
     </>
   )

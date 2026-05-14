@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.3 - 2026-05-15
+
+### Changed
+- feat: Market pages now show curated v1.1 oracle reviews from the Cloudflare collateral-review API when available, including type, provider, rank, pricing, notes, and source links.
+- infra: the collateral-review Pages Function now composes collateral and oracle review resources behind one trusted client/server response contract with shared review DTO types.
+- docs: documented API contract typing rules so upstream JSON validation stays at backend boundaries while successful API responses remain strongly typed.
+
 ## v1.5.2 - 2026-05-15
 
 ### Changed

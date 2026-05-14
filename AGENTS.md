@@ -64,3 +64,11 @@ For more technical information, refer to the `AGENTS.technology.md` file.
 
 ## House rules
 - Quote rule: use plain ASCII quotes in code/docs ('single quotes' and "double quotes"); avoid "smart quotes".
+
+## API contract typing philosophy
+- Treat external JSON and internal/API contracts as different layers.
+- Raw upstream JSON is untrusted: parse it as `unknown` or a local loose raw type, validate it at the boundary, and fail or drop the resource there.
+- Successful internal/API responses are trusted contracts: if an endpoint returns `200`, shared client/server response types should have the required base fields, not `Partial` shapes or defensive optional fields.
+- Use `null` only for intentional product states, such as a missing optional resource (`oracleReview: null`), not as a substitute for validation.
+- Avoid adding `?`/`null` to fields just because malformed JSON could exist upstream. If required fields are missing, that is a backend validation/upstream failure, not a frontend typing concern.
+- Shared DTO/types should describe normalized wire contracts. Runtime normalizers and fetch/cache behavior may remain environment-local unless deliberately extracted into an environment-neutral module.

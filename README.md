@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.3: Market pages can show curated v1.1 oracle reviews composed by the Cloudflare collateral-review API.
 - v1.5.2: Market pages can show optional oracle-provider labels from a generated artifacts dataset derived from Monarch metadata.
 - v1.5.1: Supply optimizer and live market APR now include Morpho reward program APRs in net APR calculations.
-- v1.5.0: Added optional wallet-authenticated Cloudflare KV sync for user-managed collateral blacklist and lost-value market exclusions.
 
 ## Development
 
@@ -79,9 +79,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.3` (2026-05-15): Market pages can show curated v1.1 oracle reviews composed by the Cloudflare collateral-review API.
+- `v1.5.2` (2026-05-15): Market pages can show optional oracle-provider labels from a generated artifacts dataset derived from Monarch metadata.
 - `v1.5.1` (2026-05-14): supply optimizer and live market APR now include Morpho reward program APRs as "net APR", with base/reward breakdown in the live APR hook.
-- `v1.5.0` (2026-05-13): added wallet-authenticated Cloudflare KV sync for user collateral blacklist and lost-value market exclusions.
-- `v1.4.18` (2026-05-11): added local lost-value market exclusions, consolidated user-managed exclusions, and made local dev serve real Pages Function API handlers.
 
 ## Live Version
 
