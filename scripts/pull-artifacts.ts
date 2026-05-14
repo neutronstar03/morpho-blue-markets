@@ -22,8 +22,9 @@ async function fetchJson(url: string) {
 
 async function main() {
   const baseUrl = (parseArgValue('--base-url') ?? DEFAULT_BASE_URL).replace(/\/+$/, '')
-  const pullWhitelist = parseFlag('--whitelist') || (!parseFlag('--blacklist'))
   const pullBlacklist = parseFlag('--blacklist')
+  const pullOracleProviders = parseFlag('--oracle-providers')
+  const pullWhitelist = parseFlag('--whitelist') || (!pullBlacklist && !pullOracleProviders)
 
   if (pullWhitelist) {
     const url = `${baseUrl}/whitelist.collaterals.json`
@@ -37,6 +38,13 @@ async function main() {
     const json = await fetchJson(url)
     await Bun.write('public/blacklist.markets.json', `${JSON.stringify(json, null, 2)}\n`)
     console.log(`Wrote public/blacklist.markets.json from ${url}`)
+  }
+
+  if (pullOracleProviders) {
+    const url = `${baseUrl}/oracle-providers.json`
+    const json = await fetchJson(url)
+    await Bun.write('public/oracle-providers.json', `${JSON.stringify(json, null, 2)}\n`)
+    console.log(`Wrote public/oracle-providers.json from ${url}`)
   }
 }
 

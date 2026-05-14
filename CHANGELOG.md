@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.2 - 2026-05-15
+
+### Changed
+- feat: Market pages can now show an optional Oracle Provider row using a compact generated artifact derived from Monarch oracle metadata.
+- data: added an oracle provider artifact generator and artifacts workflow integration with SHA-based deploy skipping to avoid brittle runtime Gist dependencies.
+
 ## v1.5.1 - 2026-05-14
 
 ### Changed

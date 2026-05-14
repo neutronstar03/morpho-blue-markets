@@ -110,6 +110,7 @@ function devPagesFunctionsPlugin(): Plugin {
         const artifactNames = new Set([
           '/blacklist.markets.json',
           '/blacklist.markets.manual.json',
+          '/oracle-providers.json',
           '/whitelist.collaterals.json',
         ])
         if (artifactNames.has(url.pathname)) {

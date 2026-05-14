@@ -14,6 +14,7 @@ import { ViewingWalletProvider } from './contexts/viewing-wallet'
 import { useAnalytics } from './hooks/use-analytics'
 import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
 import { useMarketBlacklistPreload } from './market-blacklist'
+import { useOracleProvidersPreload } from './oracle-providers'
 import { config } from './wagmi'
 
 function HomeMagicOptimizerEffects() {
@@ -21,6 +22,7 @@ function HomeMagicOptimizerEffects() {
   // This component intentionally renders nothing.
   useCollateralWhitelistPreload()
   useMarketBlacklistPreload()
+  useOracleProvidersPreload()
   useHomeMagicOptimizerScan()
   useAnalytics()
   return null

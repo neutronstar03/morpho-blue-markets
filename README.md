@@ -11,6 +11,12 @@ This project focuses on practical Morpho market exploration and action tooling, 
 - Opportunity recap for coarse chain-level deployable yield evaluation
 - Blacklist recap for reviewing user-hidden and unsafe collaterals, with optional wallet-authenticated sync across devices
 
+## Recent updates
+
+- v1.5.2: Market pages can show optional oracle-provider labels from a generated artifacts dataset derived from Monarch metadata.
+- v1.5.1: Supply optimizer and live market APR now include Morpho reward program APRs in net APR calculations.
+- v1.5.0: Added optional wallet-authenticated Cloudflare KV sync for user-managed collateral blacklist and lost-value market exclusions.
+
 ## Development
 
 To run this project locally, follow these steps:
@@ -58,6 +64,8 @@ To also pull the latest market blacklist dataset (optional):
 ```bash
 bun run artifacts:pull:all
 ```
+
+The full artifact pull also downloads the optional oracle provider metadata used to show compact oracle-provider labels when available.
 
 #### Generate Locally
 

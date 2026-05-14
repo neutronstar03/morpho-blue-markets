@@ -1,7 +1,7 @@
 {
   "name": "morpho-blue-markets",
   "type": "module",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "private": true,
   "description": "An alternative frontend for the Morpho Blue DEFI protocol.",
   "author": {
@@ -25,9 +25,10 @@
     "gen:whitelist:collaterals": "bun scripts/collateral-whitelist-generator.ts",
     "gen:whitelist:collaterals:reset": "bun scripts/collateral-whitelist-generator.ts --reset-all",
     "gen:whitelist:collaterals:recheck-unknown": "bun scripts/collateral-whitelist-generator.ts --recheck-unknown --unknown-cooldown-hours 100",
-    "gen:all": "bun scripts/blacklist-generator.ts && bun scripts/collateral-whitelist-generator.ts",
+    "gen:oracle-providers": "bun scripts/oracle-provider-generator.ts",
+    "gen:all": "bun scripts/blacklist-generator.ts && bun scripts/collateral-whitelist-generator.ts && bun scripts/oracle-provider-generator.ts",
     "artifacts:pull": "bun scripts/pull-artifacts.ts --whitelist",
-    "artifacts:pull:all": "bun scripts/pull-artifacts.ts --whitelist --blacklist",
+    "artifacts:pull:all": "bun scripts/pull-artifacts.ts --whitelist --blacklist --oracle-providers",
     "test:ui": "vitest --config vitest.config.ts",
     "snapshot:usds:24164776": "bun tests/scripts/rpc-snapshot01.ts"
   },

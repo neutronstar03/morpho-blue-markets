@@ -6,6 +6,7 @@ import { useMarketLiquidations } from '~/lib/hooks/graphql/use-market-liquidatio
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
+import { getOracleProvider, useOracleProvidersVersion } from '~/lib/oracle-providers'
 import { MarketCollateralReview } from './market-collateral-review'
 
 interface MarketDetailsProps {
@@ -41,7 +42,9 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 export function MarketDetails({ market }: MarketDetailsProps) {
+  useOracleProvidersVersion()
   const supplyingVaultCount = market.supplyingVaults.length + market.supplyingVaultV2s.length
+  const oracleProvider = getOracleProvider(market.morphoBlue.chain.id, market.oracleAddress)
 
   const { data: marketStateRaw } = useMarket(market.uniqueKey)
   const live = useMarketPreview({ market, marketStateRaw, deltaSupplyAssets: 0n })
@@ -85,6 +88,9 @@ export function MarketDetails({ market }: MarketDetailsProps) {
         value={formatPercent(market.state.utilization)}
       />
       <DetailRow label="LLTV" value={formatLltv(market.lltv)} />
+      {oracleProvider && (
+        <DetailRow label="Oracle Provider" value={oracleProvider} />
+      )}
 
       <SectionTitle title="Collateral" />
       <DetailRow
