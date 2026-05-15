@@ -1,11 +1,13 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { useState } from 'react'
+import { Badge } from '~/components/ui/badge'
 import { formatLltv, formatPercent, formatUsd } from '~/lib/formatters'
 import { useMarketLiquidations } from '~/lib/hooks/graphql/use-market-liquidations'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
+import { getOracleProviderRank } from '~/lib/oracle-provider-rank'
 import { getOracleProvider, useOracleProvidersVersion } from '~/lib/oracle-providers'
 import { MarketCollateralReview } from './market-collateral-review'
 
@@ -38,6 +40,39 @@ function SectionTitle({ title }: { title: string }) {
     <h3 className="text-lg font-semibold text-white mt-6 mb-2 border-b-2 border-blue-500 pb-1">
       {title}
     </h3>
+  )
+}
+
+function oracleProviderRankClass(rank: number) {
+  if (rank >= 5)
+    return 'border-green-700/30 bg-green-900/30 text-green-400'
+  if (rank >= 4)
+    return 'border-lime-700/30 bg-lime-900/30 text-lime-300'
+  if (rank >= 3)
+    return 'border-yellow-700/30 bg-yellow-900/30 text-yellow-300'
+  if (rank >= 2)
+    return 'border-orange-700/30 bg-orange-900/30 text-orange-400'
+  return 'border-red-700/30 bg-red-900/30 text-red-400'
+}
+
+function OracleProviderValue({ provider }: { provider: string }) {
+  const rank = getOracleProviderRank(provider)
+
+  return (
+    <span className="inline-flex flex-wrap items-center justify-end gap-2">
+      <span>{provider}</span>
+      {rank && (
+        <Badge
+          variant="neutral"
+          className={oracleProviderRankClass(rank)}
+          title={`Coarse provider confidence: ${rank}/5`}
+        >
+          {rank}
+          {' '}
+          / 5
+        </Badge>
+      )}
+    </span>
   )
 }
 
@@ -89,7 +124,7 @@ export function MarketDetails({ market }: MarketDetailsProps) {
       />
       <DetailRow label="LLTV" value={formatLltv(market.lltv)} />
       {oracleProvider && (
-        <DetailRow label="Oracle Provider" value={oracleProvider} />
+        <DetailRow label="Oracle Provider" value={<OracleProviderValue provider={oracleProvider} />} />
       )}
 
       <SectionTitle title="Collateral" />

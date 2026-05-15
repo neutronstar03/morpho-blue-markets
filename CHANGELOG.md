@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.4 - 2026-05-15
+
+### Changed
+- feat: Market Details now shows a color-coded provider confidence pill beside Monarch-derived oracle provider labels.
+- ux: unknown provider labels default to a visible `1 / 5` confidence pill so new generated labels are not silently unranked.
+
 ## v1.5.3 - 2026-05-15
 
 ### Changed
