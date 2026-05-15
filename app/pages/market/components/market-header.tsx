@@ -8,6 +8,7 @@ import { getSupportedChainName } from '~/lib/addresses'
 import { getExplorerUrl } from '~/lib/explorer'
 import { useMarketRiskStatus } from '~/lib/market-risk/hooks'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
+import { getMarketSystemUnhealthyEntry, useUnhealthyMarketsVersion } from '~/lib/unhealthy-markets'
 import { LocalCollateralBlacklistControl } from './local-collateral-blacklist-control'
 
 function formatAddress(address: string) {
@@ -20,6 +21,7 @@ interface MarketHeaderProps {
 
 export function MarketHeader({ market }: MarketHeaderProps) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
+  const unhealthyMarketsVersion = useUnhealthyMarketsVersion()
   const chainName = getSupportedChainName(market.morphoBlue.chain.id)
   const { status } = useMarketRiskStatus({
     chainId: market.morphoBlue.chain.id,
@@ -41,6 +43,10 @@ export function MarketHeader({ market }: MarketHeaderProps) {
   )
 
   const morphoMarketUrl = morphoAppMarketUrl(chainName, market.uniqueKey)
+  const unhealthyEntry = (() => {
+    void unhealthyMarketsVersion
+    return getMarketSystemUnhealthyEntry(market.uniqueKey, market.morphoBlue.chain.id)
+  })()
 
   return (
     <div className="border-b border-gray-700 p-3 sm:p-6">
@@ -86,6 +92,14 @@ export function MarketHeader({ market }: MarketHeaderProps) {
           </div>
           <div className="mt-1 flex items-center gap-2">
             <p className="text-sm text-gray-400">{chainName}</p>
+            {unhealthyEntry && (
+              <span
+                className="inline-flex rounded-full border border-red-700/40 bg-red-900/20 px-2 py-0.5 text-[11px] font-medium text-red-200"
+                title={`Unhealthy borrowers: $${unhealthyEntry.unhealthyBorrowUsd.toLocaleString()} borrow across ${unhealthyEntry.unhealthyBorrowerCount} borrower(s); min health ${unhealthyEntry.minHealthFactor}.`}
+              >
+                Unhealthy borrowers
+              </span>
+            )}
             <Button
               type="button"
               variant="outline"

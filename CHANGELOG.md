@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.5 - 2026-05-15
+
+### Changed
+- feat: added system unhealthy-market risk detection that queries the Morpho GraphQL API for borrower positions with health factor <= 1 and blocks supply on markets exceeding a $500 unhealthy-borrow-USD threshold.
+- ux: Market pages now show a "Unhealthy borrowers" badge in the header and a descriptive block message explaining the supply restriction.
+- data: the blacklist generator script now also produces `unhealthy.markets.json`, published as a new artifact dataset alongside the existing blacklist.
+- infra: updated the pull-artifacts script, `.gitignore`, Vite dev middleware, and the artifacts CI workflow to support the additional unhealthy-markets dataset.
+
 ## v1.5.4 - 2026-05-15
 
 ### Changed

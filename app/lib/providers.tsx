@@ -15,6 +15,7 @@ import { useAnalytics } from './hooks/use-analytics'
 import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
 import { useMarketBlacklistPreload } from './market-blacklist'
 import { useOracleProvidersPreload } from './oracle-providers'
+import { useUnhealthyMarketsPreload } from './unhealthy-markets'
 import { config } from './wagmi'
 
 function HomeMagicOptimizerEffects() {
@@ -22,6 +23,7 @@ function HomeMagicOptimizerEffects() {
   // This component intentionally renders nothing.
   useCollateralWhitelistPreload()
   useMarketBlacklistPreload()
+  useUnhealthyMarketsPreload()
   useOracleProvidersPreload()
   useHomeMagicOptimizerScan()
   useAnalytics()

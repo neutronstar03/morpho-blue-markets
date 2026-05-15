@@ -9,6 +9,7 @@ export type MarketRiskReasonCode
     | 'manual_approve'
     | 'manual_ban'
     | 'blacklist'
+    | 'system_unhealthy_borrowers'
     | 'oracle_misconfigured'
     | 'missing_market_data'
 

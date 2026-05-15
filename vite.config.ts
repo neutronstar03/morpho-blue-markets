@@ -111,6 +111,7 @@ function devPagesFunctionsPlugin(): Plugin {
           '/blacklist.markets.json',
           '/blacklist.markets.manual.json',
           '/oracle-providers.json',
+          '/unhealthy.markets.json',
           '/whitelist.collaterals.json',
         ])
         if (artifactNames.has(url.pathname)) {

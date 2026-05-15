@@ -24,6 +24,7 @@ artifacts/
 # Optional pull-once datasets (do not commit)
 public/blacklist.markets.json
 public/oracle-providers.json
+public/unhealthy.markets.json
 public/whitelist.collaterals.json
 
 # Wrangler local dev state

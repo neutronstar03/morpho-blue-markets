@@ -1,7 +1,7 @@
 {
   "name": "morpho-blue-markets",
   "type": "module",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "private": true,
   "description": "An alternative frontend for the Morpho Blue DEFI protocol.",
   "author": {
@@ -28,7 +28,7 @@
     "gen:oracle-providers": "bun scripts/oracle-provider-generator.ts",
     "gen:all": "bun scripts/blacklist-generator.ts && bun scripts/collateral-whitelist-generator.ts && bun scripts/oracle-provider-generator.ts",
     "artifacts:pull": "bun scripts/pull-artifacts.ts --whitelist",
-    "artifacts:pull:all": "bun scripts/pull-artifacts.ts --whitelist --blacklist --oracle-providers",
+    "artifacts:pull:all": "bun scripts/pull-artifacts.ts --whitelist --blacklist --unhealthy-markets --oracle-providers",
     "test:ui": "vitest --config vitest.config.ts",
     "snapshot:usds:24164776": "bun tests/scripts/rpc-snapshot01.ts"
   },

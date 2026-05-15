@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.5: System unhealthy-market detection blocks supply on markets with unresolved underwater borrowers above a $500 threshold.
 - v1.5.4: Market Details now shows a color-coded provider confidence pill beside oracle-provider labels.
 - v1.5.3: Market pages can show curated v1.1 oracle reviews composed by the Cloudflare collateral-review API.
-- v1.5.2: Market pages can show optional oracle-provider labels from a generated artifacts dataset derived from Monarch metadata.
 
 ## Development
 
@@ -65,7 +65,7 @@ To also pull the latest market blacklist dataset (optional):
 bun run artifacts:pull:all
 ```
 
-The full artifact pull also downloads the optional oracle provider metadata used to show compact oracle-provider labels when available.
+The full artifact pull also downloads optional oracle provider metadata and generated unhealthy-market risk data when available.
 
 #### Generate Locally
 
@@ -79,9 +79,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.5` (2026-05-15): System unhealthy-market detection blocks supply on markets with unresolved underwater borrowers above a $500 threshold.
 - `v1.5.4` (2026-05-15): Market Details now shows a color-coded provider confidence pill beside oracle-provider labels.
 - `v1.5.3` (2026-05-15): Market pages can show curated v1.1 oracle reviews composed by the Cloudflare collateral-review API.
-- `v1.5.2` (2026-05-15): Market pages can show optional oracle-provider labels from a generated artifacts dataset derived from Monarch metadata.
 
 ## Live Version
 

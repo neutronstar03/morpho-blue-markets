@@ -7,7 +7,8 @@ import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatMarketSize, formatPercent } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
-import { isMarketBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { getMarketRisk } from '~/lib/market-risk/market-risk'
 import { DepositForm } from './deposit-form'
 import { MarketPosition } from './market-position'
 import { WithdrawForm } from './withdraw-form'
@@ -84,17 +85,22 @@ export function MarketActions({ market }: MarketActionsProps) {
   const missingLiquidityTo90Usd = utilization > targetUtilization
     ? Math.max(0, market.state.supplyAssetsUsd * (utilization / targetUtilization - 1))
     : 0
-  const isSupplyBlocked = useMemo(() => {
+  const marketRisk = useMemo(() => {
     void blacklistVersion
-    return isMarketBlacklisted({
+    return getMarketRisk({
       chainId: market.morphoBlue.chain.id,
       uniqueKey: market.uniqueKey,
       loanAssetAddress: market.loanAsset.address,
       collateralAssetAddress: market.collateralAsset.address,
       loanAssetSymbol: market.loanAsset.symbol,
       collateralAssetSymbol: market.collateralAsset.symbol,
+      warnings: market.warnings,
     })
   }, [blacklistVersion, market])
+  const isSupplyBlocked = marketRisk.status === 'black'
+  const supplyBlockedMessage = marketRisk.reasonCodes.includes('system_unhealthy_borrowers')
+    ? 'Supply is blocked for this market because MBM detected unresolved unhealthy borrowers above the system-risk threshold. Direct access remains available for inspection and recovery.'
+    : 'Supply is blocked for this market because it is blacklisted or marked as lost value. Direct access remains available for inspection and recovery.'
 
   return (
     <div className="p-3 sm:p-6">
@@ -159,7 +165,7 @@ export function MarketActions({ market }: MarketActionsProps) {
             ? isSupplyBlocked
               ? (
                   <div className="rounded-lg border border-red-700/30 bg-red-900/10 p-4 text-sm text-red-200">
-                    Supply is blocked for this market because it is blacklisted or marked as lost value. Direct access remains available for inspection and recovery.
+                    {supplyBlockedMessage}
                   </div>
                 )
               : (

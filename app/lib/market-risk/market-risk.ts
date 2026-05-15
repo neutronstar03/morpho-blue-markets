@@ -3,6 +3,7 @@ import { isCollateralWhitelisted } from '../collateral-whitelist'
 import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue } from '../local-market-exclusions'
 import { isMarketBlacklisted } from '../market-blacklist'
 import { isOracleMisconfiguredWarning } from '../morpho/morpho-warnings'
+import { isMarketSystemUnhealthy } from '../unhealthy-markets'
 import { getCollateralDecision } from './collateral-decisions'
 
 export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
@@ -28,6 +29,13 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     return {
       status: 'black',
       reasonCodes: ['local_market_lost_value'],
+    }
+  }
+
+  if (isMarketSystemUnhealthy(uniqueKey, chainId)) {
+    return {
+      status: 'black',
+      reasonCodes: ['system_unhealthy_borrowers'],
     }
   }
 

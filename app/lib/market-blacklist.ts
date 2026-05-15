@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import blacklistAssets from './blacklist.assets.json'
 import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue, subscribeLocalMarketExclusions } from './local-market-exclusions'
+import { isMarketSystemUnhealthy, subscribeUnhealthyMarkets } from './unhealthy-markets'
 
 interface BlacklistMarketEntry {
   chainId: number
@@ -264,9 +265,11 @@ export function subscribeMarketBlacklist(listener: () => void) {
   }
   window.addEventListener(CHANGE_EVENT, onEvent)
   const unsubscribeLocalMarketExclusions = subscribeLocalMarketExclusions(onLocalExclusionChange)
+  const unsubscribeUnhealthyMarkets = subscribeUnhealthyMarkets(onLocalExclusionChange)
   return () => {
     window.removeEventListener(CHANGE_EVENT, onEvent)
     unsubscribeLocalMarketExclusions()
+    unsubscribeUnhealthyMarkets()
   }
 }
 
@@ -399,7 +402,7 @@ export function isAssetBlacklisted(address?: string | null, chainId?: number) {
 }
 
 export function isMarketIdBlacklisted(uniqueKey?: string | null, chainId?: number) {
-  return hasValueInChainMap(blacklistState.marketIdsByChain, uniqueKey, chainId) || isMarketLocallyMarkedLostValue(chainId, uniqueKey)
+  return hasValueInChainMap(blacklistState.marketIdsByChain, uniqueKey, chainId) || isMarketSystemUnhealthy(uniqueKey, chainId) || isMarketLocallyMarkedLostValue(chainId, uniqueKey)
 }
 
 export function isMarketIdManuallyBlacklisted(uniqueKey?: string | null, chainId?: number) {
