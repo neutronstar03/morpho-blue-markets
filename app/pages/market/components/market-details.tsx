@@ -6,6 +6,7 @@ import { formatLltv, formatPercent, formatUsd } from '~/lib/formatters'
 import { useMarketLiquidations } from '~/lib/hooks/graphql/use-market-liquidations'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
+import { useCollateralReview } from '~/lib/hooks/use-collateral-review'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
 import { getOracleProviderRank } from '~/lib/oracle-provider-rank'
 import { getOracleProvider, useOracleProvidersVersion } from '~/lib/oracle-providers'
@@ -55,8 +56,8 @@ function oracleProviderRankClass(rank: number) {
   return 'border-red-700/30 bg-red-900/30 text-red-400'
 }
 
-function OracleProviderValue({ provider }: { provider: string }) {
-  const rank = getOracleProviderRank(provider)
+function OracleProviderValue({ provider, rank: rankOverride }: { provider: string, rank?: number }) {
+  const rank = rankOverride ?? getOracleProviderRank(provider)
 
   return (
     <span className="inline-flex flex-wrap items-center justify-end gap-2">
@@ -65,7 +66,7 @@ function OracleProviderValue({ provider }: { provider: string }) {
         <Badge
           variant="neutral"
           className={oracleProviderRankClass(rank)}
-          title={`Coarse provider confidence: ${rank}/5`}
+          title={`Oracle provider confidence: ${rank}/5`}
         >
           {rank}
           {' '}
@@ -79,7 +80,15 @@ function OracleProviderValue({ provider }: { provider: string }) {
 export function MarketDetails({ market }: MarketDetailsProps) {
   useOracleProvidersVersion()
   const supplyingVaultCount = market.supplyingVaults.length + market.supplyingVaultV2s.length
-  const oracleProvider = getOracleProvider(market.morphoBlue.chain.id, market.oracleAddress)
+  const monarchOracleProvider = getOracleProvider(market.morphoBlue.chain.id, market.oracleAddress)
+  const { data: review } = useCollateralReview(
+    market.morphoBlue.chain.id,
+    market.collateralAsset.address,
+    market.oracleAddress,
+  )
+  const oracleReviewOverride = review?.oracleReview ?? null
+  const oracleProvider = oracleReviewOverride?.provider ?? monarchOracleProvider
+  const oracleProviderRank = oracleReviewOverride?.rank
 
   const { data: marketStateRaw } = useMarket(market.uniqueKey)
   const live = useMarketPreview({ market, marketStateRaw, deltaSupplyAssets: 0n })
@@ -124,7 +133,7 @@ export function MarketDetails({ market }: MarketDetailsProps) {
       />
       <DetailRow label="LLTV" value={formatLltv(market.lltv)} />
       {oracleProvider && (
-        <DetailRow label="Oracle Provider" value={<OracleProviderValue provider={oracleProvider} />} />
+        <DetailRow label="Oracle Provider" value={<OracleProviderValue provider={oracleProvider} rank={oracleProviderRank} />} />
       )}
 
       <SectionTitle title="Collateral" />

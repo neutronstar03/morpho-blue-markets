@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.6 - 2026-05-17
+
+### Changed
+- feat: Market Details now lets curated v1.1 oracle reviews override generic Monarch-derived Oracle Provider labels and confidence scores.
+- fix: oracle-only review API responses are preserved in the client even when no collateral review exists for the market collateral.
+
 ## v1.5.5 - 2026-05-15
 
 ### Changed

@@ -35,12 +35,14 @@ export function useCollateralReview(chainId?: number, collateralAddress?: string
         const res = await fetch(`/api/collateral-review?${params}`)
         if (res.ok) {
           const data = await res.json() as CollateralReviewApiResponse
-          return data.found
-            ? {
-                collateralReview: data.collateralReview,
-                oracleReview: data.oracleReview,
-              }
-            : null
+          if (data.collateralReview || data.oracleReview) {
+            return {
+              collateralReview: data.collateralReview,
+              oracleReview: data.oracleReview,
+            }
+          }
+
+          return null
         }
 
         if (!import.meta.env.DEV)

@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.6: Curated v1.1 oracle reviews now override generic Monarch-derived Oracle Provider labels and scores.
 - v1.5.5: System unhealthy-market detection blocks supply on markets with unresolved underwater borrowers above a $500 threshold.
 - v1.5.4: Market Details now shows a color-coded provider confidence pill beside oracle-provider labels.
-- v1.5.3: Market pages can show curated v1.1 oracle reviews composed by the Cloudflare collateral-review API.
 
 ## Development
 
@@ -79,9 +79,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.6` (2026-05-17): Curated v1.1 oracle reviews now override generic Monarch-derived Oracle Provider labels and scores.
 - `v1.5.5` (2026-05-15): System unhealthy-market detection blocks supply on markets with unresolved underwater borrowers above a $500 threshold.
 - `v1.5.4` (2026-05-15): Market Details now shows a color-coded provider confidence pill beside oracle-provider labels.
-- `v1.5.3` (2026-05-15): Market pages can show curated v1.1 oracle reviews composed by the Cloudflare collateral-review API.
 
 ## Live Version
 
