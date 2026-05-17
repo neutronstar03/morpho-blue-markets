@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.7 - 2026-05-17
+
+### Changed
+- feat: Batch withdraw and Supply APR optimizer cards are now collapsible with sticky localStorage state and smooth height animations, saving vertical space on the home page.
+- ux: removed the `(beta)` label from the Batch withdraw component.
+- ux: reduced spacing between stacked home page sections to compensate for stable collapsible headers.
+
 ## v1.5.6 - 2026-05-17
 
 ### Changed

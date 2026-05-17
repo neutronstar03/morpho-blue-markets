@@ -303,13 +303,13 @@ export default function HomePage() {
           )}
 
           <Position />
-          <div className="mt-8">
+          <div className="mt-6">
             <BatchWithdraw />
           </div>
-          <div className="mt-8">
+          <div className="mt-6">
             <SupplyAprOptimizer />
           </div>
-          <div className="mt-8">
+          <div className="mt-6">
             <AdvancedList />
           </div>
         </div>
