@@ -67,9 +67,10 @@ function computeMarketId(p: LiveAprMarketInput): `0x${string}` | undefined {
  * Uses a single multicall with `allowFailure` to keep UI resilient.
  */
 export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined) {
-  const { chainId } = useAccount()
+  const { chainId: walletChainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
-  const isWrongNetwork = requiredChainId && chainId !== requiredChainId
+  const chainId = requiredChainId ?? walletChainId
+  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
 
   const MARKET_CHUNK_SIZE = 20
   const MAX_CHUNKS = 5 // matches default `useMarkets(first=100)`
@@ -112,6 +113,7 @@ export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined) {
     if (!chunk.length || isWrongNetwork)
       return []
     return chunk.map(m => ({
+      chainId,
       address: morphoAddress,
       abi: SIMPLIFIED_MORPHO_BLUE_ABI,
       functionName: 'market',
@@ -128,6 +130,7 @@ export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined) {
       if (!marketId)
         continue
       calls.push({
+        chainId,
         address: m.irmAddress as `0x${string}`,
         abi: IRM_RATE_AT_TARGET_ABI,
         functionName: 'rateAtTarget',
@@ -137,17 +140,17 @@ export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined) {
     return calls
   }
 
-  const marketStateContracts0 = useMemo(() => buildMarketStateContracts(chunkedMarkets[0] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
-  const marketStateContracts1 = useMemo(() => buildMarketStateContracts(chunkedMarkets[1] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
-  const marketStateContracts2 = useMemo(() => buildMarketStateContracts(chunkedMarkets[2] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
-  const marketStateContracts3 = useMemo(() => buildMarketStateContracts(chunkedMarkets[3] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
-  const marketStateContracts4 = useMemo(() => buildMarketStateContracts(chunkedMarkets[4] ?? []), [chunkedMarkets, morphoAddress, isWrongNetwork])
+  const marketStateContracts0 = useMemo(() => buildMarketStateContracts(chunkedMarkets[0] ?? []), [chainId, chunkedMarkets, morphoAddress, isWrongNetwork])
+  const marketStateContracts1 = useMemo(() => buildMarketStateContracts(chunkedMarkets[1] ?? []), [chainId, chunkedMarkets, morphoAddress, isWrongNetwork])
+  const marketStateContracts2 = useMemo(() => buildMarketStateContracts(chunkedMarkets[2] ?? []), [chainId, chunkedMarkets, morphoAddress, isWrongNetwork])
+  const marketStateContracts3 = useMemo(() => buildMarketStateContracts(chunkedMarkets[3] ?? []), [chainId, chunkedMarkets, morphoAddress, isWrongNetwork])
+  const marketStateContracts4 = useMemo(() => buildMarketStateContracts(chunkedMarkets[4] ?? []), [chainId, chunkedMarkets, morphoAddress, isWrongNetwork])
 
-  const rateAtTargetContracts0 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[0] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
-  const rateAtTargetContracts1 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[1] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
-  const rateAtTargetContracts2 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[2] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
-  const rateAtTargetContracts3 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[3] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
-  const rateAtTargetContracts4 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[4] ?? []), [chunkedMarkets, isWrongNetwork, marketIds])
+  const rateAtTargetContracts0 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[0] ?? []), [chainId, chunkedMarkets, isWrongNetwork, marketIds])
+  const rateAtTargetContracts1 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[1] ?? []), [chainId, chunkedMarkets, isWrongNetwork, marketIds])
+  const rateAtTargetContracts2 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[2] ?? []), [chainId, chunkedMarkets, isWrongNetwork, marketIds])
+  const rateAtTargetContracts3 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[3] ?? []), [chainId, chunkedMarkets, isWrongNetwork, marketIds])
+  const rateAtTargetContracts4 = useMemo(() => buildRateAtTargetContracts(chunkedMarkets[4] ?? []), [chainId, chunkedMarkets, isWrongNetwork, marketIds])
 
   const enabledBase = !!chainId && !isWrongNetwork && marketsSafe.length > 0
 

@@ -52,9 +52,10 @@ export function useMarketPreview(args: {
   deltaSupplyAssets: bigint // + for supply, - for withdraw (raw loan token units)
 }) {
   const { market, marketStateRaw, deltaSupplyAssets } = args
-  const { chainId } = useAccount()
+  const { chainId: walletChainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
-  const isWrongNetwork = requiredChainId && chainId !== requiredChainId
+  const chainId = requiredChainId ?? walletChainId
+  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
 
   const marketState = useMemo(() => normalizeMorphoMarketState(marketStateRaw), [marketStateRaw])
 
@@ -119,13 +120,14 @@ export function useMarketPreview(args: {
       return []
     return [
       {
+        chainId,
         address: market.irmAddress as `0x${string}`,
         abi: IRM_RATE_AT_TARGET_ABI,
         functionName: 'rateAtTarget',
         args: [marketId] as const,
       },
     ] as const
-  }, [enabled, market.irmAddress, marketId])
+  }, [chainId, enabled, market.irmAddress, marketId])
 
   const { data: rateAtTargetResult } = useReadContracts({
     contracts: rateAtTargetContracts as any,
@@ -186,19 +188,21 @@ export function useMarketPreview(args: {
       return []
     return [
       {
+        chainId,
         address: market.irmAddress as `0x${string}`,
         abi: IRM_BORROW_RATE_VIEW_ABI,
         functionName: 'borrowRateView',
         args: [marketParams, before] as const,
       },
       {
+        chainId,
         address: market.irmAddress as `0x${string}`,
         abi: IRM_BORROW_RATE_VIEW_ABI,
         functionName: 'borrowRateView',
         args: [marketParams, after] as const,
       },
     ] as const
-  }, [enabled, before, after, market.irmAddress, marketParams])
+  }, [chainId, enabled, before, after, canUseLocalIrm, market.irmAddress, marketParams])
 
   const { data: borrowRates, isLoading: isBorrowRateLoading, error: borrowRateError } = useReadContracts({
     contracts: contracts as any,

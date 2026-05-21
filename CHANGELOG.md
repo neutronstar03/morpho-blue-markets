@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.9 - 2026-05-21
+
+### Fixed
+- fix: corrected the World Chain Morpho Blue deployment address so live market state and instantaneous APR reads work on chainId 480.
+- fix: routed live APR and market preview contract reads through the selected route chain, including disconnected wallet sessions.
+- ux: added the official World Chain icon asset to RainbowKit and app chain selectors.
+
 ## v1.5.8 - 2026-05-21
 
 ### Changed

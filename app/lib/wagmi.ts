@@ -3,6 +3,12 @@ import { defineChain, fallback, http } from 'viem'
 import { monad } from 'viem/chains'
 import { arbitrum, base, katana, mainnet, optimism, polygon, unichain, worldchain } from 'wagmi/chains'
 
+const worldchainWithIcon = {
+  ...worldchain,
+  iconUrl: '/logos/worldscan-logo-symbol-light.svg',
+  iconBackground: '#1c1d1f',
+}
+
 const hyperEvm = defineChain({
   id: 999,
   name: 'HyperEVM',
@@ -31,7 +37,7 @@ const hyperEvm = defineChain({
 export const config = getDefaultConfig({
   appName: 'mbm',
   projectId: '0d13744a3dd855198cde1538ca87976d',
-  chains: [arbitrum, base, katana, mainnet, monad, optimism, polygon, unichain, hyperEvm, worldchain],
+  chains: [arbitrum, base, katana, mainnet, monad, optimism, polygon, unichain, hyperEvm, worldchainWithIcon],
   transports: {
     [mainnet.id]: fallback([
       http('https://ethereum-rpc.publicnode.com'),

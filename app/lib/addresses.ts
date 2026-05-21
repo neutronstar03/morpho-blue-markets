@@ -11,7 +11,7 @@ export const morphoAddressOnChain = {
   'Optimism': '0xce95AfbB8EA029495c66020883F87aaE8864AF92',
   'Monad': '0xD5D960E8C380B724a48AC59E2DfF1b2CB4a1eAee',
   'Stable': '0xa40103088A899514E3fe474cD3cc5bf811b1102e',
-  'World Chain': '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb',
+  'World Chain': '0xE741BC7c34758b4caE05062794E8Ae24978AF432',
 } as const satisfies Record<SupportedChain, `0x${string}`>
 
 export type SupportedChainId = 1 | 8453 | 42161 | 137 | 130 | 999 | 747474 | 10 | 143 | 988 | 480

@@ -20,24 +20,19 @@ export type ChainIconComponent = ComponentType<{
 
 export const NetworkWorldChain: ChainIconComponent = ({ size = 24, className, variant }) => {
   const isMono = variant === 'mono'
-  const circleColor = isMono ? 'stroke-current' : 'stroke-white'
-  const pathColor = isMono ? 'stroke-current' : 'stroke-sky-400'
-  const lineColor = isMono ? 'stroke-current' : 'stroke-white/80'
+  const strokeColor = isMono ? 'currentColor' : 'white'
 
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 601 601"
       fill="none"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
       className={className}
     >
-      <circle cx="12" cy="12" r="10" className={circleColor} />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className={pathColor} />
-      <line x1="2" y1="12" x2="22" y2="12" className={lineColor} />
+      <path d="M531.166 159.484L297.328 159.854C219.9 159.854 157.129 222.625 157.129 300.053C157.129 377.481 219.9 440.253 297.328 440.253H522.509" stroke={strokeColor} strokeWidth="56.2469" strokeMiterlimit="10" strokeLinecap="round" />
+      <path d="M31.832 300.053H571.981" stroke={strokeColor} strokeWidth="56.2469" strokeMiterlimit="10" strokeLinecap="round" />
+      <path d="M300.051 28.1235C450.233 28.1235 571.981 149.871 571.981 300.053C571.981 450.236 450.233 571.983 300.051 571.983C149.868 571.983 28.1211 450.236 28.1211 300.053C28.1211 149.871 149.868 28.1235 300.051 28.1235Z" stroke={strokeColor} strokeWidth="56.2469" strokeMiterlimit="10" strokeLinecap="round" />
     </svg>
   )
 }
