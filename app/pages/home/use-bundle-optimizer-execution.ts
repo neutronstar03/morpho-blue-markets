@@ -67,6 +67,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
   const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress, executeMarketIds)
 
   const isMorphoAuthorizedRead = useReadContract({
+    chainId,
     address: morphoAddress,
     abi: MORPHO_AUTH_ABI,
     functionName: 'isAuthorized',
@@ -76,6 +77,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
   const isMorphoAuthorized = (isMorphoAuthorizedRead.data ?? false) as boolean
 
   const permit2AllowanceRead = useReadContract({
+    chainId,
     address: permit2Address,
     abi: PERMIT2_ALLOWANCE_TRANSFER_ABI,
     functionName: 'allowance',
@@ -92,6 +94,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
   }, [permit2AllowanceRead.data])
 
   const tokenAllowanceToPermit2 = useReadContract({
+    chainId,
     address: loanToken.address,
     abi: erc20Abi,
     functionName: 'allowance',
@@ -179,6 +182,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
 
   const multicallSim = useSimulateContract({
     ...(multicallRequest as any),
+    chainId,
     query: {
       enabled: !!multicallRequest && !!bundlerCfg && isMorphoAuthorized && !needsPermit2TokenApprove,
     },
@@ -201,6 +205,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
   ] as const
 
   const approvePermit2Sim = useSimulateContract({
+    chainId,
     address: loanToken.address,
     abi: isUsdtMainnet ? USDT_APPROVE_NO_RETURN_ABI : erc20Abi,
     functionName: 'approve',
@@ -209,6 +214,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
   })
 
   const authorizeSim = useSimulateContract({
+    chainId,
     address: morphoAddress,
     abi: MORPHO_AUTH_ABI,
     functionName: 'setAuthorization',
@@ -244,16 +250,19 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
   }, [approvePermit2Sim.data?.request, authorizeSim.data?.request, bundleSummary, isMorphoAuthorized, multicallSim.data?.request, needsPermit2TokenApprove, optimizerFacts, optimizerSuccessItems, permit2ToSign])
 
   const refreshPrerequisites = useCallback(async () => {
-    await Promise.all([
+    // Only refresh onchain reads here. Some simulations are deliberately disabled
+    // during prerequisite steps (for example the final multicall while a Permit2
+    // signature is still missing). Calling `refetch()` on a disabled
+    // `useSimulateContract` without an ABI makes wagmi surface "abi is required",
+    // which can abort the flow after a prerequisite transaction already succeeded
+    // and leave the UI showing stale authorization/allowance state.
+    await Promise.allSettled([
       isMorphoAuthorizedRead.refetch(),
       permit2AllowanceRead.refetch(),
       tokenAllowanceToPermit2.refetch(),
       marketParamsRead.refetch(),
-      multicallSim.refetch(),
-      approvePermit2Sim.refetch(),
-      authorizeSim.refetch(),
     ])
-  }, [approvePermit2Sim, authorizeSim, isMorphoAuthorizedRead, marketParamsRead, multicallSim, permit2AllowanceRead, tokenAllowanceToPermit2])
+  }, [isMorphoAuthorizedRead, marketParamsRead, permit2AllowanceRead, tokenAllowanceToPermit2])
 
   const requiredStepLabels = useMemo(() => {
     const labels: string[] = []

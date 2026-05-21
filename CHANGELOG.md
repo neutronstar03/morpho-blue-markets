@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.10 - 2026-05-22
+
+### Fixed
+- fix: prevented World Chain optimizer execution from refetching disabled simulations after prerequisite transactions, avoiding stale `authorized=false` state and wagmi `abi is required` errors.
+- fix: pinned optimizer and batch-withdraw contract reads/simulations to the intended route chain so execution state refreshes do not drift with wallet context.
+
 ## v1.5.9 - 2026-05-21
 
 ### Fixed

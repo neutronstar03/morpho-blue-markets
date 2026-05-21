@@ -420,6 +420,7 @@ export function useBatchWithdrawController() {
   const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress as Address | undefined, executeMarketIds)
 
   const isMorphoAuthorizedRead = useReadContract({
+    chainId,
     address: morphoAddress,
     abi: MORPHO_AUTH_ABI,
     functionName: 'isAuthorized',
@@ -442,6 +443,7 @@ export function useBatchWithdrawController() {
   }, [ctx])
 
   const authorizeSim = useSimulateContract({
+    chainId,
     address: morphoAddress,
     abi: MORPHO_AUTH_ABI,
     functionName: 'setAuthorization',
@@ -504,6 +506,7 @@ export function useBatchWithdrawController() {
 
   const multicallSim = useSimulateContract({
     ...(multicallRequest as any),
+    chainId,
     query: {
       enabled: !!multicallRequest && !!bundlerCfg && !!userAddress && !isViewingWallet && isMorphoAuthorized,
     },
@@ -528,13 +531,14 @@ export function useBatchWithdrawController() {
   }, [authorizeSim.data?.request, isMorphoAuthorized, multicallSim.data?.request, withdrawFacts, withdrawItems])
 
   const refreshExecutionState = useCallback(async () => {
-    await Promise.all([
+    // Refresh reads only. Disabled simulations may intentionally have no request
+    // yet; refetching them can surface wagmi's "abi is required" and interrupt a
+    // flow after authorization already succeeded.
+    await Promise.allSettled([
       isMorphoAuthorizedRead.refetch(),
       marketParamsRead.refetch(),
-      authorizeSim.refetch(),
-      multicallSim.refetch(),
     ])
-  }, [authorizeSim, isMorphoAuthorizedRead, marketParamsRead, multicallSim])
+  }, [isMorphoAuthorizedRead, marketParamsRead])
 
   const requiredExecutionSteps = useMemo(() => {
     const steps: string[] = []
