@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { getSupportedChainName } from '~/lib/addresses'
 
-type GeckoNetworkSlug = 'eth' | 'base' | 'arbitrum' | 'polygon' | 'unichain' | 'hyperevm' | 'katana' | 'optimism'
+type GeckoNetworkSlug = 'eth' | 'base' | 'arbitrum' | 'polygon' | 'unichain' | 'hyperevm' | 'katana' | 'optimism' | 'world-chain'
 
 const GECKOTERMINAL_BASE_URL = 'https://api.geckoterminal.com/api/v2'
 
@@ -75,6 +75,8 @@ function mapChainToGeckoNetwork(chainId?: number): GeckoNetworkSlug | undefined 
       return 'katana'
     case 'Optimism':
       return 'optimism'
+    case 'World Chain':
+      return 'world-chain'
     default:
       return undefined
   }

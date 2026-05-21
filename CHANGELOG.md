@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.8 - 2026-05-21
+
+### Changed
+- feat: added World Chain (chainId 480) support across chain config, Morpho links, chain icons, market risk links, and token liquidity lookups.
+- feat: enabled World Chain Bundler3 execution for optimizer and batch-withdraw flows.
+- data: included World Chain in collateral whitelist and oracle provider artifact generators.
+
 ## v1.5.7 - 2026-05-17
 
 ### Changed

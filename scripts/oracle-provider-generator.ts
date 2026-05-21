@@ -4,7 +4,7 @@ import process from 'node:process'
 const OUTPUT_PATH = 'public/oracle-providers.json'
 const DEFAULT_MONARCH_GIST_BASE_URL = 'https://gist.githubusercontent.com/starksama/087ce4682243a059d77b1361fcccf221/raw'
 
-const SUPPORTED_CHAIN_IDS = [1, 8453, 42161, 137, 130, 999, 747474, 10, 143, 988] as const
+const SUPPORTED_CHAIN_IDS = [1, 8453, 42161, 137, 130, 999, 747474, 10, 143, 988, 480] as const
 
 const LABEL_BY_NORMALIZED: Record<string, string> = {
   api3: 'API3',

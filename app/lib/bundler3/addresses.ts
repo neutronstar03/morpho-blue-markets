@@ -24,6 +24,10 @@ export const BUNDLER3_CONFIG_BY_CHAIN_ID = {
     bundler3: '0x2d9C3A9E67c966C711208cc78b34fB9E9f8db589',
     generalAdapter1: '0xB261B51938A9767406ef83bbFbaAFE16691b7047',
   },
+  480: { // World Chain
+    bundler3: '0x3D07BF2FFb23248034bF704F3a4786F1ffE2a448',
+    generalAdapter1: '0x30fa9A3cF56931ACEea42E28D35519a97D90aA67',
+  },
   143: { // Monad
     bundler3: '0x82b684483e844422FD339df0b67b3B111F02c66E',
     generalAdapter1: '0x725AB8CAd931BCb80Fdbf10955a806765cCe00e5',

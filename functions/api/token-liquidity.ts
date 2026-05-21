@@ -19,6 +19,7 @@ const CHAIN_ID_TO_GECKO_NETWORK: Record<number, string> = {
   999: 'hyperevm',
   747474: 'katana',
   10: 'optimism',
+  480: 'world-chain',
 }
 
 interface Env {}

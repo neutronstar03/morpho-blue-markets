@@ -1,7 +1,8 @@
 export function morphoAppChainSlug(chainName: string) {
   const exceptions: Record<string, string> = {
-    hyperliquid: 'hyperevm',
-    optimism: 'opmainnet',
+    'hyperliquid': 'hyperevm',
+    'optimism': 'opmainnet',
+    'world chain': 'world-chain',
   }
 
   return exceptions[chainName.toLowerCase()] ?? chainName.toLowerCase()

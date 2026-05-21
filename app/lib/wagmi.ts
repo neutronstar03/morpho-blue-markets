@@ -1,7 +1,7 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { defineChain, fallback, http } from 'viem'
 import { monad } from 'viem/chains'
-import { arbitrum, base, katana, mainnet, optimism, polygon, unichain } from 'wagmi/chains'
+import { arbitrum, base, katana, mainnet, optimism, polygon, unichain, worldchain } from 'wagmi/chains'
 
 const hyperEvm = defineChain({
   id: 999,
@@ -31,7 +31,7 @@ const hyperEvm = defineChain({
 export const config = getDefaultConfig({
   appName: 'mbm',
   projectId: '0d13744a3dd855198cde1538ca87976d',
-  chains: [arbitrum, base, katana, mainnet, monad, optimism, polygon, unichain, hyperEvm],
+  chains: [arbitrum, base, katana, mainnet, monad, optimism, polygon, unichain, hyperEvm, worldchain],
   transports: {
     [mainnet.id]: fallback([
       http('https://ethereum-rpc.publicnode.com'),
@@ -83,6 +83,10 @@ export const config = getDefaultConfig({
       http('https://endpoints.omniatech.io/v1/op/mainnet/public'),
       http('https://0xrpc.io/op'),
       http('https://public-op-mainnet.fastnode.io'),
+    ], { rank: false, retryCount: 2 }),
+    [worldchain.id]: fallback([
+      http('https://worldchain-mainnet.g.alchemy.com/public'),
+      http('https://worldchain.drpc.org'),
     ], { rank: false, retryCount: 2 }),
   },
 })
