@@ -445,9 +445,7 @@ function ensureBackgroundListener() {
   })
 }
 
-export function useUserBlacklistSync(wallet?: string | null) {
-  const normalized = normalizeWallet(wallet)
-  const serverState: UserBlacklistSyncState = { enabled: false, busy: false }
+function useBlacklistSyncEffects(normalized: string | undefined) {
   useEffect(() => {
     activeWallet = normalized
     ensureBackgroundListener()
@@ -487,6 +485,21 @@ export function useUserBlacklistSync(wallet?: string | null) {
       document.removeEventListener('visibilitychange', onVisibilityHidden)
     }
   }, [normalized])
+}
+
+// Lightweight engine hook that installs the background push listener and
+// mount/focus sync without returning UI state. Use this in a root-level
+// component so local blacklist changes trigger XHRs even when the user
+// has never opened Advanced Settings.
+export function useUserBlacklistSyncEngine(wallet?: string | null) {
+  const normalized = normalizeWallet(wallet)
+  useBlacklistSyncEffects(normalized)
+}
+
+export function useUserBlacklistSync(wallet?: string | null) {
+  const normalized = normalizeWallet(wallet)
+  const serverState: UserBlacklistSyncState = { enabled: false, busy: false }
+  useBlacklistSyncEffects(normalized)
 
   // gSSP form with a static server snapshot prevents hydration mismatches:
   // localStorage doesn't exist server-side, so the server render gets a known-inert default

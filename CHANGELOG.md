@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.15 - 2026-05-24
+
+### Fixed
+- fix: installed the blacklist sync background listener at the app root so local blacklist changes (collateral, oracle, lost-value) trigger XHR pushes even when the user has never opened Advanced Settings.
+
 ## v1.5.14 - 2026-05-24
 
 ### Fixed

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { darkTheme, RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
-import { WagmiProvider } from 'wagmi'
+import { useAccount, WagmiProvider } from 'wagmi'
 import { useCollateralWhitelistPreload } from './collateral-whitelist'
 import { BatchWithdrawProvider } from './contexts/batch-withdraw.context'
 import { NetworkProvider } from './contexts/network'
@@ -16,6 +16,7 @@ import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan
 import { useMarketBlacklistPreload } from './market-blacklist'
 import { useOracleProvidersPreload } from './oracle-providers'
 import { useUnhealthyMarketsPreload } from './unhealthy-markets'
+import { useUserBlacklistSyncEngine } from './user-blacklist-sync'
 import { config } from './wagmi'
 
 function HomeMagicOptimizerEffects() {
@@ -27,6 +28,15 @@ function HomeMagicOptimizerEffects() {
   useOracleProvidersPreload()
   useHomeMagicOptimizerScan()
   useAnalytics()
+  return null
+}
+
+function BlacklistSyncEffects() {
+  // Keep the blacklist sync engine alive at the root so local blacklist
+  // changes (collateral, oracle, lost-value) trigger background XHRs
+  // even when the user has never opened Advanced Settings.
+  const { address } = useAccount()
+  useUserBlacklistSyncEngine(address)
   return null
 }
 
@@ -52,6 +62,7 @@ export function Providers({ children }: { children: ReactNode }) {
               <SupplyAprOptimizerProvider>
                 <BatchWithdrawProvider>
                   <HomeMagicOptimizerEffects />
+                  <BlacklistSyncEffects />
                   <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>
                 </BatchWithdrawProvider>
               </SupplyAprOptimizerProvider>
