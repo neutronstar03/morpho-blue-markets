@@ -53,6 +53,12 @@ let lastSnapshotWallet: string | undefined
 let lastSnapshotSignature = ''
 let lastSnapshot: UserBlacklistSyncState = { enabled: false, busy: false }
 
+// Focus-based background sync guards
+let lastBackgroundSyncAt = 0
+let tabHiddenAt = 0
+const MIN_HIDDEN_MS = 30_000
+const SYNC_COOLDOWN_MS = 60_000
+
 function normalizeWallet(wallet?: string | null) {
   const normalized = (wallet ?? '').trim().toLowerCase()
   return /^0x[a-f0-9]{40}$/.test(normalized) ? normalized : undefined
@@ -353,6 +359,28 @@ export async function pushUserBlacklistSync(wallet: string) {
   }
 }
 
+// Silent bidirectional sync on mount/tab-focus. Does NOT set busy state so the UI
+// doesn't flicker. Errors are swallowed — this is best-effort background freshness.
+export async function backgroundSyncUserBlacklist(wallet: string) {
+  const normalized = normalizeWallet(wallet)
+  const token = readToken(normalized)
+  if (!normalized || !token)
+    return
+  if (Date.now() - lastBackgroundSyncAt < SYNC_COOLDOWN_MS)
+    return
+
+  lastBackgroundSyncAt = Date.now()
+  try {
+    const merged = mergeBlob(await fetchRemoteBlob(token), localBlob())
+    applyBlobToLocal(merged)
+    await putRemoteBlob(token, merged)
+    setSyncResult(normalized)
+  }
+  catch {
+    // Silently ignore background sync errors so focus events don't spam toasts.
+  }
+}
+
 export function disableUserBlacklistSyncOnDevice(wallet: string) {
   const normalized = normalizeWallet(wallet)
   if (!normalized)
@@ -385,6 +413,41 @@ export function useUserBlacklistSync(wallet?: string | null) {
   useEffect(() => {
     activeWallet = normalized
     ensureBackgroundListener()
+
+    if (!normalized)
+      return
+    const token = readToken(normalized)
+    if (!token)
+      return
+
+    // Mount sync: wait a few seconds for the page to settle, then pull fresh data.
+    const mountTimer = setTimeout(() => {
+      void backgroundSyncUserBlacklist(normalized)
+    }, 3000)
+
+    // Focus sync: when the user returns to this tab after it was hidden for a while,
+    // silently pull the latest remote blacklist so cross-device changes appear quickly.
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible')
+        return
+      const wasHiddenFor = Date.now() - tabHiddenAt
+      if (wasHiddenFor < MIN_HIDDEN_MS)
+        return
+      void backgroundSyncUserBlacklist(normalized)
+    }
+    const onVisibilityHidden = () => {
+      if (document.visibilityState === 'hidden')
+        tabHiddenAt = Date.now()
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    document.addEventListener('visibilitychange', onVisibilityHidden)
+
+    return () => {
+      clearTimeout(mountTimer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      document.removeEventListener('visibilitychange', onVisibilityHidden)
+    }
   }, [normalized])
 
   // gSSP form with a static server snapshot prevents hydration mismatches:

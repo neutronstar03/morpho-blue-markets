@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.12 - 2026-05-24
+
+### Changed
+- feat: added focus-based background blacklist sync that silently pulls remote changes when the tab becomes visible after being hidden for 30+ seconds, with a 60-second cooldown to prevent API spam.
+- feat: added mount-time background sync that waits 3 seconds after page load before silently refreshing the blacklist from the backend.
+- ux: background sync does not show busy state or error toasts, keeping the UI calm during cross-device updates.
+
 ## v1.5.11 - 2026-05-24
 
 ### Changed
