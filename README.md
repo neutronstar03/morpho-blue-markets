@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.14: Fixed oracle blacklist cross-device sync and market filtering contract.
 - v1.5.13: Added local oracle blacklist controls and recap rows, plus shared collapsible headers on batch withdraw and supply optimizer cards.
 - v1.5.12: Added focus-based background blacklist sync for near-instant cross-device blacklist updates.
-- v1.5.11: Added asset search to the Markets filter bar with redesigned desktop single-row and mobile popover layouts.
 
 ## Development
 
@@ -79,9 +79,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.14` (2026-05-24): Fixed oracle blacklist cross-device sync and market filtering contract.
+- `v1.5.13` (2026-05-24): Added local oracle blacklist controls and recap rows, plus shared collapsible headers on batch withdraw and supply optimizer cards.
 - `v1.5.12` (2026-05-24): Added focus-based background blacklist sync for near-instant cross-device blacklist updates.
-- `v1.5.11` (2026-05-24): Added asset search to the Markets filter bar with redesigned desktop single-row and mobile popover layouts.
-- `v1.5.10` (2026-05-22): Fixed World Chain optimizer prerequisite refreshes that could show stale authorization and `abi is required` errors.
 
 ## Live Version
 

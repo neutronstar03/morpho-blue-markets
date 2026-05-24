@@ -439,6 +439,7 @@ export function filterBlacklistedMarkets<T>(
     collateralAssetAddress?: string | null
     loanAssetSymbol?: string | null
     collateralAssetSymbol?: string | null
+    oracleAddress?: string | null
     chainId?: number
   },
 ) {

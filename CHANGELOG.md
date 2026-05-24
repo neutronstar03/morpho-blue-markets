@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.14 - 2026-05-24
+
+### Fixed
+- fix: included oracle blacklist entries in wallet-authenticated sync blob serialization, merge, and remote apply so cross-device oracle exclusions now sync alongside collaterals and lost-value markets.
+- fix: added `oracleAddress` to the `filterBlacklistedMarkets` argument contract so market filtering correctly respects oracle blacklists in suggestion lists.
+
 ## v1.5.13 - 2026-05-24
 
 ### Changed

@@ -11,10 +11,11 @@ interface TokenRecord {
 }
 
 interface UserBlacklistBlob {
-  // Compact KV shape: c=collaterals, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; s/n=symbol/name; ls/cs=loan/collateral symbols; la/ca=loan/collateral addresses.
+  // Compact KV shape: c=collaterals, o=oracles, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; s/n=symbol/name; p=provider; ls/cs=loan/collateral symbols; la/ca=loan/collateral addresses.
   v: 1
   u: number
   c?: Record<string, Record<string, { t: number, s?: string, n?: string }>>
+  o?: Record<string, Record<string, { t: number, p?: string, cs?: string }>>
   w?: Record<string, Record<string, { t: number, ls?: string, cs?: string, la?: string, ca?: string }>>
 }
 
@@ -71,7 +72,7 @@ function normalizeTimestamp(value: unknown) {
 }
 
 function emptyBlob(): UserBlacklistBlob {
-  return { v: 1, u: Date.now(), c: {}, w: {} }
+  return { v: 1, u: Date.now(), c: {}, o: {}, w: {} }
 }
 
 function validateBlob(raw: unknown): UserBlacklistBlob | null {
@@ -83,7 +84,7 @@ function validateBlob(raw: unknown): UserBlacklistBlob | null {
   if (input.v !== 1 || !updatedAt)
     return null
 
-  const blob: UserBlacklistBlob = { v: 1, u: updatedAt, c: {}, w: {} }
+  const blob: UserBlacklistBlob = { v: 1, u: updatedAt, c: {}, o: {}, w: {} }
 
   if (input.c != null) {
     // Sanitize collateral exclusions keyed as c[chainId][collateralAddress] with timestamp, symbol, and name metadata.
@@ -106,6 +107,32 @@ function validateBlob(raw: unknown): UserBlacklistBlob | null {
           t,
           s: normalizeText(value.s, 32),
           n: normalizeText(value.n, 120),
+        }
+      }
+    }
+  }
+
+  if (input.o != null) {
+    // Sanitize oracle exclusions keyed as o[chainId][oracleAddress] with timestamp, provider, and collateral symbol metadata.
+    if (typeof input.o !== 'object')
+      return null
+    for (const [rawChainId, entries] of Object.entries(input.o)) {
+      const chainId = normalizeChainId(rawChainId)
+      if (!chainId || !entries || typeof entries !== 'object')
+        return null
+      for (const [rawAddress, entry] of Object.entries(entries)) {
+        const address = normalizeAddress(rawAddress)
+        if (!address || !entry || typeof entry !== 'object')
+          return null
+        const value = entry as { t?: unknown, p?: unknown, cs?: unknown }
+        const t = normalizeTimestamp(value.t)
+        if (!t)
+          return null
+        blob.o![chainId] ??= {}
+        blob.o![chainId][address] = {
+          t,
+          p: normalizeText(value.p, 64),
+          cs: normalizeText(value.cs, 32),
         }
       }
     }

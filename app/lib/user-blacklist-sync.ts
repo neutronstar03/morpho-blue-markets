@@ -2,9 +2,11 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import {
   listLocallyExcludedCollaterals,
+  listLocallyExcludedOracles,
   listMarketsLocallyMarkedLostValue,
   setCollateralLocallyExcludedWithTimestamp,
   setMarketLocallyMarkedLostValueWithTimestamp,
+  setOracleLocallyExcludedWithTimestamp,
   subscribeLocalMarketExclusions,
 } from './local-market-exclusions'
 
@@ -22,11 +24,18 @@ interface SyncMarketEntry {
   ca?: string
 }
 
+interface SyncOracleEntry {
+  t: number
+  p?: string
+  cs?: string
+}
+
 export interface UserBlacklistBlob {
-  // Compact KV shape: c=collaterals, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; s/n=symbol/name; ls/cs=loan/collateral symbols; la/ca=loan/collateral addresses.
+  // Compact KV shape: c=collaterals, o=oracles, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; s/n=symbol/name; p=provider; ls/cs=loan/collateral symbols; la/ca=loan/collateral addresses.
   v: 1
   u: number
   c: Record<string, Record<string, SyncCollateralEntry>>
+  o: Record<string, Record<string, SyncOracleEntry>>
   w: Record<string, Record<string, SyncMarketEntry>>
 }
 
@@ -171,7 +180,7 @@ export function subscribeUserBlacklistSync(listener: () => void) {
 }
 
 function emptyBlob(updatedAt = Date.now()): UserBlacklistBlob {
-  return { v: 1, u: updatedAt, c: {}, w: {} }
+  return { v: 1, u: updatedAt, c: {}, o: {}, w: {} }
 }
 
 function localBlob(updatedAt = Date.now()): UserBlacklistBlob {
@@ -183,6 +192,15 @@ function localBlob(updatedAt = Date.now()): UserBlacklistBlob {
       t: entry.ts,
       s: entry.symbol,
       n: entry.name,
+    }
+  }
+  for (const entry of listLocallyExcludedOracles()) {
+    const chainId = String(entry.chainId)
+    blob.o[chainId] ??= {}
+    blob.o[chainId][entry.oracleAddress.toLowerCase()] = {
+      t: entry.ts,
+      p: entry.provider,
+      cs: entry.collateralSymbol,
     }
   }
   for (const entry of listMarketsLocallyMarkedLostValue()) {
@@ -213,6 +231,14 @@ function mergeBlob(a: UserBlacklistBlob, b: UserBlacklistBlob): UserBlacklistBlo
           merged.c[chainId][address] = entry
       }
     }
+    for (const [chainId, entries] of Object.entries(blob.o ?? {})) {
+      merged.o[chainId] ??= {}
+      for (const [address, entry] of Object.entries(entries)) {
+        const existing = merged.o[chainId][address]
+        if (!existing || entry.t >= existing.t)
+          merged.o[chainId][address] = entry
+      }
+    }
     for (const [chainId, entries] of Object.entries(blob.w ?? {})) {
       merged.w[chainId] ??= {}
       for (const [marketId, entry] of Object.entries(entries)) {
@@ -236,6 +262,18 @@ function applyBlobToLocal(blob: UserBlacklistBlob) {
         ts: entry.t,
         symbol: entry.s,
         name: entry.n,
+      })
+    }
+  }
+  for (const [chainId, entries] of Object.entries(blob.o ?? {})) {
+    const parsedChainId = Number(chainId)
+    if (!Number.isFinite(parsedChainId))
+      continue
+    for (const [address, entry] of Object.entries(entries)) {
+      setOracleLocallyExcludedWithTimestamp(parsedChainId, address, {
+        ts: entry.t,
+        provider: entry.p,
+        collateralSymbol: entry.cs,
       })
     }
   }
