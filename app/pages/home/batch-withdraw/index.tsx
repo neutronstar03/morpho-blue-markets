@@ -1,9 +1,9 @@
-import { ChevronDown, ChevronUp, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Collapsible } from 'radix-ui'
+import { CollapsibleCardHeader } from '~/components/collapsible-card-header'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
-import { cn } from '~/lib/utils'
 import { BatchWithdrawExecutionPanel } from './execution-panel'
 import { BatchWithdrawForm } from './form'
 import { BatchWithdrawResults } from './results'
@@ -35,41 +35,25 @@ export function BatchWithdraw() {
 
   return (
     <Card className="mb-6" data-testid="batch-withdraw-card">
-      <div className={cn('p-4 border-b border-gray-700 flex items-center justify-between gap-3', !isExpanded && 'min-h-20')}>
-        <div className="flex flex-col">
-          <h2 className="text-xl font-bold text-white">Batch withdraw</h2>
-          <p className={cn('text-sm text-gray-400', !isExpanded && 'hidden')}>
-            Withdraws from your lowest-APR markets first.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {hasSomethingToClear && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={clear}
-              className="h-8 px-2.5 text-xs"
-              title="Clear"
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear
-            </Button>
-          )}
+      <CollapsibleCardHeader
+        title="Batch withdraw"
+        subtitle="Withdraws from your lowest-APR markets first."
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded(v => !v)}
+        actions={hasSomethingToClear && (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => setIsExpanded(v => !v)}
-            className="h-8 w-8 px-0"
-            aria-expanded={isExpanded}
-            aria-label={isExpanded ? 'Collapse batch withdraw' : 'Expand batch withdraw'}
+            onClick={clear}
+            className="h-8 px-2.5 text-xs"
+            title="Clear"
           >
-            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            <X className="h-3.5 w-3.5" />
+            Clear
           </Button>
-        </div>
-      </div>
+        )}
+      />
 
       <Collapsible.Root open={isExpanded} onOpenChange={setIsExpanded}>
         <Collapsible.Content className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
