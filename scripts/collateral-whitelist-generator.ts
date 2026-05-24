@@ -118,6 +118,7 @@ async function fetchOptimizerMarketsByChain(chainId: number): Promise<SupplyMark
     collateralAssetAddress: market.collateralAsset?.address,
     loanAssetSymbol: market.loanAsset?.symbol,
     collateralAssetSymbol: market.collateralAsset?.symbol,
+    oracleAddress: market.oracleAddress,
     chainId,
   })).filter(m => !isOracleMisconfiguredWarning(m.warnings))
 }

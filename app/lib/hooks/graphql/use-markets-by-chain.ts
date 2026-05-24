@@ -77,6 +77,7 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
         collateralAssetAddress: market.collateralAsset?.address,
         loanAssetSymbol: market.loanAsset?.symbol,
         collateralAssetSymbol: market.collateralAsset?.symbol,
+        oracleAddress: market.oracleAddress,
         chainId,
       })).filter(m => !isOracleMisconfiguredWarning(m.warnings))
     },

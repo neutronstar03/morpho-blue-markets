@@ -5,6 +5,7 @@ export type MarketRiskReasonCode
   = | 'ok'
     | 'unknown_collateral'
     | 'local_blacklist'
+    | 'local_oracle_blacklist'
     | 'local_market_lost_value'
     | 'manual_approve'
     | 'manual_ban'
@@ -30,5 +31,6 @@ export interface MarketRiskInput {
   collateralAssetAddress?: string | null
   loanAssetSymbol?: string | null
   collateralAssetSymbol?: string | null
+  oracleAddress?: string | null
   warnings?: Array<{ type: string, level?: 'YELLOW' | 'RED' | string }>
 }

@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import blacklistAssets from './blacklist.assets.json'
-import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue, subscribeLocalMarketExclusions } from './local-market-exclusions'
+import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue, isOracleLocallyExcluded, subscribeLocalMarketExclusions } from './local-market-exclusions'
 import { isMarketSystemUnhealthy, subscribeUnhealthyMarkets } from './unhealthy-markets'
 
 interface BlacklistMarketEntry {
@@ -415,10 +415,12 @@ export function isMarketBlacklisted(args: {
   collateralAssetAddress?: string | null
   loanAssetSymbol?: string | null
   collateralAssetSymbol?: string | null
+  oracleAddress?: string | null
   chainId?: number
 }) {
   return (
     isMarketIdBlacklisted(args.uniqueKey, args.chainId)
+    || isOracleLocallyExcluded(args.chainId, args.oracleAddress)
     || isCollateralLocallyExcluded(args.chainId, args.collateralAssetAddress)
     || isAssetBlacklisted(args.loanAssetAddress, args.chainId)
     || isAssetBlacklisted(args.collateralAssetAddress, args.chainId)

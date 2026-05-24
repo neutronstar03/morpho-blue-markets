@@ -203,6 +203,7 @@ export function useMarkets({
             collateralAssetAddress: market.collateralAsset?.address,
             loanAssetSymbol: market.loanAsset?.symbol,
             collateralAssetSymbol: market.collateralAsset?.symbol,
+            oracleAddress: market.oracleAddress,
             chainId: market.morphoBlue?.chain?.id,
           })).filter(market => !isOracleMisconfiguredWarning(market.warnings)),
         },

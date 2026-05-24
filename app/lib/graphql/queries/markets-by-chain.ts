@@ -9,6 +9,7 @@ export interface SupplyMarketData {
   marketId: string
   uniqueKey: string
   irmAddress: string
+  oracleAddress?: string | null
   loanAsset: {
     address: string
     symbol: string
@@ -80,6 +81,7 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
         marketId
         uniqueKey: marketId
         irmAddress
+        oracleAddress
         loanAsset {
           address
           symbol

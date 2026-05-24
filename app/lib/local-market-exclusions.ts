@@ -1,4 +1,4 @@
-// Stores user-managed local collateral and market exclusions in localStorage.
+// Stores user-managed local collateral, oracle, and market exclusions in localStorage.
 export interface LocalCollateralExclusionEntry {
   ts: number
   symbol?: string
@@ -13,6 +13,12 @@ export interface LocalMarketLostValueEntry {
   collateralAssetAddress?: string
 }
 
+export interface LocalOracleBlacklistEntry {
+  ts: number
+  provider?: string
+  collateralSymbol?: string
+}
+
 export interface LocalCollateralExclusionRecord extends LocalCollateralExclusionEntry {
   chainId: number
   collateralAddress: string
@@ -21,6 +27,11 @@ export interface LocalCollateralExclusionRecord extends LocalCollateralExclusion
 export interface LocalMarketLostValueRecord extends LocalMarketLostValueEntry {
   chainId: number
   marketUniqueKey: string
+}
+
+export interface LocalOracleBlacklistRecord extends LocalOracleBlacklistEntry {
+  chainId: number
+  oracleAddress: string
 }
 
 const KEY_PREFIX = 'local-market-exclusions:v1:'
@@ -48,9 +59,14 @@ function marketKey(chainId: number, marketUniqueKey: string) {
   return `${KEY_PREFIX}market:${chainId}:${normalizeId(marketUniqueKey)}`
 }
 
+function oracleKey(chainId: number, oracleAddress: string) {
+  return `${KEY_PREFIX}oracle:${chainId}:${normalizeId(oracleAddress)}`
+}
+
 function parseNewKey(key: string):
   | { kind: 'collateral', chainId: number, id: string }
   | { kind: 'market', chainId: number, id: string }
+  | { kind: 'oracle', chainId: number, id: string }
   | undefined {
   if (!key.startsWith(KEY_PREFIX))
     return undefined
@@ -63,10 +79,11 @@ function parseNewKey(key: string):
   const kind = parts[0]
   const chainId = Number.parseInt(parts[1], 10)
   const id = normalizeId(parts.slice(2).join(':'))
-  if ((kind !== 'collateral' && kind !== 'market') || !Number.isFinite(chainId) || chainId <= 0 || !id)
+  const validKinds = ['collateral', 'market', 'oracle']
+  if (!validKinds.includes(kind) || !Number.isFinite(chainId) || chainId <= 0 || !id)
     return undefined
 
-  return { kind, chainId, id }
+  return { kind, chainId, id } as Extract<ReturnType<typeof parseNewKey>, { kind: string }>
 }
 
 function parseLegacyKey(key: string, prefix: string): { chainId: number, id: string } | undefined {
@@ -146,6 +163,17 @@ function readMarketEntry(key: string): LocalMarketLostValueEntry | undefined {
   }
 }
 
+function readOracleEntry(key: string): LocalOracleBlacklistEntry | undefined {
+  const parsed = safeReadJson<LocalOracleBlacklistEntry>(key)
+  if (!parsed)
+    return undefined
+  return {
+    ts: typeof parsed.ts === 'number' ? parsed.ts : 0,
+    provider: typeof parsed.provider === 'string' && parsed.provider.trim() ? parsed.provider.trim() : undefined,
+    collateralSymbol: typeof parsed.collateralSymbol === 'string' && parsed.collateralSymbol.trim() ? parsed.collateralSymbol.trim() : undefined,
+  }
+}
+
 function migrateLegacyKeys() {
   if (typeof window === 'undefined' || didMigrateLegacyKeys)
     return
@@ -189,19 +217,22 @@ export function getLocalMarketExclusionsVersion() {
   return localMarketExclusionsVersion
 }
 
-export function isCollateralLocallyExcluded(chainId?: number, collateralAddress?: string | null) {
-  migrateLegacyKeys()
-  if (chainId == null || !collateralAddress)
-    return false
-  return readCollateralEntry(collateralKey(chainId, collateralAddress)) != null
+// Factories below deduplicate the read/write/list boilerplate across collateral/market/oracle exclusions, which all share the same localStorage shape.
+function createIsExcluded<E>(
+  keyFn: (chainId: number, id: string) => string,
+  readEntry: (key: string) => E | undefined,
+) {
+  return (chainId?: number, id?: string | null) => {
+    migrateLegacyKeys()
+    if (chainId == null || !id)
+      return false
+    return readEntry(keyFn(chainId, id)) != null
+  }
 }
 
-export function isMarketLocallyMarkedLostValue(chainId?: number, marketUniqueKey?: string | null) {
-  migrateLegacyKeys()
-  if (chainId == null || !marketUniqueKey)
-    return false
-  return readMarketEntry(marketKey(chainId, marketUniqueKey)) != null
-}
+export const isCollateralLocallyExcluded = createIsExcluded(collateralKey, readCollateralEntry)
+export const isMarketLocallyMarkedLostValue = createIsExcluded(marketKey, readMarketEntry)
+export const isOracleLocallyExcluded = createIsExcluded(oracleKey, readOracleEntry)
 
 export function setCollateralLocallyExcluded(
   chainId: number,
@@ -231,11 +262,17 @@ export function setCollateralLocallyExcludedWithTimestamp(
   emitChange()
 }
 
-export function clearCollateralLocallyExcluded(chainId: number, collateralAddress: string) {
-  migrateLegacyKeys()
-  safeWrite(collateralKey(chainId, collateralAddress), undefined)
-  emitChange()
+function createClearExcluded(keyFn: (chainId: number, id: string) => string) {
+  return (chainId: number, id: string) => {
+    migrateLegacyKeys()
+    safeWrite(keyFn(chainId, id), undefined)
+    emitChange()
+  }
 }
+
+export const clearCollateralLocallyExcluded = createClearExcluded(collateralKey)
+export const clearMarketLocallyMarkedLostValue = createClearExcluded(marketKey)
+export const clearOracleLocallyExcluded = createClearExcluded(oracleKey)
 
 export function setMarketLocallyMarkedLostValue(
   chainId: number,
@@ -280,9 +317,31 @@ export function setMarketLocallyMarkedLostValueWithTimestamp(
   emitChange()
 }
 
-export function clearMarketLocallyMarkedLostValue(chainId: number, marketUniqueKey: string) {
+export function setOracleLocallyExcluded(
+  chainId: number,
+  oracleAddress: string,
+  metadata?: { provider?: string | null, collateralSymbol?: string | null },
+) {
   migrateLegacyKeys()
-  safeWrite(marketKey(chainId, marketUniqueKey), undefined)
+  safeWrite(oracleKey(chainId, oracleAddress), {
+    ts: Date.now(),
+    provider: typeof metadata?.provider === 'string' && metadata.provider.trim() ? metadata.provider.trim() : undefined,
+    collateralSymbol: typeof metadata?.collateralSymbol === 'string' && metadata.collateralSymbol.trim() ? metadata.collateralSymbol.trim() : undefined,
+  })
+  emitChange()
+}
+
+export function setOracleLocallyExcludedWithTimestamp(
+  chainId: number,
+  oracleAddress: string,
+  metadata?: { ts?: number, provider?: string | null, collateralSymbol?: string | null },
+) {
+  migrateLegacyKeys()
+  safeWrite(oracleKey(chainId, oracleAddress), {
+    ts: normalizeTimestamp(metadata?.ts),
+    provider: typeof metadata?.provider === 'string' && metadata.provider.trim() ? metadata.provider.trim() : undefined,
+    collateralSymbol: typeof metadata?.collateralSymbol === 'string' && metadata.collateralSymbol.trim() ? metadata.collateralSymbol.trim() : undefined,
+  })
   emitChange()
 }
 
@@ -311,70 +370,73 @@ export function subscribeLocalMarketExclusions(listener: () => void) {
   }
 }
 
-export function listLocallyExcludedCollaterals(): LocalCollateralExclusionRecord[] {
-  migrateLegacyKeys()
-  if (typeof window === 'undefined')
-    return []
+function createListExcluded<E, R extends { chainId: number, ts: number }>(
+  kind: string,
+  readEntry: (key: string) => E | undefined,
+  mapRecord: (parsedKey: { chainId: number, id: string }, entry: E) => R,
+) {
+  return (): R[] => {
+    migrateLegacyKeys()
+    if (typeof window === 'undefined')
+      return []
 
-  const out: LocalCollateralExclusionRecord[] = []
-  try {
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i)
-      if (!key)
-        continue
-      const parsedKey = parseNewKey(key)
-      if (!parsedKey || parsedKey.kind !== 'collateral')
-        continue
-      const entry = readCollateralEntry(key)
-      if (!entry)
-        continue
-      out.push({
-        chainId: parsedKey.chainId,
-        collateralAddress: parsedKey.id,
-        ts: entry.ts,
-        symbol: entry.symbol,
-        name: entry.name,
-      })
+    const out: R[] = []
+    try {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i)
+        if (!key)
+          continue
+        const parsedKey = parseNewKey(key)
+        if (!parsedKey || parsedKey.kind !== kind)
+          continue
+        const entry = readEntry(key)
+        if (!entry)
+          continue
+        out.push(mapRecord(parsedKey, entry))
+      }
     }
-  }
-  catch {
-    return []
-  }
+    catch {
+      return []
+    }
 
-  return out.sort((a, b) => b.ts - a.ts)
+    return out.sort((a, b) => b.ts - a.ts)
+  }
 }
 
-export function listMarketsLocallyMarkedLostValue(): LocalMarketLostValueRecord[] {
-  migrateLegacyKeys()
-  if (typeof window === 'undefined')
-    return []
+export const listLocallyExcludedOracles = createListExcluded(
+  'oracle',
+  readOracleEntry,
+  (parsedKey, entry) => ({
+    chainId: parsedKey.chainId,
+    oracleAddress: parsedKey.id,
+    ts: entry.ts,
+    provider: entry.provider,
+    collateralSymbol: entry.collateralSymbol,
+  }),
+)
 
-  const out: LocalMarketLostValueRecord[] = []
-  try {
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i)
-      if (!key)
-        continue
-      const parsedKey = parseNewKey(key)
-      if (!parsedKey || parsedKey.kind !== 'market')
-        continue
-      const entry = readMarketEntry(key)
-      if (!entry)
-        continue
-      out.push({
-        chainId: parsedKey.chainId,
-        marketUniqueKey: parsedKey.id,
-        ts: entry.ts,
-        loanAssetSymbol: entry.loanAssetSymbol,
-        collateralAssetSymbol: entry.collateralAssetSymbol,
-        loanAssetAddress: entry.loanAssetAddress,
-        collateralAssetAddress: entry.collateralAssetAddress,
-      })
-    }
-  }
-  catch {
-    return []
-  }
+export const listLocallyExcludedCollaterals = createListExcluded(
+  'collateral',
+  readCollateralEntry,
+  (parsedKey, entry) => ({
+    chainId: parsedKey.chainId,
+    collateralAddress: parsedKey.id,
+    ts: entry.ts,
+    symbol: entry.symbol,
+    name: entry.name,
+  }),
+)
 
-  return out.sort((a, b) => b.ts - a.ts)
-}
+export const listMarketsLocallyMarkedLostValue = createListExcluded(
+  'market',
+  readMarketEntry,
+  (parsedKey, entry) => ({
+    chainId: parsedKey.chainId,
+    marketUniqueKey: parsedKey.id,
+    ts: entry.ts,
+    loanAssetSymbol: entry.loanAssetSymbol,
+    collateralAssetSymbol: entry.collateralAssetSymbol,
+    loanAssetAddress: entry.loanAssetAddress,
+    collateralAssetAddress: entry.collateralAssetAddress,
+  }),
+)

@@ -1,6 +1,7 @@
-import type { MarketRiskInput, MarketRiskReasonCode, MarketRiskStatusEntry } from './types'
+// Derives a market's risk status from local exclusions, system health, collateral decisions, and the static blacklist.
+import type { MarketRiskInput, MarketRiskReasonCode, MarketRiskStatus, MarketRiskStatusEntry } from './types'
 import { isCollateralWhitelisted } from '../collateral-whitelist'
-import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue } from '../local-market-exclusions'
+import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue, isOracleLocallyExcluded } from '../local-market-exclusions'
 import { isMarketBlacklisted } from '../market-blacklist'
 import { isOracleMisconfiguredWarning } from '../morpho/morpho-warnings'
 import { isMarketSystemUnhealthy } from '../unhealthy-markets'
@@ -32,6 +33,13 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     }
   }
 
+  if (isOracleLocallyExcluded(chainId, input.oracleAddress)) {
+    return {
+      status: 'black',
+      reasonCodes: ['local_oracle_blacklist'],
+    }
+  }
+
   if (isMarketSystemUnhealthy(uniqueKey, chainId)) {
     return {
       status: 'black',
@@ -46,6 +54,7 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     collateralAssetAddress: input.collateralAssetAddress,
     loanAssetSymbol: input.loanAssetSymbol,
     collateralAssetSymbol: input.collateralAssetSymbol,
+    oracleAddress: input.oracleAddress,
   })) {
     return {
       status: 'black',
@@ -86,6 +95,29 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     status: 'yellow',
     reasonCodes: reasons,
   }
+}
+
+export interface MarketRiskStatusInput {
+  chainId?: number
+  uniqueKey?: string
+  loanAsset?: { address?: string | null, symbol?: string | null }
+  collateralAsset?: { address?: string | null, symbol?: string | null }
+  oracleAddress?: string | null
+  warnings?: Array<{ type: string, level?: 'YELLOW' | 'RED' | string }>
+}
+
+// Accepts nested asset objects (e.g. market.loanAsset) so callers don't have to manually flatten fields into MarketRiskInput every time.
+export function getMarketRiskStatus(input: MarketRiskStatusInput): MarketRiskStatus {
+  return getMarketRisk({
+    chainId: input.chainId,
+    uniqueKey: input.uniqueKey,
+    loanAssetAddress: input.loanAsset?.address,
+    collateralAssetAddress: input.collateralAsset?.address,
+    loanAssetSymbol: input.loanAsset?.symbol,
+    collateralAssetSymbol: input.collateralAsset?.symbol,
+    oracleAddress: input.oracleAddress,
+    warnings: input.warnings,
+  }).status
 }
 
 export function getExecutionGuard(markets: MarketRiskInput[]) {
