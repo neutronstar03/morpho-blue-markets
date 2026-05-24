@@ -28,7 +28,7 @@ import { getMorphoBlueAddress, parseTokenAmount, useTokenBalance } from '~/lib/h
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
-import { getMarketRisk } from '~/lib/market-risk/market-risk'
+import { getMarketRiskStatus } from '~/lib/market-risk/market-risk'
 import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
@@ -182,15 +182,14 @@ export function useSupplyAprOptimizerController() {
     if (!effectiveChainId)
       return selectedUserMarketsAll
     return selectedUserMarketsAll.filter((p) => {
-      const status = getMarketRisk({
+      const status = getMarketRiskStatus({
         chainId: effectiveChainId,
         uniqueKey: p.market.uniqueKey,
-        loanAssetAddress: p.market.loanAsset.address,
-        collateralAssetAddress: p.market.collateralAsset.address,
-        loanAssetSymbol: p.market.loanAsset.symbol,
-        collateralAssetSymbol: p.market.collateralAsset.symbol,
+        loanAsset: p.market.loanAsset,
+        collateralAsset: p.market.collateralAsset,
         warnings: p.market.warnings,
-      }).status
+        oracleAddress: p.market.oracleAddress,
+      })
       return status !== 'black'
     })
   }, [blacklistVersion, decisionsVersion, effectiveChainId, selectedUserMarketsAll, whitelistVersion])
@@ -616,15 +615,14 @@ export function useSupplyAprOptimizerController() {
     for (const m of (topMarkets ?? [])) {
       const id = m.uniqueKey.toLowerCase()
       const status = effectiveChainId
-        ? getMarketRisk({
-          chainId: effectiveChainId,
-          uniqueKey: m.uniqueKey,
-          loanAssetAddress: m.loanAsset?.address,
-          collateralAssetAddress: m.collateralAsset?.address,
-          loanAssetSymbol: m.loanAsset?.symbol,
-          collateralAssetSymbol: m.collateralAsset?.symbol,
-          warnings: m.warnings,
-        }).status
+        ? getMarketRiskStatus({
+            chainId: effectiveChainId,
+            uniqueKey: m.uniqueKey,
+            loanAsset: m.loanAsset,
+            collateralAsset: m.collateralAsset,
+            warnings: m.warnings,
+            oracleAddress: m.oracleAddress,
+          })
         : undefined
       if (status === 'black')
         continue
@@ -634,15 +632,14 @@ export function useSupplyAprOptimizerController() {
     for (const p of selectedUserMarkets) {
       const id = p.market.uniqueKey.toLowerCase()
       const status = effectiveChainId
-        ? getMarketRisk({
-          chainId: effectiveChainId,
-          uniqueKey: p.market.uniqueKey,
-          loanAssetAddress: p.market.loanAsset?.address,
-          collateralAssetAddress: p.market.collateralAsset?.address,
-          loanAssetSymbol: p.market.loanAsset?.symbol,
-          collateralAssetSymbol: p.market.collateralAsset?.symbol,
-          warnings: p.market.warnings,
-        }).status
+        ? getMarketRiskStatus({
+            chainId: effectiveChainId,
+            uniqueKey: p.market.uniqueKey,
+            loanAsset: p.market.loanAsset,
+            collateralAsset: p.market.collateralAsset,
+            warnings: p.market.warnings,
+            oracleAddress: p.market.oracleAddress,
+          })
         : undefined
       if (status === 'black')
         continue
@@ -713,15 +710,14 @@ export function useSupplyAprOptimizerController() {
       map.set(m.uniqueKey.toLowerCase(), {
         collateralSymbol: m.collateralAsset?.symbol,
         status: effectiveChainId
-          ? getMarketRisk({
-            chainId: effectiveChainId,
-            uniqueKey: m.uniqueKey,
-            loanAssetAddress: m.loanAsset?.address,
-            collateralAssetAddress: m.collateralAsset?.address,
-            loanAssetSymbol: m.loanAsset?.symbol,
-            collateralAssetSymbol: m.collateralAsset?.symbol,
-            warnings: m.warnings,
-          }).status
+          ? getMarketRiskStatus({
+              chainId: effectiveChainId,
+              uniqueKey: m.uniqueKey,
+              loanAsset: m.loanAsset,
+              collateralAsset: m.collateralAsset,
+              warnings: m.warnings,
+              oracleAddress: m.oracleAddress,
+            })
           : undefined,
       })
     }
@@ -729,15 +725,14 @@ export function useSupplyAprOptimizerController() {
       map.set(p.market.uniqueKey.toLowerCase(), {
         collateralSymbol: p.market.collateralAsset?.symbol,
         status: effectiveChainId
-          ? getMarketRisk({
-            chainId: effectiveChainId,
-            uniqueKey: p.market.uniqueKey,
-            loanAssetAddress: p.market.loanAsset?.address,
-            collateralAssetAddress: p.market.collateralAsset?.address,
-            loanAssetSymbol: p.market.loanAsset?.symbol,
-            collateralAssetSymbol: p.market.collateralAsset?.symbol,
-            warnings: p.market.warnings,
-          }).status
+          ? getMarketRiskStatus({
+              chainId: effectiveChainId,
+              uniqueKey: p.market.uniqueKey,
+              loanAsset: p.market.loanAsset,
+              collateralAsset: p.market.collateralAsset,
+              warnings: p.market.warnings,
+              oracleAddress: p.market.oracleAddress,
+            })
           : undefined,
       })
     }

@@ -18,7 +18,7 @@ import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { isMarketIdBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
-import { getMarketRisk } from '~/lib/market-risk/market-risk'
+import { getMarketRiskStatus } from '~/lib/market-risk/market-risk'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { PositionChainPills } from './position-chain-pills'
 import { PositionGroups } from './position-groups'
@@ -60,15 +60,14 @@ function PositionClient() {
       return out
     for (const p of (positions ?? [])) {
       const key = `${chainId}:${p.market.uniqueKey.toLowerCase()}`
-      out[key] = getMarketRisk({
+      out[key] = getMarketRiskStatus({
         chainId,
         uniqueKey: p.market.uniqueKey,
-        loanAssetAddress: p.market.loanAsset.address,
-        collateralAssetAddress: p.market.collateralAsset.address,
-        loanAssetSymbol: p.market.loanAsset.symbol,
-        collateralAssetSymbol: p.market.collateralAsset.symbol,
+        loanAsset: p.market.loanAsset,
+        collateralAsset: p.market.collateralAsset,
         warnings: p.market.warnings,
-      }).status
+        oracleAddress: p.market.oracleAddress,
+      })
     }
     return out
   }, [blacklistVersion, chainId, decisionsVersion, positions, whitelistVersion])

@@ -1,3 +1,4 @@
+// Market-page controls for local collateral, oracle, and lost-value exclusions.
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useMemo } from 'react'
 import { useAccount } from 'wagmi'
@@ -7,12 +8,16 @@ import { useUserPosition } from '~/lib/hooks/rpc/use-morpho'
 import {
   clearCollateralLocallyExcluded,
   clearMarketLocallyMarkedLostValue,
+  clearOracleLocallyExcluded,
   isCollateralLocallyExcluded,
   isMarketLocallyMarkedLostValue,
+  isOracleLocallyExcluded,
   setCollateralLocallyExcluded,
   setMarketLocallyMarkedLostValue,
+  setOracleLocallyExcluded,
 } from '~/lib/local-market-exclusions'
 import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { getOracleProvider } from '~/lib/oracle-providers'
 
 interface LocalCollateralBlacklistControlProps {
   market: SingleMorphoMarket
@@ -30,12 +35,18 @@ export function LocalCollateralBlacklistControl({ market, isOpen }: LocalCollate
   const collateralAddress = market.collateralAsset.address
   const collateralSymbol = market.collateralAsset.symbol
   const collateralName = market.collateralAsset.name
+  const oracleAddress = market.oracleAddress
   const { data: position, isLoading: isLoadingPosition } = useUserPosition(marketUniqueKey, address)
 
-  const isBlacklisted = useMemo(() => {
+  const isCollateralBlacklisted = useMemo(() => {
     void blacklistVersion
     return isCollateralLocallyExcluded(chainId, collateralAddress)
   }, [blacklistVersion, chainId, collateralAddress])
+
+  const isOracleBlacklisted = useMemo(() => {
+    void blacklistVersion
+    return isOracleLocallyExcluded(chainId, oracleAddress)
+  }, [blacklistVersion, chainId, oracleAddress])
 
   const isWrittenOff = useMemo(() => {
     void blacklistVersion
@@ -49,14 +60,26 @@ export function LocalCollateralBlacklistControl({ market, isOpen }: LocalCollate
     return supplyShares > 0n || borrowShares > 0n || collateral > 0n
   }, [position])
 
-  const onToggleBlacklist = () => {
-    if (isBlacklisted) {
+  const onToggleCollateralBlacklist = () => {
+    if (isCollateralBlacklisted) {
       clearCollateralLocallyExcluded(chainId, collateralAddress)
       return
     }
     setCollateralLocallyExcluded(chainId, collateralAddress, {
       symbol: collateralSymbol,
       name: collateralName,
+    })
+  }
+
+  const onToggleOracleBlacklist = () => {
+    if (isOracleBlacklisted) {
+      clearOracleLocallyExcluded(chainId, oracleAddress)
+      return
+    }
+    const provider = getOracleProvider(chainId, oracleAddress)
+    setOracleLocallyExcluded(chainId, oracleAddress, {
+      provider: provider ?? undefined,
+      collateralSymbol,
     })
   }
 
@@ -83,6 +106,7 @@ export function LocalCollateralBlacklistControl({ market, isOpen }: LocalCollate
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
               Advanced
             </p>
+
             <div>
               <p className="text-sm font-medium text-gray-200">Collateral blacklist</p>
               <p className="mt-1 text-sm text-gray-300">
@@ -92,17 +116,39 @@ export function LocalCollateralBlacklistControl({ market, isOpen }: LocalCollate
                 <Button
                   type="button"
                   size="sm"
-                  variant={isBlacklisted ? 'outline' : 'default'}
-                  className={isBlacklisted
+                  variant={isCollateralBlacklisted ? 'outline' : 'default'}
+                  className={isCollateralBlacklisted
                     ? 'border-green-700/30 bg-green-900/10 text-green-300 hover:bg-green-900/20'
                     : 'bg-red-600 text-white hover:bg-red-700'}
-                  onClick={onToggleBlacklist}
+                  onClick={onToggleCollateralBlacklist}
                 >
-                  {isBlacklisted ? 'Remove local blacklist' : `Blacklist ${collateralSymbol}`}
+                  {isCollateralBlacklisted ? 'Remove local blacklist' : `Blacklist ${collateralSymbol}`}
                 </Button>
                 <span className="text-xs text-gray-500 font-mono break-all">{collateralAddress}</span>
               </div>
             </div>
+
+            <div className="border-t border-white/10 pt-4">
+              <p className="text-sm font-medium text-gray-200">Oracle blacklist</p>
+              <p className="mt-1 text-sm text-gray-300">
+                Blacklist this oracle address. All markets using it will be hidden from suggestions. Reversible.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isOracleBlacklisted ? 'outline' : 'default'}
+                  className={isOracleBlacklisted
+                    ? 'border-green-700/30 bg-green-900/10 text-green-300 hover:bg-green-900/20'
+                    : 'bg-red-600 text-white hover:bg-red-700'}
+                  onClick={onToggleOracleBlacklist}
+                >
+                  {isOracleBlacklisted ? 'Remove oracle blacklist' : 'Blacklist oracle'}
+                </Button>
+                <span className="text-xs text-gray-500 font-mono break-all">{oracleAddress}</span>
+              </div>
+            </div>
+
             {canShowWriteoffControl && (
               <div className="border-t border-white/10 pt-4">
                 <p className="text-sm font-medium text-gray-200">Lost value market</p>

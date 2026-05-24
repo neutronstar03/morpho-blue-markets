@@ -95,6 +95,7 @@ export function MarketActions({ market }: MarketActionsProps) {
       loanAssetSymbol: market.loanAsset.symbol,
       collateralAssetSymbol: market.collateralAsset.symbol,
       warnings: market.warnings,
+      oracleAddress: market.oracleAddress,
     })
   }, [blacklistVersion, market])
   const isSupplyBlocked = marketRisk.status === 'black'

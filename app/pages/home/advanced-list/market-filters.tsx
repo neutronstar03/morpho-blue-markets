@@ -116,7 +116,7 @@ export function MarketFilters({
             </SelectContent>
           </Select>
           <Select value={comparison} onValueChange={v => setComparison(v as '>' | '<')}>
-            <SelectTrigger className="h-9 w-auto min-w-[3.75rem] justify-center bg-gray-700 border-gray-600 text-white text-base font-semibold">
+            <SelectTrigger className="h-9 w-auto min-w-[5rem] justify-center bg-gray-700 border-gray-600 text-white text-base font-semibold">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -157,7 +157,7 @@ export function MarketFilters({
                     </SelectContent>
                   </Select>
                   <Select value={comparison} onValueChange={v => setComparison(v as '>' | '<')}>
-                    <SelectTrigger className="h-9 w-10 justify-center bg-gray-700 border-gray-600 text-white text-base font-semibold">
+                    <SelectTrigger className="h-9 w-14 justify-center bg-gray-700 border-gray-600 text-white text-base font-semibold">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

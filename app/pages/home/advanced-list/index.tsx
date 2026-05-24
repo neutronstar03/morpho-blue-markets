@@ -171,6 +171,7 @@ export function AdvancedList() {
         loanAssetSymbol: m.marketLabel.split('/')[1]?.trim(),
         collateralAssetSymbol: m.marketLabel.split('/')[0]?.trim(),
         warnings: m.warnings,
+        oracleAddress: m.oracleAddress,
       }).status
     }
     return out

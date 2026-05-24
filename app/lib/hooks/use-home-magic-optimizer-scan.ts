@@ -10,7 +10,7 @@ import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-position
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
 import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
-import { getMarketRisk } from '~/lib/market-risk/market-risk'
+import { getMarketRiskStatus } from '~/lib/market-risk/market-risk'
 import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
@@ -115,15 +115,14 @@ export function useHomeMagicOptimizerScan() {
     if (!chainId)
       return selectedUserMarkets
     return selectedUserMarkets.filter((p) => {
-      const status = getMarketRisk({
+      const status = getMarketRiskStatus({
         chainId,
         uniqueKey: p.market.uniqueKey,
-        loanAssetAddress: p.market.loanAsset.address,
-        collateralAssetAddress: p.market.collateralAsset.address,
-        loanAssetSymbol: p.market.loanAsset.symbol,
-        collateralAssetSymbol: p.market.collateralAsset.symbol,
+        loanAsset: p.market.loanAsset,
+        collateralAsset: p.market.collateralAsset,
         warnings: p.market.warnings,
-      }).status
+        oracleAddress: p.market.oracleAddress,
+      })
       return status !== 'black'
     })
   }, [blacklistVersion, chainId, decisionsVersion, selectedUserMarkets, whitelistVersion])
@@ -325,15 +324,14 @@ export function useHomeMagicOptimizerScan() {
 
     for (const m of topMarkets) {
       const id = m.uniqueKey.toLowerCase()
-      const status = getMarketRisk({
+      const status = getMarketRiskStatus({
         chainId,
         uniqueKey: m.uniqueKey,
-        loanAssetAddress: m.loanAsset?.address,
-        collateralAssetAddress: m.collateralAsset?.address,
-        loanAssetSymbol: m.loanAsset?.symbol,
-        collateralAssetSymbol: m.collateralAsset?.symbol,
+        loanAsset: m.loanAsset,
+        collateralAsset: m.collateralAsset,
         warnings: m.warnings,
-      }).status
+        oracleAddress: m.oracleAddress,
+      })
       if (status === 'black')
         continue
       universe.set(id, {
@@ -343,15 +341,14 @@ export function useHomeMagicOptimizerScan() {
     }
     for (const p of selectedUserMarketsSafe) {
       const id = p.market.uniqueKey.toLowerCase()
-      const status = getMarketRisk({
+      const status = getMarketRiskStatus({
         chainId,
         uniqueKey: p.market.uniqueKey,
-        loanAssetAddress: p.market.loanAsset.address,
-        collateralAssetAddress: p.market.collateralAsset.address,
-        loanAssetSymbol: p.market.loanAsset.symbol,
-        collateralAssetSymbol: p.market.collateralAsset.symbol,
+        loanAsset: p.market.loanAsset,
+        collateralAsset: p.market.collateralAsset,
         warnings: p.market.warnings,
-      }).status
+        oracleAddress: p.market.oracleAddress,
+      })
       if (status === 'black')
         continue
       universe.set(id, {
