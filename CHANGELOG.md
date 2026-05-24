@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.13 - 2026-05-24
+
+### Changed
+- feat: added local oracle blacklist storage with market-risk integration, hiding markets that share a blacklisted oracle from optimizers and static blacklist checks.
+- feat: added oracle blacklist toggle on the market page and oracle rows in the home blacklist recap.
+- ux: extracted a shared `CollapsibleCardHeader` for batch withdraw and supply optimizer cards.
+- data: lowered Pyth oracle provider rank scores in the optimizer sort key.
+
 ## v1.5.12 - 2026-05-24
 
 ### Changed
