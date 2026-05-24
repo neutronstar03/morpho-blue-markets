@@ -1,6 +1,5 @@
 import type { LoanAssetOption } from './shared'
 import type { OptimizerStrategy } from '~/lib/optimizer/supply-optimizer-runner'
-import { Minus, Plus } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { InfoTooltip } from '~/components/ui/info-tooltip'
 import { Input } from '~/components/ui/input'
@@ -14,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { StepperInput } from '~/components/ui/stepper-input'
 import { fmtToken } from '~/lib/optimizer/supply-optimizer-ui-utils'
 
 interface SupplyAprOptimizerFormProps {
@@ -142,49 +142,26 @@ export function SupplyAprOptimizerForm({
             )}
           />
         </div>
-        <div className="grid h-10 w-full grid-cols-[2.5rem_1fr_2.5rem] overflow-hidden rounded-md border border-gray-700 bg-gray-900">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-full rounded-none border-0 border-r border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
-            onClick={() => {
-              const current = Number.parseFloat(marketApr ?? '0')
-              if (!Number.isFinite(current) || current <= 0.25)
-                return
-              const next = Math.max(0, Math.round((current - 0.25) * 100) / 100)
-              onChangeMarketApr(String(next))
-            }}
-            aria-label="Decrease market APR"
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <div className="relative">
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={marketApr ?? ''}
-              onChange={e => onChangeMarketApr(e.target.value)}
-              placeholder={defaultMarketApr}
-              className="h-full rounded-none border-0 px-2 text-center tabular-nums text-white placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset focus-visible:ring-offset-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              aria-label="Market APR percent"
-            />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-full rounded-none border-0 border-l border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
-            onClick={() => {
-              const current = Number.parseFloat(marketApr ?? '0')
-              const next = Math.round(((Number.isFinite(current) ? current : 0) + 0.25) * 100) / 100
-              onChangeMarketApr(String(next))
-            }}
-            aria-label="Increase market APR"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
+        <StepperInput
+          value={marketApr ?? ''}
+          onChange={onChangeMarketApr}
+          onDecrement={() => {
+            const current = Number.parseFloat(marketApr ?? '0')
+            if (!Number.isFinite(current) || current <= 0.25)
+              return
+            const next = Math.max(0, Math.round((current - 0.25) * 100) / 100)
+            onChangeMarketApr(String(next))
+          }}
+          onIncrement={() => {
+            const current = Number.parseFloat(marketApr ?? '0')
+            const next = Math.round(((Number.isFinite(current) ? current : 0) + 0.25) * 100) / 100
+            onChangeMarketApr(String(next))
+          }}
+          canDecrement={Number.parseFloat(marketApr ?? '0') > 0.25}
+          placeholder={defaultMarketApr}
+          ariaLabel="Market APR percent"
+          inputClassName="px-2"
+        />
         <div className="text-xs text-gray-500 min-h-0 md:h-4">
           Default:
           {' '}
@@ -278,48 +255,27 @@ export function SupplyAprOptimizerForm({
             )}
           />
         </div>
-        <div className="grid h-10 w-full grid-cols-[2.5rem_1fr_2.5rem] overflow-hidden rounded-md border border-gray-700 bg-gray-900">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-full rounded-none border-0 border-r border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
-            onClick={() => {
-              const current = parseMaxMarkets(maxMarketsInput ?? '')
-              if (current > 1)
-                setMaxMarketsInput(String(current - 1))
-            }}
-            disabled={parseMaxMarkets(maxMarketsInput ?? '') <= 1}
-            aria-label="Decrease max markets"
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <Input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={maxMarketsInput ?? ''}
-            onChange={(e) => {
-              const digitsOnly = e.target.value.replace(/\D+/g, '')
-              setMaxMarketsInput(digitsOnly)
-            }}
-            className="h-full rounded-none border-0 px-0 text-center tabular-nums text-white placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset focus-visible:ring-offset-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            aria-label="Max markets"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-full rounded-none border-0 border-l border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
-            onClick={() => {
-              const current = parseMaxMarkets(maxMarketsInput ?? '')
-              setMaxMarketsInput(String(current + 1))
-            }}
-            aria-label="Increase max markets"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
+        <StepperInput
+          value={maxMarketsInput ?? ''}
+          onChange={(value) => {
+            const digitsOnly = value.replace(/\D+/g, '')
+            setMaxMarketsInput(digitsOnly)
+          }}
+          onDecrement={() => {
+            const current = parseMaxMarkets(maxMarketsInput ?? '')
+            if (current > 1)
+              setMaxMarketsInput(String(current - 1))
+          }}
+          onIncrement={() => {
+            const current = parseMaxMarkets(maxMarketsInput ?? '')
+            setMaxMarketsInput(String(current + 1))
+          }}
+          canDecrement={parseMaxMarkets(maxMarketsInput ?? '') > 1}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          ariaLabel="Max markets"
+          inputClassName="px-0"
+        />
         <div className="text-xs text-gray-500 leading-4">Use +/- or type a value (min 1)</div>
       </div>
 

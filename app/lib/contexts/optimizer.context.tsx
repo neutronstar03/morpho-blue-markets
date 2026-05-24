@@ -70,7 +70,7 @@ export function SupplyAprOptimizerProvider({ children }: { children: ReactNode }
 
   const clear = useCallback(() => {
     setSelectionState({})
-    setInputs(prev => ({ ...prev, marketApr: DEFAULT_MARKET_APR }))
+    setInputs(prev => ({ ...prev, marketApr: DEFAULT_MARKET_APR, newDepositAmount: undefined }))
     setDerivedState({})
     setRun((prev) => {
       const nextRunId = prev.runId + 1

@@ -1,10 +1,10 @@
 // Renders home-page power-user controls, including local blacklist sync setup.
-import { AlertTriangle, Cloud, Eye, Filter, Minus, Plus, Power, X } from 'lucide-react'
+import { AlertTriangle, Cloud, Eye, Filter, Power, X } from 'lucide-react'
 import { useState } from 'react'
 import { useAccount, useSignMessage } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
-import { Input } from '~/components/ui/input'
+import { StepperInput } from '~/components/ui/stepper-input'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import {
@@ -146,50 +146,28 @@ export function AdvancedSettings({ onClose, onShowBlacklistRecap }: AdvancedSett
             </div>
           </div>
           <div className="shrink-0 self-end md:self-auto flex flex-col items-end">
-            <div className="grid h-10 w-40 md:w-48 grid-cols-[2.5rem_1fr_2.5rem] overflow-hidden rounded-md border border-gray-700 bg-gray-900">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-full rounded-none border-0 border-r border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
-                onClick={() => {
-                  const current = Number.parseFloat(skipThreshold ?? '0.25')
-                  if (!Number.isFinite(current) || current <= 0)
-                    return
-                  const next = Math.max(0, Math.round((current - 0.25) * 100) / 100)
-                  setSkipThreshold(String(next))
-                }}
-                aria-label="Decrease skip optimization threshold"
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <div className="relative">
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={skipThreshold ?? ''}
-                  onChange={e => setSkipThreshold(e.target.value)}
-                  placeholder="0.25"
-                  className="h-full rounded-none border-0 px-2 text-center tabular-nums text-white placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset focus-visible:ring-offset-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  aria-label="Skip optimization threshold percent"
-                />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">%</span>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-full rounded-none border-0 border-l border-gray-700 bg-gray-900 px-0 text-gray-300 hover:bg-gray-800 hover:text-white"
-                onClick={() => {
-                  const current = Number.parseFloat(skipThreshold ?? '0.25')
-                  const next = Math.min(10, Math.round(((Number.isFinite(current) ? current : 0.25) + 0.25) * 100) / 100)
-                  setSkipThreshold(String(next))
-                }}
-                aria-label="Increase skip optimization threshold"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+            <StepperInput
+              className="w-40 md:w-48"
+              value={skipThreshold ?? ''}
+              onChange={setSkipThreshold}
+              onDecrement={() => {
+                const current = Number.parseFloat(skipThreshold ?? '0.25')
+                if (!Number.isFinite(current) || current <= 0)
+                  return
+                const next = Math.max(0, Math.round((current - 0.25) * 100) / 100)
+                setSkipThreshold(String(next))
+              }}
+              onIncrement={() => {
+                const current = Number.parseFloat(skipThreshold ?? '0.25')
+                const next = Math.min(10, Math.round(((Number.isFinite(current) ? current : 0.25) + 0.25) * 100) / 100)
+                setSkipThreshold(String(next))
+              }}
+              canDecrement={Number.parseFloat(skipThreshold ?? '0.25') > 0}
+              placeholder="0.25"
+              ariaLabel="Skip optimization threshold percent"
+              suffix="%"
+              inputClassName="px-2"
+            />
             <p className="text-xs text-gray-500 mt-1.5">Default: 0.25%</p>
           </div>
         </div>
