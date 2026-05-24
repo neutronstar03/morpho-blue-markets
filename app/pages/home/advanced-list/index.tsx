@@ -96,6 +96,7 @@ export function AdvancedList() {
   const [orderDirection, setOrderDirection] = useLocalStorage<OrderDirection>('advanced-list:orderDirection', OrderDirection.Desc)
   const [chainFilter, setChainFilter] = useLocalStorage<MarketChainFilter>('advanced-list:chainFilter', 'ALL')
   const [showOpportunityRecap, setShowOpportunityRecap] = useLocalStorage<boolean>('advanced-list:show-opportunity-recap', false)
+  const [searchQuery, setSearchQuery] = useLocalStorage<string>('advanced-list:search', '')
 
   const where = useMemo(
     () => buildWhereClause(aprType, comparison, aprValue, chainFilter),
@@ -176,11 +177,16 @@ export function AdvancedList() {
   }, [blacklistVersion, decisionsVersion, markets, whitelistVersion])
 
   const visibleMarkets = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
     return markets.filter((m) => {
       const key = `${m.chainId}:${m.id.toLowerCase()}`
-      return riskStatusByKey[key] !== 'black'
+      if (riskStatusByKey[key] === 'black')
+        return false
+      if (!query)
+        return true
+      return m.marketLabel.toLowerCase().includes(query)
     })
-  }, [markets, riskStatusByKey])
+  }, [markets, riskStatusByKey, searchQuery])
 
   const { chainId: walletChainId } = useAccount()
   const selectedChainId = useMemo(() => {
@@ -270,6 +276,8 @@ export function AdvancedList() {
         chainFilter={chainFilter}
         setChainFilter={setChainFilter}
         rateType={displayRateType}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
       />
 
       {displayRateType === 'supply' && showOpportunityRecap && (

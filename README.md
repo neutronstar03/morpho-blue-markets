@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.11: Added asset search to the Markets filter bar with redesigned desktop single-row and mobile popover layouts.
 - v1.5.10: Fixed World Chain optimizer prerequisite refreshes that could show stale authorization and `abi is required` errors.
 - v1.5.9: Fixed World Chain instantaneous APR reads and added the official World Chain selector icon.
-- v1.5.8: Added World Chain support across chain config, market links, liquidity, risk tooling, and Bundler3 execution.
 
 ## Development
 
@@ -79,9 +79,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.11` (2026-05-24): Added asset search to the Markets filter bar with redesigned desktop single-row and mobile popover layouts.
 - `v1.5.10` (2026-05-22): Fixed World Chain optimizer prerequisite refreshes that could show stale authorization and `abi is required` errors.
 - `v1.5.9` (2026-05-21): Fixed World Chain instantaneous APR reads and added the official World Chain selector icon.
-- `v1.5.8` (2026-05-21): Added World Chain support across chain config, market links, liquidity, risk tooling, and Bundler3 execution.
 
 ## Live Version
 

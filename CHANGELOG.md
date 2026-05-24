@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.11 - 2026-05-24
+
+### Changed
+- feat: added an asset search input to the Markets filter bar that filters the market list by collateral or loan asset symbol.
+- ui: redesigned the desktop Markets filter bar into a single-row layout with search, chain selector, APY filter, and sort controls inline.
+- ui: redesigned the mobile Markets filter layout with compact pill buttons for Filters and Sort that open popover panels, avoiding a tall vertical stack.
+- infra: added a reusable `Popover` UI primitive wrapping `@radix-ui/react-popover`.
+
 ## v1.5.10 - 2026-05-22
 
 ### Fixed
