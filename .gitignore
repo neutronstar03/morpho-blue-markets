@@ -29,3 +29,6 @@ public/whitelist.collaterals.json
 
 # Wrangler local dev state
 .wrangler/
+
+# IDE / agent state
+.serena/

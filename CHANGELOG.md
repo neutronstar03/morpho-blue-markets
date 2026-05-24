@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.16 - 2026-05-25
+
+### Fixed
+- fix: Supply APR optimizer Clear button now properly disappears after clearing by resetting `newDepositAmount` in the context clear handler.
+- fix: Market APR and Max markets stepper inputs no longer show a white background when the OS is in light mode.
+- fix: forced dark mode always via `<html className="dark">` so the dark-only UI renders correctly regardless of OS color scheme.
+
+### Changed
+- ux: extracted a reusable `StepperInput` UI primitive from the duplicated minus/input/plus markup used in Supply APR optimizer and Advanced Settings.
+
 ## v1.5.15 - 2026-05-24
 
 ### Fixed
