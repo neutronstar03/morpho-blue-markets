@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.17 - 2026-05-26
+
+### Added
+- feat: on-demand oracle price drift comparison against DefiLlama reference on the Market page, with green/red drift indicator (>1% flagged as red).
+
+### Changed
+- ux: reorganized Market page into clearer sections (Market Detail, Risk Assessment with Market Health / Price & Oracle / Debt sub-groups, Collateral/Oracle Reviews).
+- ux: introduced `DetailPillGrid` and `SubGroupContent` layout primitives to compress tabular data into pill grids, reducing mobile scroll length significantly.
+- ux: replaced static Supply Rates section with a collapsible card that shows Average APY as recap when collapsed.
+- ux: compressed vertical spacing across all market detail rows and review sections.
+
 ## v1.5.16 - 2026-05-25
 
 ### Fixed

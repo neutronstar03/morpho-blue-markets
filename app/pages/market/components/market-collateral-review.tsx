@@ -14,7 +14,7 @@ function DetailRow({
   value: React.ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-gray-700/50 py-2 last:border-b-0">
+    <div className="flex items-start justify-between gap-3 border-b border-gray-700/50 py-1.5 last:border-b-0">
       <span className="pt-0.5 text-gray-400 text-sm">{label}</span>
       <div className="min-w-0 max-w-[82%] text-right text-white font-normal">{value}</div>
     </div>
@@ -69,7 +69,7 @@ export function MarketCollateralReview({ market }: MarketCollateralReviewProps) 
     <>
       {collateralReview && (
         <>
-          <h3 className="text-lg font-semibold text-white mt-6 mb-2 border-b-2 border-blue-500 pb-1">
+          <h3 className="text-lg font-semibold text-white mt-4 mb-1.5 border-b-2 border-blue-500 pb-1">
             Collateral Review
           </h3>
 
@@ -130,7 +130,7 @@ export function MarketCollateralReview({ market }: MarketCollateralReviewProps) 
 
       {oracleReview && (
         <>
-          <h3 className="text-lg font-semibold text-white mt-6 mb-2 border-b-2 border-blue-500 pb-1">
+          <h3 className="text-lg font-semibold text-white mt-4 mb-1.5 border-b-2 border-blue-500 pb-1">
             Oracle Review
           </h3>
 

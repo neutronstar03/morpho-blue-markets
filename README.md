@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.17: Added oracle price drift vs DefiLlama on Market page, reorganized sections into pills/grids for better mobile experience, and made Supply Rates collapsible.
 - v1.5.16: Fixed Clear button persistence, white input backgrounds in light OS mode, forced dark mode always, and extracted a shared `StepperInput` component.
 - v1.5.15: Fixed blacklist sync background listener so local changes trigger XHRs without opening Advanced Settings.
-- v1.5.14: Fixed oracle blacklist cross-device sync and market filtering contract.
 
 ## Development
 
