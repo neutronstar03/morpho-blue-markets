@@ -5,19 +5,18 @@ import { getSupportedChainName } from '~/lib/addresses'
 import { DEFILLAMA_CHAIN_SLUGS, fetchLlamaPrices } from '~/lib/defillama'
 import { STALE_TIME_MEDIUM_MS } from '~/lib/hooks/query-stale-times'
 import { useOraclePrice } from '~/lib/hooks/rpc/use-oracle-price'
+import { useSwapEstimate } from '~/lib/hooks/use-swap-estimate'
 
 export interface OracleDriftResult {
   oraclePrice: number | undefined
-  defiLlamaPrice: number | undefined
+  marketPrice: number | undefined
   drift: number | undefined
   driftPct: number | undefined
   isLoading: boolean
   error: Error | null
 }
 
-export function useOracleDrift(market: SingleMorphoMarket): OracleDriftResult {
-  const { oraclePrice, isLoading: isLoadingOracle, error: oracleError } = useOraclePrice(market)
-
+function useDefiLlamaPrice(market: SingleMorphoMarket) {
   const chainName = getSupportedChainName(market.morphoBlue.chain.id)
   const llamaSlug = typeof chainName === 'string' && chainName in DEFILLAMA_CHAIN_SLUGS
     ? DEFILLAMA_CHAIN_SLUGS[chainName as keyof typeof DEFILLAMA_CHAIN_SLUGS]
@@ -30,11 +29,7 @@ export function useOracleDrift(market: SingleMorphoMarket): OracleDriftResult {
     ? `${llamaSlug}:${market.loanAsset.address.toLowerCase()}`
     : undefined
 
-  const {
-    data: llamaData,
-    isLoading: isLoadingLlama,
-    error: llamaError,
-  } = useQuery({
+  return useQuery({
     queryKey: ['defillama-prices', collateralKey, loanKey],
     queryFn: async () => {
       if (!collateralKey || !loanKey)
@@ -45,35 +40,66 @@ export function useOracleDrift(market: SingleMorphoMarket): OracleDriftResult {
     enabled: !!collateralKey && !!loanKey,
     staleTime: STALE_TIME_MEDIUM_MS,
   })
+}
+
+export function useOracleDrift(market: SingleMorphoMarket): OracleDriftResult {
+  const { oraclePrice, isLoading: isLoadingOracle, error: oracleError } = useOraclePrice(market)
+
+  const chainId = market.morphoBlue.chain.id
+  const isKatana = chainId === 747474
+
+  // Primary path: 0x swap estimate (all chains except Katana)
+  const {
+    effectivePrice: swapPrice,
+    isLoading: isLoadingSwap,
+    error: swapError,
+  } = useSwapEstimate(market)
+
+  // Fallback path: DefiLlama (Katana only — 0x does not support chain 747474)
+  const {
+    data: llamaData,
+    isLoading: isLoadingLlama,
+    error: llamaError,
+  } = useDefiLlamaPrice(market)
 
   const defiLlamaPrice = useMemo(() => {
-    if (!llamaData?.coins || !collateralKey || !loanKey)
+    if (!llamaData?.coins)
       return undefined
+    const chainName = getSupportedChainName(chainId)
+    const llamaSlug = typeof chainName === 'string' && chainName in DEFILLAMA_CHAIN_SLUGS
+      ? DEFILLAMA_CHAIN_SLUGS[chainName as keyof typeof DEFILLAMA_CHAIN_SLUGS]
+      : undefined
+    if (!llamaSlug)
+      return undefined
+    const collateralKey = `${llamaSlug}:${market.collateralAsset.address.toLowerCase()}`
+    const loanKey = `${llamaSlug}:${market.loanAsset.address.toLowerCase()}`
     const collateralEntry = llamaData.coins[collateralKey]
     const loanEntry = llamaData.coins[loanKey]
     if (!collateralEntry?.price || !loanEntry?.price)
       return undefined
     return collateralEntry.price / loanEntry.price
-  }, [llamaData, collateralKey, loanKey])
+  }, [llamaData, chainId, market.collateralAsset.address, market.loanAsset.address])
+
+  const marketPrice = isKatana ? defiLlamaPrice : swapPrice
 
   const drift = useMemo(() => {
-    if (oraclePrice == null || defiLlamaPrice == null)
+    if (oraclePrice == null || marketPrice == null)
       return undefined
-    return oraclePrice - defiLlamaPrice
-  }, [oraclePrice, defiLlamaPrice])
+    return oraclePrice - marketPrice
+  }, [oraclePrice, marketPrice])
 
   const driftPct = useMemo(() => {
-    if (drift == null || defiLlamaPrice == null || defiLlamaPrice === 0)
+    if (drift == null || marketPrice == null || marketPrice === 0)
       return undefined
-    return (drift / defiLlamaPrice) * 100
-  }, [drift, defiLlamaPrice])
+    return (drift / marketPrice) * 100
+  }, [drift, marketPrice])
 
-  const isLoading = isLoadingOracle || isLoadingLlama
-  const error = oracleError ?? llamaError ?? null
+  const isLoading = isLoadingOracle || (isKatana ? isLoadingLlama : isLoadingSwap)
+  const error = oracleError ?? (isKatana ? llamaError : swapError) ?? null
 
   return {
     oraclePrice,
-    defiLlamaPrice,
+    marketPrice,
     drift,
     driftPct,
     isLoading,

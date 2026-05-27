@@ -4,11 +4,12 @@ import { Badge } from '~/components/ui/badge'
 import { DetailPillGrid } from '~/components/ui/detail-pill-grid'
 import { InfoTooltip } from '~/components/ui/info-tooltip'
 import { StatPill } from '~/components/ui/stat-pill'
-import { formatPercent, formatUsd } from '~/lib/formatters'
+import { formatPercent, formatTokenAmountShort, formatUsd } from '~/lib/formatters'
 import { useMarketLiquidations } from '~/lib/hooks/graphql/use-market-liquidations'
 import { useCollateralReview } from '~/lib/hooks/use-collateral-review'
 import { useOracleDrift } from '~/lib/hooks/use-oracle-drift'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
+import { useSwapEstimate } from '~/lib/hooks/use-swap-estimate'
 import { getOracleProviderRank } from '~/lib/oracle-provider-rank'
 import { getOracleProvider, useOracleProvidersVersion } from '~/lib/oracle-providers'
 import { DetailRow, SectionTitle, SubGroupContent, SubGroupTitle } from './market-detail-shared'
@@ -89,8 +90,12 @@ export function RiskAssessmentSection({ market }: Props) {
     market.morphoBlue.chain.id,
   )
 
-  const { oraclePrice, defiLlamaPrice, drift, driftPct } = useOracleDrift(market)
-  const hasDriftData = oraclePrice != null && defiLlamaPrice != null
+  const { oraclePrice, marketPrice, drift, driftPct } = useOracleDrift(market)
+  const hasDrift = oraclePrice != null && marketPrice != null
+
+  const { sellAmountFormatted } = useSwapEstimate(market)
+
+  const isKatana = market.morphoBlue.chain.id === 747474
 
   const supplyingVaultCount = market.supplyingVaults.length + market.supplyingVaultV2s.length
 
@@ -103,6 +108,12 @@ export function RiskAssessmentSection({ market }: Props) {
   const oracleReviewOverride = review?.oracleReview ?? null
   const oracleProvider = oracleReviewOverride?.provider ?? monarchOracleProvider
   const oracleProviderRank = oracleReviewOverride?.rank
+
+  const marketPriceTooltip = isKatana
+    ? 'External price reference from DefiLlama (Katana fallback).'
+    : sellAmountFormatted
+      ? `Swap simulated with ${formatTokenAmountShort(Number(sellAmountFormatted))} ${market.collateralAsset.symbol}`
+      : 'Live DEX spot price via 0x swap simulation. Excludes 0x protocol fee.'
 
   return (
     <>
@@ -181,31 +192,33 @@ export function RiskAssessmentSection({ market }: Props) {
           value={formatPercent(market.state.dailyPriceVariation)}
           noBorder
         />
-        {hasDriftData && (
-          <>
-            <DetailPillGrid>
-              <StatPill
-                label="Oracle price"
-                value={formatCrossPrice(oraclePrice, market.collateralAsset.symbol, market.loanAsset.symbol)}
-              />
-              <StatPill
-                label={(
-                  <span className="inline-flex items-center gap-1">
-                    DefiLlama
-                    <InfoTooltip content="External price reference from DefiLlama. Hidden when unavailable." iconClassName="text-gray-500" />
-                  </span>
-                )}
-                value={formatCrossPrice(defiLlamaPrice, market.collateralAsset.symbol, market.loanAsset.symbol)}
-              />
-            </DetailPillGrid>
-            {drift != null && driftPct != null && (
-              <DetailRow
-                label="Oracle drift"
-                value={<DriftValue drift={drift} driftPct={driftPct} />}
-                noBorder
-              />
+        <DetailPillGrid>
+          <StatPill
+            label="Oracle price"
+            value={oraclePrice != null
+              ? formatCrossPrice(oraclePrice, market.collateralAsset.symbol, market.loanAsset.symbol)
+              : '—'}
+          />
+          <StatPill
+            label={(
+              <span className="inline-flex items-center gap-1">
+                Market price
+                <InfoTooltip content={marketPriceTooltip} iconClassName="text-gray-500" />
+              </span>
             )}
-          </>
+            value={marketPrice != null
+              ? formatCrossPrice(marketPrice, market.collateralAsset.symbol, market.loanAsset.symbol)
+              : (
+                  <span className="text-gray-500">N/A</span>
+                )}
+          />
+        </DetailPillGrid>
+        {hasDrift && drift != null && driftPct != null && (
+          <DetailRow
+            label="Oracle drift"
+            value={<DriftValue drift={drift} driftPct={driftPct} />}
+            noBorder
+          />
         )}
       </SubGroupContent>
 

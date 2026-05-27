@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.18 - 2026-05-27
+
+### Added
+- feat: added a Cloudflare Pages `/api/swap-estimate` function backed by 0x quotes for executable Market page price checks, with local Vite dev routing and `.dev.vars` support.
+- feat: Market Risk Assessment now compares oracle price against a 0x-derived `Market price` on supported chains, while keeping DefiLlama only as the Katana fallback.
+
+### Changed
+- ux: Market price now shows `N/A` when simulation is unavailable and explains the simulated collateral amount in the info tooltip.
+- infra: swap estimate requests now use a canonical two-significant-digit `sellAmount` so normal HTTP cache semantics remain correct while improving cache reuse.
+
 ## v1.5.17 - 2026-05-26
 
 ### Added

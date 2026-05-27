@@ -15,7 +15,7 @@ const GetMarketDocument = gql`
       oracleAddress
       irmAddress
       loanAsset { address symbol name decimals }
-      collateralAsset { address symbol name decimals }
+      collateralAsset { address symbol name decimals priceUsd }
       supplyingVaults { address }
       supplyingVaultV2s { address }
       morphoBlue { chain { id } }
@@ -29,6 +29,10 @@ const GetMarketDocument = gql`
         utilization
         # this value is awesome, it's the variation of the collateral price over the last 24 hours
         dailyPriceVariation
+
+        # Collateral amounts for price fallback
+        collateralAssets
+        collateralAssetsUsd
 
         # Base (ex-rewards) instantaneous + aggregates
         supplyApy
@@ -75,6 +79,7 @@ export interface SingleMorphoMarket {
     symbol: string
     name: string
     decimals: number
+    priceUsd: number | null
   }
   supplyingVaults: { address: string }[]
   supplyingVaultV2s: { address: string }[]
@@ -96,6 +101,8 @@ export interface SingleMorphoMarket {
     borrowAssetsUsd: number
     utilization: number
     dailyPriceVariation: number
+    collateralAssets: string | null
+    collateralAssetsUsd: number | null
     supplyApy: number
     avgSupplyApy: number
     dailySupplyApy: number

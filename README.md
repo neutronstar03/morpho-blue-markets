@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.18: Added 0x-backed Market price simulation for oracle drift checks, with canonical swap sizing for cacheable `/api/swap-estimate` requests and Katana DefiLlama fallback.
 - v1.5.17: Added oracle price drift vs DefiLlama on Market page, reorganized sections into pills/grids for better mobile experience, and made Supply Rates collapsible.
 - v1.5.16: Fixed Clear button persistence, white input backgrounds in light OS mode, forced dark mode always, and extracted a shared `StepperInput` component.
-- v1.5.15: Fixed blacklist sync background listener so local changes trigger XHRs without opening Advanced Settings.
 
 ## Development
 
@@ -79,9 +79,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
-- `v1.5.15` (2026-05-24): Fixed blacklist sync background listener so local changes trigger XHRs without opening Advanced Settings.
-- `v1.5.14` (2026-05-24): Fixed oracle blacklist cross-device sync and market filtering contract.
-- `v1.5.13` (2026-05-24): Added local oracle blacklist controls and recap rows, plus shared collapsible headers on batch withdraw and supply optimizer cards.
+- `v1.5.18` (2026-05-27): Added 0x-backed Market price simulation for oracle drift checks, with canonical swap sizing for cacheable `/api/swap-estimate` requests.
+- `v1.5.17` (2026-05-26): Added oracle price drift vs DefiLlama on Market page and reorganized market sections into mobile-friendly pill grids.
+- `v1.5.16` (2026-05-25): Fixed Clear button persistence, white input backgrounds, forced dark mode, and extracted a shared `StepperInput` component.
 
 ## Live Version
 

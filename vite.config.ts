@@ -10,6 +10,7 @@ import { defineConfig } from 'vite'
 import svgr from 'vite-plugin-svgr'
 import { onRequestGet as collateralReview } from './functions/api/collateral-review'
 import { onRequestGet as popularLoanAssets } from './functions/api/popular-loan-assets'
+import { onRequestGet as swapEstimate } from './functions/api/swap-estimate'
 import { onRequestGet as tokenLiquidity } from './functions/api/token-liquidity'
 import {
   onRequestGet as userBlacklistGet,
@@ -57,6 +58,7 @@ interface DevApiRoute {
 const DEV_API_HANDLERS: Record<string, DevApiRoute> = {
   '/api/collateral-review': { GET: collateralReview as PagesFunctionHandler },
   '/api/popular-loan-assets': { GET: popularLoanAssets as PagesFunctionHandler },
+  '/api/swap-estimate': { GET: swapEstimate as unknown as PagesFunctionHandler },
   '/api/token-liquidity': { GET: tokenLiquidity as PagesFunctionHandler },
   '/api/user-blacklist': {
     GET: userBlacklistGet as unknown as PagesFunctionHandler,
@@ -66,9 +68,34 @@ const DEV_API_HANDLERS: Record<string, DevApiRoute> = {
   },
 }
 
+// Read local .dev.vars (Cloudflare Pages dev convention) into a plain record.
+function loadDevVars(): Record<string, string> {
+  const vars: Record<string, string> = {}
+  const path = join(process.cwd(), '.dev.vars')
+  if (existsSync(path)) {
+    const content = readFileSync(path, 'utf-8')
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#'))
+        continue
+      const eq = trimmed.indexOf('=')
+      if (eq === -1)
+        continue
+      const key = trimmed.slice(0, eq).trim()
+      const value = trimmed.slice(eq + 1).trim()
+      // Unwrap simple quotes if present
+      vars[key] = value.replace(/^["']|["']$/g, '')
+    }
+  }
+  return vars
+}
+
+const devVars = loadDevVars()
+
 const devUserBlacklistKv = new Map<string, string>()
 
-const devPagesEnv = {
+const devPagesEnv: Record<string, unknown> = {
+  ZEROEX_API_KEY: devVars.ZEROEX_API_KEY ?? process.env.ZEROEX_API_KEY ?? '',
   USER_BLACKLIST: {
     get: async (key: string) => devUserBlacklistKv.get(key) ?? null,
     put: async (key: string, value: string) => {

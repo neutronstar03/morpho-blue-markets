@@ -5,6 +5,7 @@
 interface Env {
   UMAMI_BACKEND_URL: string
   USER_BLACKLIST: KVNamespace
+  ZEROEX_API_KEY: string
 }
 
 interface KVNamespace {
