@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.22 - 2026-05-27
+
+### Changed
+- ux: Market page query failures now show a concise recoverable warning with Retry and Back to Markets actions instead of raw GraphQL error payloads.
+
 ## v1.5.21 - 2026-05-27
 
 ### Fixed
