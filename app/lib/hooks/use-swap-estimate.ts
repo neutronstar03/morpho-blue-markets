@@ -2,6 +2,7 @@ import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useQuery } from '@tanstack/react-query'
 import { formatUnits, parseUnits } from 'viem'
 import { STALE_TIME_MEDIUM_MS } from '~/lib/hooks/query-stale-times'
+import { useOraclePrice } from '~/lib/hooks/rpc/use-oracle-price'
 
 const MIN_SWAP_USD = 5_000
 const MAX_SWAP_USD = 50_000
@@ -16,6 +17,10 @@ function computeTargetUsd(borrowAssetsUsd: number): number {
 }
 
 function getCollateralPriceUsd(market: SingleMorphoMarket): number | null {
+  if (market.collateralAsset.price?.usd != null && Number.isFinite(market.collateralAsset.price.usd)) {
+    return market.collateralAsset.price.usd
+  }
+
   // Direct price from Morpho (added to query in use-market.ts)
   if (market.collateralAsset.priceUsd != null && Number.isFinite(market.collateralAsset.priceUsd)) {
     return market.collateralAsset.priceUsd
@@ -29,6 +34,14 @@ function getCollateralPriceUsd(market: SingleMorphoMarket): number | null {
     if (assetsNum > 0) {
       return collateralAssetsUsd / assetsNum
     }
+  }
+
+  return null
+}
+
+function getLoanPriceUsd(market: SingleMorphoMarket): number | null {
+  if (market.loanAsset.price?.usd != null && Number.isFinite(market.loanAsset.price.usd)) {
+    return market.loanAsset.price.usd
   }
 
   return null
@@ -80,7 +93,13 @@ export interface UseSwapEstimateReturn {
 export function useSwapEstimate(market: SingleMorphoMarket): UseSwapEstimateReturn {
   const chainId = market.morphoBlue.chain.id
   const borrowAssetsUsd = market.state.borrowAssetsUsd
-  const priceUsd = getCollateralPriceUsd(market)
+  const { oraclePrice } = useOraclePrice(market)
+  const collateralPriceUsd = getCollateralPriceUsd(market)
+  const loanPriceUsd = getLoanPriceUsd(market)
+  const oracleDerivedPriceUsd = oraclePrice != null && loanPriceUsd != null
+    ? oraclePrice * loanPriceUsd
+    : null
+  const priceUsd = collateralPriceUsd ?? oracleDerivedPriceUsd
   const targetUsd = Number.isFinite(borrowAssetsUsd) && borrowAssetsUsd > 0
     ? computeTargetUsd(borrowAssetsUsd)
     : undefined

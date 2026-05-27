@@ -14,8 +14,8 @@ const GetMarketDocument = gql`
       whitelisted
       oracleAddress
       irmAddress
-      loanAsset { address symbol name decimals }
-      collateralAsset { address symbol name decimals priceUsd }
+      loanAsset { address symbol name decimals price { usd } }
+      collateralAsset { address symbol name decimals priceUsd price { usd } }
       supplyingVaults { address }
       supplyingVaultV2s { address }
       morphoBlue { chain { id } }
@@ -73,6 +73,7 @@ export interface SingleMorphoMarket {
     symbol: string
     name: string
     decimals: number
+    price: { usd: number } | null
   }
   collateralAsset: {
     address: string
@@ -80,6 +81,7 @@ export interface SingleMorphoMarket {
     name: string
     decimals: number
     priceUsd: number | null
+    price: { usd: number } | null
   }
   supplyingVaults: { address: string }[]
   supplyingVaultV2s: { address: string }[]

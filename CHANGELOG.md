@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.19 - 2026-05-27
+
+### Fixed
+- fix: swap-estimate now falls back to oracle-derived collateral USD sizing when Morpho has no collateral USD price, allowing Base stkWELL/USDC markets to reach the 0x quote path.
+
 ## v1.5.18 - 2026-05-27
 
 ### Added
