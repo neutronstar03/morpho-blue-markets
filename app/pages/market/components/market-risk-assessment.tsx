@@ -160,8 +160,8 @@ export function RiskAssessmentSection({ market }: Props) {
           />
           <StatPill
             className="flex-row"
-            label="Whitelisted"
-            value={market.whitelisted
+            label="Listed"
+            value={market.listed
               ? (
                   <span className="inline-flex items-center gap-1 text-green-400">
                     <CheckCircleIcon className="h-3.5 w-3.5" />

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.20 - 2026-05-27
+
+### Fixed
+- fix: updated Morpho market GraphQL queries from removed `whitelisted` field to current `listed` field, restoring production market list and market detail loads.
+
 ## v1.5.19 - 2026-05-27
 
 ### Fixed

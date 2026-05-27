@@ -47,7 +47,7 @@ export interface MorphoMarket {
     dailyNetBorrowApy: number
     weeklyNetBorrowApy: number
   }
-  whitelisted: boolean
+  listed: boolean
   supplyingVaults: { address: string }[]
   supplyingVaultV2s: { address: string }[]
   creationTimestamp: string
@@ -113,7 +113,7 @@ export const QUERY_LIST_MARKETS = gql`
           dailyNetBorrowApy
           weeklyNetBorrowApy
         }
-        whitelisted
+        listed
         creationTimestamp
         warnings { type level }
       }

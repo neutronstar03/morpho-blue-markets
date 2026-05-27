@@ -11,7 +11,7 @@ const GetMarketDocument = gql`
       marketId
       uniqueKey: marketId
       lltv
-      whitelisted
+      listed
       oracleAddress
       irmAddress
       loanAsset { address symbol name decimals price { usd } }
@@ -65,7 +65,7 @@ export interface SingleMorphoMarket {
   marketId: string
   uniqueKey: string
   lltv: string // format 770000000000000000
-  whitelisted: boolean
+  listed: boolean
   oracleAddress: string
   irmAddress: string
   loanAsset: {

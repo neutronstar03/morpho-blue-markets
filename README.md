@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.20: Restored production market list and market detail loads after Morpho replaced the `Market.whitelisted` GraphQL field with `Market.listed`.
 - v1.5.19: Fixed swap-estimate sizing for markets such as Base stkWELL/USDC when Morpho has no collateral USD price, using oracle-derived sizing before calling 0x.
 - v1.5.18: Added 0x-backed Market price simulation for oracle drift checks, with canonical swap sizing for cacheable `/api/swap-estimate` requests and Katana DefiLlama fallback.
-- v1.5.17: Added oracle price drift vs DefiLlama on Market page, reorganized sections into pills/grids for better mobile experience, and made Supply Rates collapsible.
 
 ## Development
 
@@ -79,9 +79,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.20` (2026-05-27): Restored production market list and market detail loads after Morpho replaced `Market.whitelisted` with `Market.listed`.
 - `v1.5.19` (2026-05-27): Fixed swap-estimate sizing for markets with missing Morpho collateral USD prices, including Base stkWELL/USDC.
 - `v1.5.18` (2026-05-27): Added 0x-backed Market price simulation for oracle drift checks, with canonical swap sizing for cacheable `/api/swap-estimate` requests.
-- `v1.5.17` (2026-05-26): Added oracle price drift vs DefiLlama on Market page and reorganized market sections into mobile-friendly pill grids.
 
 ## Live Version
 
