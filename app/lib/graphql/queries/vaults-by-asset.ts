@@ -83,7 +83,7 @@ export const QUERY_VAULTS_V1 = gql`
         address
         name
         symbol
-        whitelisted
+        whitelisted: listed
         chain { id }
         asset {
           address
@@ -121,7 +121,7 @@ export const QUERY_VAULTS_V2 = gql`
         address
         name
         symbol
-        whitelisted
+        whitelisted: listed
         chain { id }
         asset {
           address

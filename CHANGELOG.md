@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.21 - 2026-05-27
+
+### Fixed
+- fix: updated remaining Morpho vault and blacklist-generator GraphQL queries for the current `listed` and `marketId` schema fields.
+
+### Changed
+- docs: archived dated Morpho GraphQL schema snapshots and pointed `tasks/morpho-blue.graphql` at the current snapshot.
+
 ## v1.5.20 - 2026-05-27
 
 ### Fixed

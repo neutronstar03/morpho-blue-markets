@@ -9,13 +9,13 @@ export const BLOCKED_VAULT_ASSET_SYMBOLS = new Set(['APXUSD', 'AUSD', 'FXUSD'])
 interface VaultV1Filters {
   chainId_in?: number[]
   totalAssetsUsd_gte?: number
-  whitelisted?: boolean
+  listed?: boolean
 }
 
 interface VaultV2Filters {
   chainId_in?: number[]
   totalAssetsUsd_gte?: number
-  whitelisted?: boolean
+  listed?: boolean
 }
 
 export interface SupplyVaultData {
@@ -175,12 +175,12 @@ export async function fetchMarketAprByVaults(chainIds: number[], config: MarketA
   const whereV1: VaultV1Filters = {
     chainId_in: chainIds,
     totalAssetsUsd_gte: minLiquidityUsd,
-    whitelisted: true,
+    listed: true,
   }
   const whereV2: VaultV2Filters = {
     chainId_in: chainIds,
     totalAssetsUsd_gte: minLiquidityUsd,
-    whitelisted: true,
+    listed: true,
   }
 
   const [v1Result, v2Result] = await Promise.all([

@@ -95,7 +95,7 @@ async function fetchMarkets(skip: number) {
     query EnumerateMarkets($first: Int!, $skip: Int!) {
       markets(first: $first, skip: $skip) {
         items {
-          uniqueKey
+          uniqueKey: marketId
           morphoBlue { chain { id } }
           collateralAsset { symbol address }
           loanAsset { symbol address }
