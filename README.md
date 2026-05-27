@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.23: Restored full-stack local dev through Wrangler Pages while pinning Wrangler to avoid idle CPU spin, and added Market header copy actions.
 - v1.5.22: Market page query failures now show a concise recoverable warning instead of raw GraphQL error payloads.
 - v1.5.21: Fixed remaining Morpho GraphQL schema drift in vault APR and blacklist generator queries, and archived dated schema snapshots.
-- v1.5.20: Restored production market list and market detail loads after Morpho replaced the `Market.whitelisted` GraphQL field with `Market.listed`.
 
 ## Development
 
@@ -33,7 +33,7 @@ To run this project locally, follow these steps:
     ```
     The application will usually be available at `http://localhost:5173`.
     If that port is already in use, Vite will automatically choose the next free port.
-    Local `/api/*` calls are handled by a dev-only Vite middleware that mirrors the Cloudflare Pages Functions used in production.
+    Local `/api/*` calls are proxied through Wrangler Pages dev so Cloudflare Pages Functions and KV bindings match production more closely.
 
 ### Collateral Whitelist (Optional)
 
@@ -79,9 +79,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.23` (2026-05-28): Restored full-stack local dev through Wrangler Pages while pinning Wrangler to avoid idle CPU spin, and added Market header copy actions.
 - `v1.5.22` (2026-05-27): Market page query failures now show a concise recoverable warning instead of raw GraphQL error payloads.
 - `v1.5.21` (2026-05-27): Fixed remaining Morpho GraphQL schema drift in vault APR and blacklist generator queries, and archived dated schema snapshots.
-- `v1.5.20` (2026-05-27): Restored production market list and market detail loads after Morpho replaced `Market.whitelisted` with `Market.listed`.
 
 ## Live Version
 

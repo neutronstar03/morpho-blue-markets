@@ -26,6 +26,8 @@ import { getMarketSupplyUsd, getPositionSuppliedAssets, hasVisibleSupplyPosition
 import { usePositionChainPills } from './use-position-chain-pills'
 import { usePositionGroups } from './use-position-groups'
 
+const OPEN_SUPPLY_APR_OPTIMIZER_EVENT = 'open-supply-apr-optimizer'
+
 // This component is the general position in the homepage
 
 function PositionClient() {
@@ -191,6 +193,8 @@ function PositionClient() {
       maxMarketsUsed: 6,
       usePrecomputedIfFresh: false,
     })
+
+    window.dispatchEvent(new Event(OPEN_SUPPLY_APR_OPTIMIZER_EVENT))
 
     window.requestAnimationFrame(() => {
       const el = document.querySelector('[data-testid="supply-apr-optimizer-card"]') as HTMLElement | null

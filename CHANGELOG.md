@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.23 - 2026-05-28
+
+### Added
+- ux: Market headers now expose one-click copy actions for collateral address, loan asset address, and market ID.
+
+### Changed
+- ux: opening optimizer flows from positions and opportunities now expands the Supply APR optimizer card before scrolling to it.
+- dev: local `bun run dev` now runs the full React Router plus Wrangler Pages stack, with `bun run dev:frontend` available for frontend-only debugging.
+- infra: local Pages Function development now uses Wrangler proxying instead of the custom Vite middleware.
+
+### Fixed
+- fix: pinned Wrangler to `4.81.1` after `4.95.0` caused idle CPU spin in the Wrangler dev CLI on Windows.
+
 ## v1.5.22 - 2026-05-27
 
 ### Changed

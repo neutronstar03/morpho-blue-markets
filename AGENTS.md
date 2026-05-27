@@ -7,7 +7,8 @@ Name of the project: MBM - Morpho Blue Markets
 Runtime/toolchain: Node 20 + bun
 
 - Install: bun install
-- Dev: bun run dev (React Router dev server with Vite middleware for local `/api/*` calls)
+- Dev: bun run dev (React Router dev server plus Wrangler Pages dev proxy for local `/api/*` calls)
+- Frontend-only dev: bun run dev:frontend
 - Cloudflare Pages preview: bun run preview:cf
 - Typecheck (fast): bun run typecheck
 - Lint/format: bun run lint

@@ -1,11 +1,10 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
-import { Settings2 } from 'lucide-react'
-import { useState } from 'react'
+import { Check, Copy, Settings2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Button } from '~/components/ui/button'
 import { MarketRiskText } from '~/components/ui/market-risk-text'
 import { getSupportedChainName } from '~/lib/addresses'
-import { getExplorerUrl } from '~/lib/explorer'
 import { useMarketRiskStatus } from '~/lib/market-risk/hooks'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 import { getMarketSystemUnhealthyEntry, useUnhealthyMarketsVersion } from '~/lib/unhealthy-markets'
@@ -21,6 +20,8 @@ interface MarketHeaderProps {
 
 export function MarketHeader({ market }: MarketHeaderProps) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
+  const [copiedValue, setCopiedValue] = useState<string | null>(null)
+  const copiedResetTimeout = useRef<number | null>(null)
   const unhealthyMarketsVersion = useUnhealthyMarketsVersion()
   const chainName = getSupportedChainName(market.morphoBlue.chain.id)
   const { status } = useMarketRiskStatus({
@@ -33,20 +34,29 @@ export function MarketHeader({ market }: MarketHeaderProps) {
     warnings: market.warnings,
   })
 
-  const loanAssetExplorerUrl = getExplorerUrl(
-    market.morphoBlue.chain.id,
-    market.loanAsset.address as `0x${string}`,
-  )
-  const collateralAssetExplorerUrl = getExplorerUrl(
-    market.morphoBlue.chain.id,
-    market.collateralAsset.address as `0x${string}`,
-  )
-
   const morphoMarketUrl = morphoAppMarketUrl(chainName, market.uniqueKey)
   const unhealthyEntry = (() => {
     void unhealthyMarketsVersion
     return getMarketSystemUnhealthyEntry(market.uniqueKey, market.morphoBlue.chain.id)
   })()
+
+  useEffect(() => () => {
+    if (copiedResetTimeout.current !== null)
+      window.clearTimeout(copiedResetTimeout.current)
+  }, [])
+
+  async function copyToClipboard(value: string) {
+    await navigator.clipboard.writeText(value)
+    setCopiedValue(value)
+
+    if (copiedResetTimeout.current !== null)
+      window.clearTimeout(copiedResetTimeout.current)
+
+    copiedResetTimeout.current = window.setTimeout(() => {
+      setCopiedValue(null)
+      copiedResetTimeout.current = null
+    }, 1500)
+  }
 
   return (
     <div className="border-b border-gray-700 p-3 sm:p-6">
@@ -54,27 +64,37 @@ export function MarketHeader({ market }: MarketHeaderProps) {
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2">
             <h2 className="flex min-w-0 flex-wrap items-center gap-x-2 text-xl font-bold text-white sm:text-2xl">
-              <a
-                className="flex items-center gap-x-2 transition-colors hover:text-blue-400"
-                href={collateralAssetExplorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <span className="flex items-center gap-x-2">
                 <MarketRiskText status={status} size="xl">
                   {market.collateralAsset.symbol}
                 </MarketRiskText>
-                <LinkNewWindow className="w-4 h-4" />
-              </a>
+                <button
+                  type="button"
+                  className="cursor-pointer rounded text-gray-300 transition-colors hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                  onClick={() => void copyToClipboard(market.collateralAsset.address)}
+                  title={`Copy ${market.collateralAsset.symbol} address`}
+                  aria-label={`Copy ${market.collateralAsset.symbol} address`}
+                >
+                  {copiedValue === market.collateralAsset.address
+                    ? <Check className="h-4 w-4" />
+                    : <Copy className="h-4 w-4" />}
+                </button>
+              </span>
               <span className="text-gray-500 mx-1">/</span>
-              <a
-                className="flex items-center gap-x-2 transition-colors hover:text-blue-400"
-                href={loanAssetExplorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <span className="flex items-center gap-x-2">
                 <span className="text-white text-xl">{market.loanAsset.symbol}</span>
-                <LinkNewWindow className="w-4 h-4" />
-              </a>
+                <button
+                  type="button"
+                  className="cursor-pointer rounded text-gray-300 transition-colors hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                  onClick={() => void copyToClipboard(market.loanAsset.address)}
+                  title={`Copy ${market.loanAsset.symbol} address`}
+                  aria-label={`Copy ${market.loanAsset.symbol} address`}
+                >
+                  {copiedValue === market.loanAsset.address
+                    ? <Check className="h-4 w-4" />
+                    : <Copy className="h-4 w-4" />}
+                </button>
+              </span>
             </h2>
             <Button
               type="button"
@@ -117,16 +137,29 @@ export function MarketHeader({ market }: MarketHeaderProps) {
         </div>
         <div className="shrink-0 text-right">
           <p className="text-xs text-gray-400 sm:text-sm">Market ID</p>
-          <a
-            href={morphoMarketUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1 inline-flex items-center gap-x-1.5 font-mono text-xs text-gray-300 transition-colors hover:text-blue-400 sm:gap-x-2 sm:text-sm"
-            title="Open in Morpho official UI"
-          >
-            {formatAddress(market.uniqueKey)}
-            <LinkNewWindow className="w-4 h-4" />
-          </a>
+          <div className="mt-1 inline-flex items-center gap-x-1.5 font-mono text-xs text-gray-300 sm:gap-x-2 sm:text-sm">
+            <a
+              href={morphoMarketUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-x-1.5 transition-colors hover:text-blue-400 sm:gap-x-2"
+              title="Open in Morpho official UI"
+            >
+              {formatAddress(market.uniqueKey)}
+              <LinkNewWindow className="h-4 w-4" />
+            </a>
+            <button
+              type="button"
+              className="cursor-pointer rounded transition-colors hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              onClick={() => void copyToClipboard(market.uniqueKey)}
+              title="Copy market ID"
+              aria-label="Copy market ID"
+            >
+              {copiedValue === market.uniqueKey
+                ? <Check className="h-4 w-4" />
+                : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
       </div>
       <LocalCollateralBlacklistControl market={market} isOpen={isAdvancedOpen} />

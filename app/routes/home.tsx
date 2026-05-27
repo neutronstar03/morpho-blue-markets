@@ -20,6 +20,8 @@ import { BlacklistRecap } from '~/pages/home/blacklist-recap'
 import { Position } from '~/pages/home/position'
 import { SupplyAprOptimizer } from '~/pages/home/supply-apr-optimizer'
 
+const OPEN_SUPPLY_APR_OPTIMIZER_EVENT = 'open-supply-apr-optimizer'
+
 export function meta(_: Route.MetaArgs) {
   return [
     { title: 'mbm' },
@@ -187,6 +189,8 @@ export default function HomePage() {
       maxMarketsUsed: 6,
       usePrecomputedIfFresh: true,
     })
+
+    window.dispatchEvent(new Event(OPEN_SUPPLY_APR_OPTIMIZER_EVENT))
 
     dismissOpportunity(opportunity.id)
 

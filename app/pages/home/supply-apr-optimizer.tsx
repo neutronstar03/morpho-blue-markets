@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { Collapsible } from 'radix-ui'
+import { useEffect } from 'react'
 import { CollapsibleCardHeader } from '~/components/collapsible-card-header'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
@@ -10,8 +11,16 @@ import { SupplyAprOptimizerForm } from '~/pages/home/supply-apr-optimizer/optimi
 import { SupplyAprOptimizerResults } from '~/pages/home/supply-apr-optimizer/optimizer-results'
 import { useSupplyAprOptimizerController } from '~/pages/home/supply-apr-optimizer/use-supply-apr-optimizer-controller'
 
+const OPEN_SUPPLY_APR_OPTIMIZER_EVENT = 'open-supply-apr-optimizer'
+
 export function SupplyAprOptimizer() {
   const [isExpanded, setIsExpanded] = useLocalStorage('supply-apr-optimizer:expanded', false)
+
+  useEffect(() => {
+    const openOptimizer = () => setIsExpanded(true)
+    window.addEventListener(OPEN_SUPPLY_APR_OPTIMIZER_EVENT, openOptimizer)
+    return () => window.removeEventListener(OPEN_SUPPLY_APR_OPTIMIZER_EVENT, openOptimizer)
+  }, [setIsExpanded])
 
   const {
     ctx,
