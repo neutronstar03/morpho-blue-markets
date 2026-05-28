@@ -322,6 +322,9 @@ export function useUserPosition(marketKey: string, userAddress: string | undefin
     ],
     query: {
       enabled: !!userAddress && !!marketKey,
+      refetchOnMount: 'always',
+      refetchInterval: 20_000,
+      staleTime: 0,
     },
   })
 }
@@ -339,6 +342,9 @@ export function useMarket(marketKey: string) {
     args: [marketKey as any],
     query: {
       enabled: !!marketKey,
+      refetchOnMount: 'always',
+      refetchInterval: 20_000,
+      staleTime: 0,
     },
   })
 }

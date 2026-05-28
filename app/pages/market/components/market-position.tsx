@@ -1,16 +1,11 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
-import { useEffect, useMemo, useState } from 'react'
-import { useAccount, useChainId, useReadContract } from 'wagmi'
+import { useMemo } from 'react'
+import { useAccount } from 'wagmi'
 import { InfoTooltip } from '~/components/ui/info-tooltip'
-import { IRM_RATE_AT_TARGET_ABI } from '~/lib/abis/simplified'
-import { useNetworkContext } from '~/lib/contexts/network'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatBigintShort } from '~/lib/formatters'
-import { useMarket, useUserPosition } from '~/lib/hooks/rpc/use-morpho'
+import { useLiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
 import { useIsClient } from '~/lib/hooks/use-is-client'
-import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
-import { getSuppliedAssetsFromShares } from '~/lib/morpho/position-visibility'
-import { projectMorphoMarketAccrual } from '~/lib/morpho/project-accrual'
 
 // While having similar name as position.tsx, this component is specific to a single market
 
@@ -42,92 +37,22 @@ export function MarketPosition({ market }: MarketPositionProps) {
   const { address: connectedAddress } = useAccount()
   const { viewingAddress, isViewingWallet } = useViewingWallet()
   const address = viewingAddress ?? connectedAddress
-  const chainId = useChainId()
-  const { requiredChainId } = useNetworkContext()
-  const effectiveChainId = requiredChainId ?? chainId
-  const [projectionTimestamp, setProjectionTimestamp] = useState(() => Math.floor(Date.now() / 1000))
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setProjectionTimestamp(Math.floor(Date.now() / 1000))
-    }, 30_000)
-
-    return () => window.clearInterval(interval)
-  }, [])
-
-  const { data: position, isLoading: isLoadingPosition } = useUserPosition(
-    market.uniqueKey,
-    address,
-  )
-  const { data: marketState, isLoading: isLoadingMarketState } = useMarket(
-    market.uniqueKey,
-  )
-
-  const { data: rateAtTarget } = useReadContract({
-    chainId: effectiveChainId,
-    address: market.irmAddress as `0x${string}`,
-    abi: IRM_RATE_AT_TARGET_ABI,
-    functionName: 'rateAtTarget',
-    args: [market.uniqueKey as `0x${string}`],
-    query: {
-      enabled: !!market.irmAddress && !!market.uniqueKey,
-      staleTime: 5 * 60 * 1000,
-    },
-  })
-
-  const [userSupplyShares] = useMemo(
-    () => position || [0n],
-    [position],
-  )
-  const [
-    totalSupplyAssets,
-    totalSupplyShares,
-  ] = useMemo(
-    () => marketState || [0n, 0n],
-    [marketState],
-  )
+  const { data: position, isLoading } = useLiveMarketPosition({ market, address })
+  const userSupplyShares = position?.userState.supplyShares ?? 0n
 
   const loanDecimals = market.loanAsset.decimals
-
-  const suppliedAssets = useMemo(() => {
-    return getSuppliedAssetsFromShares({
-      userSupplyShares,
-      totalSupplyAssets,
-      totalSupplyShares,
-    })
-  }, [userSupplyShares, totalSupplyAssets, totalSupplyShares])
+  const suppliedAssets = position?.liveState?.suppliedAssets ?? 0n
 
   const projectedPosition = useMemo(() => {
-    const normalizedMarketState = normalizeMorphoMarketState(marketState)
-    if (!normalizedMarketState || rateAtTarget == null)
+    if (!position?.liveState?.projectedSuppliedAssets || position.liveState.projectedSuppliedAssets <= 0n)
       return undefined
-
-    const timestamp = BigInt(projectionTimestamp)
-
-    const projectedMarketState = projectMorphoMarketAccrual({
-      marketId: market.uniqueKey as `0x${string}`,
-      market: normalizedMarketState,
-      rateAtTarget,
-      timestamp,
-    })
-
-    const amount = getSuppliedAssetsFromShares({
-      userSupplyShares,
-      totalSupplyAssets: projectedMarketState.totalSupplyAssets,
-      totalSupplyShares: projectedMarketState.totalSupplyShares,
-    })
-
-    const secondsSinceLastMarketUpdate = timestamp > normalizedMarketState.lastUpdate
-      ? timestamp - normalizedMarketState.lastUpdate
-      : 0n
+    const secondsSinceLastMarketUpdate = position.liveState.secondsSinceLastMarketUpdate ?? 0n
 
     return {
-      amount,
+      amount: position.liveState.projectedSuppliedAssets,
       lastMarketUpdateAgo: formatDurationAgo(secondsSinceLastMarketUpdate),
     }
-  }, [market.uniqueKey, marketState, projectionTimestamp, rateAtTarget, userSupplyShares])
-
-  const isLoading = isLoadingPosition || isLoadingMarketState
+  }, [position])
 
   if (!isClient) {
     return null
