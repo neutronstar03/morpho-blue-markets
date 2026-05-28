@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { formatUnits, parseUnits } from 'viem'
 import { STALE_TIME_MEDIUM_MS } from '~/lib/hooks/query-stale-times'
 import { useOraclePrice } from '~/lib/hooks/rpc/use-oracle-price'
+import { fetchKyberSwapEstimate, isKyberSwapSupportedChain } from '~/lib/kyberswap'
 
 const MIN_SWAP_USD = 5_000
 const MAX_SWAP_USD = 50_000
@@ -115,27 +116,14 @@ export function useSwapEstimate(market: SingleMorphoMarket): UseSwapEstimateRetu
         throw new Error('No swap amount available for collateral')
       }
 
-      const params = new URLSearchParams({
-        chainId: String(chainId),
+      return fetchKyberSwapEstimate({
+        chainId,
         sellToken: market.collateralAsset.address,
         buyToken: market.loanAsset.address,
         sellAmount: sellAmountParam,
       })
-
-      const res = await fetch(`/api/swap-estimate?${params.toString()}`)
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-        throw new Error(err.error || `HTTP ${res.status}`)
-      }
-
-      const json = await res.json()
-      if (json.error) {
-        throw new Error(json.error)
-      }
-
-      return json as SwapEstimateData
     },
-    enabled: chainId !== 747474 && sellAmountParam != null, // Katana is unsupported by 0x
+    enabled: isKyberSwapSupportedChain(chainId) && sellAmountParam != null,
     staleTime: STALE_TIME_MEDIUM_MS,
   })
 

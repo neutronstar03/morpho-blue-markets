@@ -1,3 +1,7 @@
+// DEPRECATED: unused 0x-backed swap estimate endpoint.
+// KyberSwap browser-side route simulation is now the primary oracle-drift path.
+// Keep this dead code in the repo for one release as a rollback reference.
+//
 // Edge-cached API endpoint: GET /api/swap-estimate
 // Proxies a single 0x swap quote for oracle-drift estimation.
 //

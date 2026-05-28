@@ -6,6 +6,7 @@ import { DEFILLAMA_CHAIN_SLUGS, fetchLlamaPrices } from '~/lib/defillama'
 import { STALE_TIME_MEDIUM_MS } from '~/lib/hooks/query-stale-times'
 import { useOraclePrice } from '~/lib/hooks/rpc/use-oracle-price'
 import { useSwapEstimate } from '~/lib/hooks/use-swap-estimate'
+import { isKyberSwapSupportedChain } from '~/lib/kyberswap'
 
 export interface OracleDriftResult {
   oraclePrice: number | undefined
@@ -46,16 +47,16 @@ export function useOracleDrift(market: SingleMorphoMarket): OracleDriftResult {
   const { oraclePrice, isLoading: isLoadingOracle, error: oracleError } = useOraclePrice(market)
 
   const chainId = market.morphoBlue.chain.id
-  const isKatana = chainId === 747474
+  const isKyberSupported = isKyberSwapSupportedChain(chainId)
 
-  // Primary path: 0x swap estimate (all chains except Katana)
+  // Primary path: KyberSwap route simulation for supported chains.
   const {
     effectivePrice: swapPrice,
     isLoading: isLoadingSwap,
     error: swapError,
   } = useSwapEstimate(market)
 
-  // Fallback path: DefiLlama (Katana only — 0x does not support chain 747474)
+  // Fallback path: DefiLlama for chains not supported by KyberSwap.
   const {
     data: llamaData,
     isLoading: isLoadingLlama,
@@ -80,7 +81,7 @@ export function useOracleDrift(market: SingleMorphoMarket): OracleDriftResult {
     return collateralEntry.price / loanEntry.price
   }, [llamaData, chainId, market.collateralAsset.address, market.loanAsset.address])
 
-  const marketPrice = isKatana ? defiLlamaPrice : swapPrice
+  const marketPrice = isKyberSupported ? swapPrice : defiLlamaPrice
 
   const drift = useMemo(() => {
     if (oraclePrice == null || marketPrice == null)
@@ -94,8 +95,8 @@ export function useOracleDrift(market: SingleMorphoMarket): OracleDriftResult {
     return (drift / marketPrice) * 100
   }, [drift, marketPrice])
 
-  const isLoading = isLoadingOracle || (isKatana ? isLoadingLlama : isLoadingSwap)
-  const error = oracleError ?? (isKatana ? llamaError : swapError) ?? null
+  const isLoading = isLoadingOracle || (isKyberSupported ? isLoadingSwap : isLoadingLlama)
+  const error = oracleError ?? (isKyberSupported ? swapError : llamaError) ?? null
 
   return {
     oraclePrice,

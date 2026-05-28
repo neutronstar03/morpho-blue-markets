@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.24 - 2026-05-28
+
+### Changed
+- feat: Market price simulation now uses KyberSwap route quotes directly from the browser on supported chains, removing the active dependency on 0x API keys for oracle-drift checks.
+- data: KyberSwap quote support covers Ethereum, Optimism, Polygon, Base, Arbitrum, Unichain, HyperEVM, and Monad, with DefiLlama retained for unsupported-chain fallbacks.
+- infra: kept the old 0x `/api/swap-estimate` Pages Function in the repo as explicitly deprecated dead code for one-release rollback.
+
 ## v1.5.23 - 2026-05-28
 
 ### Added

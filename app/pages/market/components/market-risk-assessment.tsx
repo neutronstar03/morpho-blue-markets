@@ -10,6 +10,7 @@ import { useCollateralReview } from '~/lib/hooks/use-collateral-review'
 import { useOracleDrift } from '~/lib/hooks/use-oracle-drift'
 import { safunessColorClass, useSafuness } from '~/lib/hooks/use-safuness'
 import { useSwapEstimate } from '~/lib/hooks/use-swap-estimate'
+import { isKyberSwapSupportedChain } from '~/lib/kyberswap'
 import { getOracleProviderRank } from '~/lib/oracle-provider-rank'
 import { getOracleProvider, useOracleProvidersVersion } from '~/lib/oracle-providers'
 import { DetailRow, SectionTitle, SubGroupContent, SubGroupTitle } from './market-detail-shared'
@@ -95,7 +96,7 @@ export function RiskAssessmentSection({ market }: Props) {
 
   const { sellAmountFormatted } = useSwapEstimate(market)
 
-  const isKatana = market.morphoBlue.chain.id === 747474
+  const isKyberSupported = isKyberSwapSupportedChain(market.morphoBlue.chain.id)
 
   const supplyingVaultCount = market.supplyingVaults.length + market.supplyingVaultV2s.length
 
@@ -109,11 +110,11 @@ export function RiskAssessmentSection({ market }: Props) {
   const oracleProvider = oracleReviewOverride?.provider ?? monarchOracleProvider
   const oracleProviderRank = oracleReviewOverride?.rank
 
-  const marketPriceTooltip = isKatana
-    ? 'External price reference from DefiLlama (Katana fallback).'
+  const marketPriceTooltip = !isKyberSupported
+    ? 'External price reference from DefiLlama (KyberSwap unsupported chain fallback).'
     : sellAmountFormatted
       ? `Swap simulated with ${formatTokenAmountShort(Number(sellAmountFormatted))} ${market.collateralAsset.symbol}`
-      : 'Live DEX spot price via 0x swap simulation. Excludes 0x protocol fee.'
+      : 'Live DEX spot price via KyberSwap route simulation.'
 
   return (
     <>

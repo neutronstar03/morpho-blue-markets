@@ -13,9 +13,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.5.24: Switched Market price simulation to direct KyberSwap route quotes on supported chains, with 0x kept only as deprecated rollback code.
 - v1.5.23: Restored full-stack local dev through Wrangler Pages while pinning Wrangler to avoid idle CPU spin, and added Market header copy actions.
 - v1.5.22: Market page query failures now show a concise recoverable warning instead of raw GraphQL error payloads.
-- v1.5.21: Fixed remaining Morpho GraphQL schema drift in vault APR and blacklist generator queries, and archived dated schema snapshots.
 
 ## Development
 
@@ -79,9 +79,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.5.24` (2026-05-28): Switched Market price simulation to direct KyberSwap route quotes on supported chains, with 0x kept only as deprecated rollback code.
 - `v1.5.23` (2026-05-28): Restored full-stack local dev through Wrangler Pages while pinning Wrangler to avoid idle CPU spin, and added Market header copy actions.
 - `v1.5.22` (2026-05-27): Market page query failures now show a concise recoverable warning instead of raw GraphQL error payloads.
-- `v1.5.21` (2026-05-27): Fixed remaining Morpho GraphQL schema drift in vault APR and blacklist generator queries, and archived dated schema snapshots.
 
 ## Live Version
 
