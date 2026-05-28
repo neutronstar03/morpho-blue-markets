@@ -118,10 +118,6 @@ function PositionClient() {
           <span className="md:hidden text-xs text-gray-500">{timeAgo || '—'}</span>
         </div>
         <div className="ml-auto flex items-center space-x-3 sm:space-x-6">
-          <div className="hidden text-right sm:block">
-            <p className="text-xs text-gray-400">Total Assets</p>
-            <p className="text-xs sm:text-sm text-white">{globalPortfolio.totalAssetsUsd != null ? formatUsd(globalPortfolio.totalAssetsUsd) : '—'}</p>
-          </div>
           <div className="text-right">
             <p className="text-xs text-gray-400">Networks</p>
             <p className="text-xs sm:text-sm text-white">{networkChainIds.length || '—'}</p>
@@ -146,36 +142,24 @@ function PositionClient() {
               )
             : (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2 rounded-xl border border-gray-800 bg-gray-950/40 p-3 text-center sm:hidden">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-gray-500">Assets</p>
-                      <p className="text-xs font-medium text-white">{globalPortfolio.totalAssetsUsd != null ? formatUsd(globalPortfolio.totalAssetsUsd) : '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-gray-500">APR</p>
-                      <p className="text-xs font-medium text-white">{globalPortfolio.weightedAprPct != null ? `${globalPortfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-gray-500">Daily</p>
-                      <p className="text-xs font-medium text-white">{globalPortfolio.dailyUsd != null ? formatUsd(globalPortfolio.dailyUsd) : '—'}</p>
-                    </div>
-                  </div>
-                  <div className="hidden grid-cols-4 gap-3 rounded-xl border border-gray-800 bg-gray-950/40 p-4 text-center sm:grid">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Total Assets</p>
-                      <p className="text-sm font-medium text-white">{globalPortfolio.totalAssetsUsd != null ? formatUsd(globalPortfolio.totalAssetsUsd) : '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Weighted APR</p>
-                      <p className="text-sm font-medium text-white">{globalPortfolio.weightedAprPct != null ? `${globalPortfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Daily USD</p>
-                      <p className="text-sm font-medium text-white">{globalPortfolio.dailyUsd != null ? formatUsd(globalPortfolio.dailyUsd) : '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Positions</p>
-                      <p className="text-sm font-medium text-white">{globalPortfolio.positionCount || '—'}</p>
+                  <div className="rounded-xl border border-gray-800 bg-gray-950/40 px-3 py-2.5 sm:px-4">
+                    <div className="grid grid-cols-3 gap-2 text-center sm:grid-cols-4 sm:gap-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">Total Assets</p>
+                        <p className="text-xs font-semibold text-white sm:text-sm">{globalPortfolio.totalAssetsUsd != null ? formatUsd(globalPortfolio.totalAssetsUsd) : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">Weighted APR</p>
+                        <p className="text-xs font-semibold text-white sm:text-sm">{globalPortfolio.weightedAprPct != null ? `${globalPortfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">Daily USD</p>
+                        <p className="text-xs font-semibold text-white sm:text-sm">{globalPortfolio.dailyUsd != null ? formatUsd(globalPortfolio.dailyUsd) : '—'}</p>
+                      </div>
+                      <div className="hidden sm:block">
+                        <p className="text-xs uppercase tracking-wide text-gray-500">Positions</p>
+                        <p className="text-sm font-semibold text-white">{globalPortfolio.positionCount || '—'}</p>
+                      </div>
                     </div>
                   </div>
                   {networkChainIds.map((networkChainId, index) => (

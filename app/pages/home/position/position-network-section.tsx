@@ -136,6 +136,17 @@ export function PositionNetworkSection({
   const riskStatusByKey = useMarketRiskStatusMap(riskMarkets)
   const portfolio = useMemo(() => computePortfolio(visiblePositions, aprByMarketKey), [visiblePositions, aprByMarketKey])
   const groupedPositions = usePositionGroups(visiblePositions, chainId, aprByMarketKey)
+  const visibleAssetCount = useMemo(() => {
+    const assets = new Set<string>()
+    for (const position of visiblePositions)
+      assets.add(position.market.loanAsset.address.toLowerCase())
+    return assets.size
+  }, [visiblePositions])
+  const positionSummary = visiblePositions.length === 1
+    ? '1 position'
+    : visibleAssetCount > 1
+      ? `${visiblePositions.length} positions, ${visibleAssetCount} assets`
+      : `${visiblePositions.length} positions`
 
   useEffect(() => {
     onPortfolioChange?.(chainId, {
@@ -195,7 +206,7 @@ export function PositionNetworkSection({
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-white sm:text-base">{chainName}</span>
           <span className="block text-xs text-gray-500">
-            {isLoading && visiblePositions.length === 0 ? 'Loading positions...' : `${visiblePositions.length} position${visiblePositions.length === 1 ? '' : 's'}`}
+            {isLoading && visiblePositions.length === 0 ? 'Loading positions...' : positionSummary}
           </span>
         </span>
         <span className="grid shrink-0 grid-cols-2 gap-3 text-right sm:gap-6">
