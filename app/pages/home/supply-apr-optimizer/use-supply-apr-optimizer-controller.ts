@@ -67,8 +67,11 @@ export function useSupplyAprOptimizerController() {
   const { address: userAddress, chain } = useAccount()
   const walletChainId = useChainId()
   const { viewingAddress, isViewingWallet } = useViewingWallet()
+  const optimizerPreset = useHomeMagicOptimizerStore(state => state.optimizerPreset)
+  const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
+  const consumeFreshPrecomputedResult = useHomeMagicOptimizerStore(state => state.consumeFreshPrecomputedResult)
   const effectiveUserAddress = viewingAddress ?? userAddress
-  const effectiveChainId = chain?.id ?? walletChainId
+  const effectiveChainId = optimizerPreset?.chainId ?? ctx.selection.chainId ?? chain?.id ?? walletChainId
   const newDepositAmount = ctx.inputs.newDepositAmount
   const setDerived = ctx.setDerived
   const setNewDepositAmount = ctx.setNewDepositAmount
@@ -95,10 +98,6 @@ export function useSupplyAprOptimizerController() {
     const parsed = parseTokenAmount(raw, 16)
     return parsed >= 0n ? parsed : 2_500_000_000_000_000n
   }, [skipThreshold])
-  const optimizerPreset = useHomeMagicOptimizerStore(state => state.optimizerPreset)
-  const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
-  const consumeFreshPrecomputedResult = useHomeMagicOptimizerStore(state => state.consumeFreshPrecomputedResult)
-
   const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions({ address: effectiveUserAddress, chainId: effectiveChainId })
 
   const ownedLoanAssetOptions = useMemo<LoanAssetOption[]>(() => {
@@ -208,19 +207,20 @@ export function useSupplyAprOptimizerController() {
   })
   const topMarkets = topMarketsQuery.data
 
-  const { data: walletBalanceRaw } = useTokenBalance(selectedOption?.address ?? ZERO_ADDRESS, selectedOption ? effectiveUserAddress : undefined)
+  const { data: walletBalanceRaw } = useTokenBalance(selectedOption?.address ?? ZERO_ADDRESS, selectedOption ? effectiveUserAddress : undefined, effectiveChainId)
 
   const morphoAddress = useMemo(() => getMorphoBlueAddress(effectiveChainId), [effectiveChainId])
   const userMarketStateContracts = useMemo(() => {
     if (!selectedOption || selectedUserMarkets.length === 0)
       return []
     return selectedUserMarkets.map(m => ({
+      chainId: effectiveChainId,
       address: morphoAddress,
       abi: SIMPLIFIED_MORPHO_BLUE_ABI,
       functionName: 'market' as const,
       args: [m.market.uniqueKey as `0x${string}`] as const,
     }))
-  }, [selectedOption, selectedUserMarkets, morphoAddress])
+  }, [effectiveChainId, selectedOption, selectedUserMarkets, morphoAddress])
 
   const { data: userMarketStates } = useReadContracts({
     contracts: userMarketStateContracts as any,
@@ -353,7 +353,7 @@ export function useSupplyAprOptimizerController() {
 
   useEffect(() => () => stopOptimizerWorker(), [stopOptimizerWorker])
 
-  const publicClient = usePublicClient()
+  const publicClient = usePublicClient({ chainId: effectiveChainId })
   const optimizeReadResult = useSupplyOptimizerReads({
     input: optimizeRequest,
     morphoAddress,
@@ -777,7 +777,7 @@ export function useSupplyAprOptimizerController() {
   }, [])
 
   useEffect(() => {
-    if (!optimizerPreset || !effectiveChainId || optimizerPreset.chainId !== effectiveChainId)
+    if (!optimizerPreset || !effectiveChainId)
       return
 
     // Reuse a still-fresh precomputed result when possible so clicking an opportunity card can open the optimizer with an answer instead of forcing a rerun.

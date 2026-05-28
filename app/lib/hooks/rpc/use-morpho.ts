@@ -155,10 +155,10 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
 }
 
 // Hook for checking token balance in wallet
-export function useTokenBalance(tokenAddress: string, userAddress?: string) {
+export function useTokenBalance(tokenAddress: string, userAddress?: string, overrideChainId?: number) {
   const activeChainId = useChainId()
   const { requiredChainId } = useNetworkContext()
-  const chainId = requiredChainId ?? activeChainId
+  const chainId = overrideChainId ?? requiredChainId ?? activeChainId
   return useReadContract({
     chainId,
     address: tokenAddress as `0x${string}`,
