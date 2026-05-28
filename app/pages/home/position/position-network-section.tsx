@@ -3,7 +3,7 @@ import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
 import type { MarketRiskInput } from '~/lib/market-risk/types'
 import { ChevronDown } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getSupportedChainName } from '~/lib/addresses'
 import { trackEvent } from '~/lib/analytics'
 import { CHAIN_ICON_BY_ID } from '~/lib/chain-icons'
@@ -91,11 +91,13 @@ export function PositionNetworkSection({
   address,
   defaultOpen,
   marketAprBySymbol,
+  onPortfolioChange,
 }: {
   chainId: number
   address: `0x${string}`
   defaultOpen: boolean
   marketAprBySymbol: MarketAprBySymbolMap
+  onPortfolioChange?: (chainId: number, state: { portfolio: Portfolio, positionCount: number, isLoading: boolean }) => void
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'native' | 'yearly'>('total')
@@ -134,6 +136,14 @@ export function PositionNetworkSection({
   const riskStatusByKey = useMarketRiskStatusMap(riskMarkets)
   const portfolio = useMemo(() => computePortfolio(visiblePositions, aprByMarketKey), [visiblePositions, aprByMarketKey])
   const groupedPositions = usePositionGroups(visiblePositions, chainId, aprByMarketKey)
+
+  useEffect(() => {
+    onPortfolioChange?.(chainId, {
+      portfolio,
+      positionCount: visiblePositions.length,
+      isLoading,
+    })
+  }, [chainId, isLoading, onPortfolioChange, portfolio, visiblePositions.length])
 
   const handleOpenOptimizerForGroup = (group: PositionGroup) => {
     const firstPosition = group.positions[0]

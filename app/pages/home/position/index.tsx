@@ -1,17 +1,24 @@
+import type { Portfolio } from './position-types'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import { Wallet } from 'lucide-react'
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useAccount, useChainId } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { supportedChainMap } from '~/lib/addresses'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
-import { formatTimeAgo } from '~/lib/formatters'
+import { formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { configuredWagmiChainIds } from '~/lib/wagmi'
 import { PositionNetworkSection } from './position-network-section'
+
+interface ChainPortfolioState {
+  portfolio: Portfolio
+  positionCount: number
+  isLoading: boolean
+}
 
 // This component is the general position in the homepage
 
@@ -22,6 +29,7 @@ function PositionClient() {
   const effectiveAddress = viewingAddress ?? userAddress
   const chainId = chain?.id ?? walletChainId
   const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
+  const [chainPortfolioById, setChainPortfolioById] = useState<Record<number, ChainPortfolioState>>({})
   const {
     data: crossChainPositions,
     isLoading,
@@ -45,6 +53,35 @@ function PositionClient() {
       return (supportedChainMap.get(a) ?? '').localeCompare(supportedChainMap.get(b) ?? '')
     })
   }, [chainId, crossChainPositions])
+
+  const handleChainPortfolioChange = useCallback((chainId: number, state: ChainPortfolioState) => {
+    setChainPortfolioById(prev => ({ ...prev, [chainId]: state }))
+  }, [])
+
+  const globalPortfolio = useMemo(() => {
+    let positionCount = 0
+    let totalAssetsUsd = 0
+    let yearlyUsd = 0
+    let dailyUsd = 0
+
+    for (const chainId of networkChainIds) {
+      const state = chainPortfolioById[chainId]
+      if (!state)
+        continue
+      positionCount += state.positionCount
+      totalAssetsUsd += state.portfolio.totalAssetsUsd ?? 0
+      yearlyUsd += state.portfolio.yearlyUsd ?? 0
+      dailyUsd += state.portfolio.dailyUsd ?? 0
+    }
+
+    return {
+      positionCount,
+      totalAssetsUsd: totalAssetsUsd || undefined,
+      yearlyUsd: yearlyUsd || undefined,
+      dailyUsd: dailyUsd || undefined,
+      weightedAprPct: totalAssetsUsd > 0 ? (yearlyUsd / totalAssetsUsd) * 100 : undefined,
+    }
+  }, [chainPortfolioById, networkChainIds])
 
   if (!isConnected && !isViewingWallet) {
     return (
@@ -81,6 +118,10 @@ function PositionClient() {
           <span className="md:hidden text-xs text-gray-500">{timeAgo || '—'}</span>
         </div>
         <div className="ml-auto flex items-center space-x-3 sm:space-x-6">
+          <div className="hidden text-right sm:block">
+            <p className="text-xs text-gray-400">Total Assets</p>
+            <p className="text-xs sm:text-sm text-white">{globalPortfolio.totalAssetsUsd != null ? formatUsd(globalPortfolio.totalAssetsUsd) : '—'}</p>
+          </div>
           <div className="text-right">
             <p className="text-xs text-gray-400">Networks</p>
             <p className="text-xs sm:text-sm text-white">{networkChainIds.length || '—'}</p>
@@ -105,6 +146,38 @@ function PositionClient() {
               )
             : (
                 <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2 rounded-xl border border-gray-800 bg-gray-950/40 p-3 text-center sm:hidden">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-500">Assets</p>
+                      <p className="text-xs font-medium text-white">{globalPortfolio.totalAssetsUsd != null ? formatUsd(globalPortfolio.totalAssetsUsd) : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-500">APR</p>
+                      <p className="text-xs font-medium text-white">{globalPortfolio.weightedAprPct != null ? `${globalPortfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-500">Daily</p>
+                      <p className="text-xs font-medium text-white">{globalPortfolio.dailyUsd != null ? formatUsd(globalPortfolio.dailyUsd) : '—'}</p>
+                    </div>
+                  </div>
+                  <div className="hidden grid-cols-4 gap-3 rounded-xl border border-gray-800 bg-gray-950/40 p-4 text-center sm:grid">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Total Assets</p>
+                      <p className="text-sm font-medium text-white">{globalPortfolio.totalAssetsUsd != null ? formatUsd(globalPortfolio.totalAssetsUsd) : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Weighted APR</p>
+                      <p className="text-sm font-medium text-white">{globalPortfolio.weightedAprPct != null ? `${globalPortfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Daily USD</p>
+                      <p className="text-sm font-medium text-white">{globalPortfolio.dailyUsd != null ? formatUsd(globalPortfolio.dailyUsd) : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Positions</p>
+                      <p className="text-sm font-medium text-white">{globalPortfolio.positionCount || '—'}</p>
+                    </div>
+                  </div>
                   {networkChainIds.map((networkChainId, index) => (
                     <PositionNetworkSection
                       key={networkChainId}
@@ -112,6 +185,7 @@ function PositionClient() {
                       address={effectiveAddress as `0x${string}`}
                       defaultOpen={networkChainId === chainId || index === 0}
                       marketAprBySymbol={marketAprBySymbol}
+                      onPortfolioChange={handleChainPortfolioChange}
                     />
                   ))}
                 </div>
