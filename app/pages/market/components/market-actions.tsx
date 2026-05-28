@@ -7,8 +7,7 @@ import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatMarketSize, formatPercent } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
-import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
-import { getMarketRisk } from '~/lib/market-risk/market-risk'
+import { useMarketRiskStatus } from '~/lib/market-risk/hooks'
 import { DepositForm } from './deposit-form'
 import { MarketPosition } from './market-position'
 import { WithdrawForm } from './withdraw-form'
@@ -21,7 +20,6 @@ export function MarketActions({ market }: MarketActionsProps) {
   const { address } = useAccount()
   const { isViewingWallet } = useViewingWallet()
   const [searchParams] = useSearchParams()
-  const blacklistVersion = useMarketBlacklistVersion()
 
   const deepLink = useMemo(() => {
     const tab = searchParams.get('tab')
@@ -85,19 +83,16 @@ export function MarketActions({ market }: MarketActionsProps) {
   const missingLiquidityTo90Usd = utilization > targetUtilization
     ? Math.max(0, market.state.supplyAssetsUsd * (utilization / targetUtilization - 1))
     : 0
-  const marketRisk = useMemo(() => {
-    void blacklistVersion
-    return getMarketRisk({
-      chainId: market.morphoBlue.chain.id,
-      uniqueKey: market.uniqueKey,
-      loanAssetAddress: market.loanAsset.address,
-      collateralAssetAddress: market.collateralAsset.address,
-      loanAssetSymbol: market.loanAsset.symbol,
-      collateralAssetSymbol: market.collateralAsset.symbol,
-      warnings: market.warnings,
-      oracleAddress: market.oracleAddress,
-    })
-  }, [blacklistVersion, market])
+  const marketRisk = useMarketRiskStatus({
+    chainId: market.morphoBlue.chain.id,
+    uniqueKey: market.uniqueKey,
+    loanAssetAddress: market.loanAsset.address,
+    collateralAssetAddress: market.collateralAsset.address,
+    loanAssetSymbol: market.loanAsset.symbol,
+    collateralAssetSymbol: market.collateralAsset.symbol,
+    warnings: market.warnings,
+    oracleAddress: market.oracleAddress,
+  })
   const isSupplyBlocked = marketRisk.status === 'black'
   const supplyBlockedMessage = marketRisk.reasonCodes.includes('system_unhealthy_borrowers')
     ? 'Supply is blocked for this market because MBM detected unresolved unhealthy borrowers above the system-risk threshold. Direct access remains available for inspection and recovery.'
