@@ -43,7 +43,7 @@ export function useBatchWithdrawController() {
 
   const [executeError, setExecuteError] = useState<string | undefined>(undefined)
   const [isRunningFlow, setIsRunningFlow] = useState(false)
-  const { startFlow, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
+  const { startFlow, runSwitchChainStep, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
 
   useEffect(() => {
     if (!chainId)
@@ -562,6 +562,9 @@ export function useBatchWithdrawController() {
     })
 
     const steps = [] as Array<{ key: string, label: string }>
+    const needsNetworkSwitch = chain?.id !== chainId
+    if (chainId && needsNetworkSwitch)
+      steps.push({ key: 'switchNetwork', label: `Switch to ${getSupportedChainName(chainId)}` })
     if (!latestStateRef.current.isMorphoAuthorized) {
       steps.push({ key: 'authorizeWallet', label: 'Confirm adapter authorization in wallet' })
       steps.push({ key: 'authorizeConfirm', label: 'Confirming adapter authorization onchain' })
@@ -578,6 +581,15 @@ export function useBatchWithdrawController() {
     })
 
     try {
+      if (chainId && needsNetworkSwitch) {
+        await runSwitchChainStep({
+          scope,
+          stepKey: 'switchNetwork',
+          chainId,
+          chainName: getSupportedChainName(chainId),
+        })
+      }
+
       if (!latestStateRef.current.isMorphoAuthorized) {
         const authorizeRequest = latestStateRef.current.authorizeRequest
         if (!authorizeRequest)
@@ -645,7 +657,7 @@ export function useBatchWithdrawController() {
     finally {
       setIsRunningFlow(false)
     }
-  }, [chainId, failTransactionFlow, finishFlow, getErrorMessage, plan.items.length, plannedTotal, refreshExecutionState, resetAfterSuccess, runTransactionStep, selectedOption, startFlow, writeContractAsync])
+  }, [chain?.id, chainId, failTransactionFlow, finishFlow, getErrorMessage, plan.items.length, plannedTotal, refreshExecutionState, resetAfterSuccess, runSwitchChainStep, runTransactionStep, selectedOption, startFlow, writeContractAsync])
 
   const execution: BatchWithdrawExecutionState = {
     bundlerCfg,
