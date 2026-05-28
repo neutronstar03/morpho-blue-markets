@@ -16,7 +16,7 @@ import { useBatchWithdraw } from '~/lib/contexts/batch-withdraw.context'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
-import { isMarketIdBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { useMarketIdBlacklistPredicate } from '~/lib/market-blacklist'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
@@ -55,14 +55,13 @@ export function useBatchWithdrawController() {
   }, [chainId, ctx])
 
   const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions({ address: effectiveUserAddress, chainId })
-  const blacklistVersion = useMarketBlacklistVersion()
+  const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()
 
   const visibleLivePositions = useMemo(() => {
     if (!livePositions || !chainId)
       return livePositions ?? []
-    void blacklistVersion
     return livePositions.filter(position => !isMarketIdBlacklisted(position.market.uniqueKey, chainId))
-  }, [blacklistVersion, chainId, livePositions])
+  }, [chainId, isMarketIdBlacklisted, livePositions])
 
   const loanAssetOptions = useMemo<LoanAssetOption[]>(() => {
     const map = new Map<string, LoanAssetOption>()

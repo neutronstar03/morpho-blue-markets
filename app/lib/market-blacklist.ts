@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import blacklistAssets from './blacklist.assets.json'
 import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue, isOracleLocallyExcluded, subscribeLocalMarketExclusions } from './local-market-exclusions'
 import { isMarketSystemUnhealthy, subscribeUnhealthyMarkets } from './unhealthy-markets'
@@ -281,6 +281,14 @@ export function useMarketBlacklistVersion() {
     () => getMarketBlacklistVersion(),
     () => 0,
   )
+}
+
+export function useMarketIdBlacklistPredicate() {
+  const version = useMarketBlacklistVersion()
+  return useMemo(() => {
+    void version
+    return (uniqueKey?: string | null, chainId?: number) => isMarketIdBlacklisted(uniqueKey, chainId)
+  }, [version])
 }
 
 export function useMarketBlacklistPreload() {

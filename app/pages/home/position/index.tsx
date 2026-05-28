@@ -1,12 +1,12 @@
 import type { Portfolio } from './position-types'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
+import type { MarketRiskInput } from '~/lib/market-risk/types'
 import { Wallet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { trackEvent } from '~/lib/analytics'
-import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
@@ -16,9 +16,8 @@ import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-position
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
-import { isMarketIdBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
-import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
-import { getMarketRiskStatus } from '~/lib/market-risk/market-risk'
+import { useMarketIdBlacklistPredicate } from '~/lib/market-blacklist'
+import { useMarketRiskStatusMap } from '~/lib/market-risk/hooks'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { PositionChainPills } from './position-chain-pills'
 import { PositionGroups } from './position-groups'
@@ -50,29 +49,22 @@ function PositionClient() {
   const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
   const { aprByMarketKey } = useLiveMarketApr(markets)
 
-  const decisionsVersion = useCollateralDecisionsVersion()
-  const whitelistVersion = useCollateralWhitelistVersion()
-  const blacklistVersion = useMarketBlacklistVersion()
-  const riskStatusByKey = useMemo(() => {
-    void decisionsVersion
-    void whitelistVersion
-    void blacklistVersion
-    const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
+  const riskMarkets = useMemo<MarketRiskInput[]>(() => {
     if (!chainId)
-      return out
-    for (const p of (positions ?? [])) {
-      const key = `${chainId}:${p.market.uniqueKey.toLowerCase()}`
-      out[key] = getMarketRiskStatus({
-        chainId,
-        uniqueKey: p.market.uniqueKey,
-        loanAsset: p.market.loanAsset,
-        collateralAsset: p.market.collateralAsset,
-        warnings: p.market.warnings,
-        oracleAddress: p.market.oracleAddress,
-      })
-    }
-    return out
-  }, [blacklistVersion, chainId, decisionsVersion, positions, whitelistVersion])
+      return []
+    return (positions ?? []).map(p => ({
+      chainId,
+      uniqueKey: p.market.uniqueKey,
+      loanAssetAddress: p.market.loanAsset?.address,
+      loanAssetSymbol: p.market.loanAsset?.symbol,
+      collateralAssetAddress: p.market.collateralAsset?.address,
+      collateralAssetSymbol: p.market.collateralAsset?.symbol,
+      warnings: p.market.warnings,
+      oracleAddress: p.market.oracleAddress,
+    }))
+  }, [chainId, positions])
+  const riskStatusByKey = useMarketRiskStatusMap(riskMarkets)
+  const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()
 
   const visiblePositions = useMemo(() => {
     if (!positions || !chainId)
@@ -85,7 +77,7 @@ function PositionClient() {
       const hasNonSupplyPosition = position.userState.borrowShares > 0n || position.userState.collateral > 0n
       return hasNonSupplyPosition || hasVisibleSupplyPosition(position)
     })
-  }, [blacklistVersion, chainId, positions])
+  }, [chainId, isMarketIdBlacklisted, positions])
 
   const [timeAgo, setTimeAgo] = useState('')
   const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'native' | 'yearly'>('total')

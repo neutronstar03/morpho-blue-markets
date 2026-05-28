@@ -3,12 +3,11 @@ import type { CrossChainUserPosition } from '~/lib/hooks/graphql/use-user-positi
 import { useMemo } from 'react'
 import { getSupportedChainName } from '~/lib/addresses'
 import { CHAIN_ICON_BY_ID } from '~/lib/chain-icons'
-import { isMarketIdBlacklisted, useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { useMarketIdBlacklistPredicate } from '~/lib/market-blacklist'
 
 export function usePositionChainPills(crossChainPositions: CrossChainUserPosition[] | undefined, currentChainId?: number) {
-  const blacklistVersion = useMarketBlacklistVersion()
+  const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()
   return useMemo<ChainPositionPillItem[]>(() => {
-    void blacklistVersion
     const counts = new Map<number, number>()
 
     for (const position of (crossChainPositions ?? [])) {
@@ -30,5 +29,5 @@ export function usePositionChainPills(crossChainPositions: CrossChainUserPositio
           return a.label.localeCompare(b.label)
         return b.count - a.count
       })
-  }, [blacklistVersion, crossChainPositions, currentChainId])
+  }, [crossChainPositions, currentChainId, isMarketIdBlacklisted])
 }
