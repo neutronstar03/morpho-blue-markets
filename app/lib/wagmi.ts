@@ -96,3 +96,5 @@ export const config = getDefaultConfig({
     ], { rank: false, retryCount: 2 }),
   },
 })
+
+export const configuredWagmiChainIds: ReadonlySet<number> = new Set(config.chains.map(chain => chain.id))
