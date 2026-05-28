@@ -1,5 +1,5 @@
 import type { PositionGroup } from './position-types'
-import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
+import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 import { useMemo } from 'react'
 import { getPositionPrincipalUsd, getPositionSuppliedAssets, getPositionYearlyUsd } from './position-utils'
 

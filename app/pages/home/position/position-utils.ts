@@ -1,4 +1,4 @@
-import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
+import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
 import { getSuppliedAssetsFromShares, hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 

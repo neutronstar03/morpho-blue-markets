@@ -1,7 +1,7 @@
 import type { Portfolio, PositionGroup } from './position-types'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
-import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
 import type { MarketRiskInput } from '~/lib/market-risk/types'
+import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 import { ChevronDown } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { getSupportedChainName } from '~/lib/addresses'
