@@ -176,6 +176,7 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
     allowFailure: true,
     query: {
       enabled: !!graphPositions && graphPositions.length > 0 && !!userAddress && !!morphoAddress,
+      refetchInterval: 20_000,
     },
   })
 
