@@ -9,14 +9,11 @@ import {
   clearCollateralLocallyExcluded,
   clearMarketLocallyMarkedLostValue,
   clearOracleLocallyExcluded,
-  isCollateralLocallyExcluded,
-  isMarketLocallyMarkedLostValue,
-  isOracleLocallyExcluded,
   setCollateralLocallyExcluded,
   setMarketLocallyMarkedLostValue,
   setOracleLocallyExcluded,
+  useLocalMarketExclusionStatus,
 } from '~/lib/local-market-exclusions'
-import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { getOracleProvider } from '~/lib/oracle-providers'
 
 interface LocalCollateralBlacklistControlProps {
@@ -28,7 +25,6 @@ export function LocalCollateralBlacklistControl({ market, isOpen }: LocalCollate
   const { address: connectedAddress } = useAccount()
   const { viewingAddress } = useViewingWallet()
   const address = viewingAddress ?? connectedAddress
-  const blacklistVersion = useMarketBlacklistVersion()
 
   const chainId = market.morphoBlue.chain.id
   const marketUniqueKey = market.uniqueKey
@@ -37,21 +33,16 @@ export function LocalCollateralBlacklistControl({ market, isOpen }: LocalCollate
   const collateralName = market.collateralAsset.name
   const oracleAddress = market.oracleAddress
   const { data: position, isLoading: isLoadingPosition } = useUserPosition(marketUniqueKey, address)
-
-  const isCollateralBlacklisted = useMemo(() => {
-    void blacklistVersion
-    return isCollateralLocallyExcluded(chainId, collateralAddress)
-  }, [blacklistVersion, chainId, collateralAddress])
-
-  const isOracleBlacklisted = useMemo(() => {
-    void blacklistVersion
-    return isOracleLocallyExcluded(chainId, oracleAddress)
-  }, [blacklistVersion, chainId, oracleAddress])
-
-  const isWrittenOff = useMemo(() => {
-    void blacklistVersion
-    return isMarketLocallyMarkedLostValue(chainId, marketUniqueKey)
-  }, [blacklistVersion, chainId, marketUniqueKey])
+  const {
+    isCollateralExcluded: isCollateralBlacklisted,
+    isOracleExcluded: isOracleBlacklisted,
+    isMarketMarkedLostValue: isWrittenOff,
+  } = useLocalMarketExclusionStatus({
+    chainId,
+    collateralAddress,
+    oracleAddress,
+    marketUniqueKey,
+  })
 
   const hasOpenPosition = useMemo(() => {
     if (!position)

@@ -1,4 +1,6 @@
 // Stores user-managed local collateral, oracle, and market exclusions in localStorage.
+import { useMemo, useSyncExternalStore } from 'react'
+
 export interface LocalCollateralExclusionEntry {
   ts: number
   symbol?: string
@@ -368,6 +370,31 @@ export function subscribeLocalMarketExclusions(listener: () => void) {
     window.removeEventListener(CHANGE_EVENT, onEvent)
     window.removeEventListener('storage', onStorage)
   }
+}
+
+export function useLocalMarketExclusionsVersion() {
+  return useSyncExternalStore(
+    subscribeLocalMarketExclusions,
+    () => getLocalMarketExclusionsVersion(),
+    () => 0,
+  )
+}
+
+export function useLocalMarketExclusionStatus(args: {
+  chainId?: number
+  collateralAddress?: string | null
+  oracleAddress?: string | null
+  marketUniqueKey?: string | null
+}) {
+  const version = useLocalMarketExclusionsVersion()
+  return useMemo(() => {
+    void version
+    return {
+      isCollateralExcluded: isCollateralLocallyExcluded(args.chainId, args.collateralAddress),
+      isOracleExcluded: isOracleLocallyExcluded(args.chainId, args.oracleAddress),
+      isMarketMarkedLostValue: isMarketLocallyMarkedLostValue(args.chainId, args.marketUniqueKey),
+    }
+  }, [args.chainId, args.collateralAddress, args.marketUniqueKey, args.oracleAddress, version])
 }
 
 function createListExcluded<E, R extends { chainId: number, ts: number }>(

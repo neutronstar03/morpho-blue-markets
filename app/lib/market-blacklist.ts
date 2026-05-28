@@ -8,6 +8,16 @@ interface BlacklistMarketEntry {
   uniqueKey: string
 }
 
+interface MarketBlacklistArgs {
+  uniqueKey?: string | null
+  loanAssetAddress?: string | null
+  collateralAssetAddress?: string | null
+  loanAssetSymbol?: string | null
+  collateralAssetSymbol?: string | null
+  oracleAddress?: string | null
+  chainId?: number
+}
+
 interface ManualBlacklistMarketEntry extends BlacklistMarketEntry {
   comment?: string
 }
@@ -291,6 +301,17 @@ export function useMarketIdBlacklistPredicate() {
   }, [version])
 }
 
+export function useFilteredBlacklistedMarkets<T>(
+  markets: T[] | undefined,
+  getArgs: (market: T) => MarketBlacklistArgs,
+) {
+  const version = useMarketBlacklistVersion()
+  return useMemo(() => {
+    void version
+    return filterBlacklistedMarkets(markets ?? [], getArgs)
+  }, [getArgs, markets, version])
+}
+
 export function useMarketBlacklistPreload() {
   useEffect(() => {
     ensureMarketBlacklistLoaded()
@@ -419,15 +440,7 @@ export function isMarketIdManuallyBlacklisted(uniqueKey?: string | null, chainId
   return hasValueInChainMap(blacklistState.manualMarketIdsByChain, uniqueKey, chainId)
 }
 
-export function isMarketBlacklisted(args: {
-  uniqueKey?: string | null
-  loanAssetAddress?: string | null
-  collateralAssetAddress?: string | null
-  loanAssetSymbol?: string | null
-  collateralAssetSymbol?: string | null
-  oracleAddress?: string | null
-  chainId?: number
-}) {
+export function isMarketBlacklisted(args: MarketBlacklistArgs) {
   return (
     isMarketIdBlacklisted(args.uniqueKey, args.chainId)
     || isOracleLocallyExcluded(args.chainId, args.oracleAddress)
@@ -443,15 +456,7 @@ export function isMarketBlacklisted(args: {
 
 export function filterBlacklistedMarkets<T>(
   markets: T[],
-  getArgs: (market: T) => {
-    uniqueKey?: string | null
-    loanAssetAddress?: string | null
-    collateralAssetAddress?: string | null
-    loanAssetSymbol?: string | null
-    collateralAssetSymbol?: string | null
-    oracleAddress?: string | null
-    chainId?: number
-  },
+  getArgs: (market: T) => MarketBlacklistArgs,
 ) {
   return markets.filter(market => !isMarketBlacklisted(getArgs(market)))
 }

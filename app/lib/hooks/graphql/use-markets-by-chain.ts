@@ -1,9 +1,9 @@
 import type { QueryMarketsByChainResult, SupplyMarketData } from '~/lib/graphql/queries/markets-by-chain'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { MarketOrderBy, OrderDirection, QUERY_MARKETS_BY_CHAIN } from '~/lib/graphql/queries/markets-by-chain'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
-import { filterBlacklistedMarkets, useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { useFilteredBlacklistedMarkets } from '~/lib/market-blacklist'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
 
@@ -22,7 +22,6 @@ export interface UseMarketsByChainOptions {
 }
 
 export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, opts: UseMarketsByChainOptions = {}) {
-  const blacklistVersion = useMarketBlacklistVersion()
   const loanAssetAddrLower = loanAssetAddress?.toLowerCase()
   const {
     minNetSupplyApy,
@@ -80,27 +79,29 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
 
   // Defensive: during chain/asset switching, React Query can briefly surface previous data.
   // Filter by the requested loanAssetAddress so we never render mismatched markets.
+  const getMarketBlacklistArgs = useCallback((market: SupplyMarketData) => ({
+    uniqueKey: market.uniqueKey,
+    loanAssetAddress: market.loanAsset?.address,
+    collateralAssetAddress: market.collateralAsset?.address,
+    loanAssetSymbol: market.loanAsset?.symbol,
+    collateralAssetSymbol: market.collateralAsset?.symbol,
+    oracleAddress: market.oracleAddress,
+    chainId,
+  }), [chainId])
+  const locallyVisibleMarkets = useFilteredBlacklistedMarkets(query.data, getMarketBlacklistArgs)
+
   const filteredData = useMemo(() => {
-    void blacklistVersion
     const data = query.data
     if (!data)
       return data
 
-    let out = filterBlacklistedMarkets(data, market => ({
-      uniqueKey: market.uniqueKey,
-      loanAssetAddress: market.loanAsset?.address,
-      collateralAssetAddress: market.collateralAsset?.address,
-      loanAssetSymbol: market.loanAsset?.symbol,
-      collateralAssetSymbol: market.collateralAsset?.symbol,
-      oracleAddress: market.oracleAddress,
-      chainId,
-    })).filter(m => !isOracleMisconfiguredWarning(m.warnings))
+    let out = locallyVisibleMarkets.filter(m => !isOracleMisconfiguredWarning(m.warnings))
 
     if (loanAssetAddrLower)
       out = out.filter(m => (m.loanAsset?.address || '').toLowerCase() === loanAssetAddrLower)
 
     return out
-  }, [blacklistVersion, chainId, loanAssetAddrLower, query.data])
+  }, [loanAssetAddrLower, locallyVisibleMarkets, query.data])
 
   return {
     ...query,

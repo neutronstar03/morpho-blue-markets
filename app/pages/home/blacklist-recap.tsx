@@ -13,8 +13,8 @@ import {
   listLocallyExcludedCollaterals,
   listLocallyExcludedOracles,
   listMarketsLocallyMarkedLostValue,
+  useLocalMarketExclusionsVersion,
 } from '~/lib/local-market-exclusions'
-import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import {
   clearCollateralDecision,
   listCollateralDecisions,
@@ -168,14 +168,14 @@ function RowAddress({ row, displayId, explorerUrl }: { row: BlacklistRecapRow, d
 }
 
 export function BlacklistRecap({ onClose }: { onClose: () => void }) {
-  const blacklistVersion = useMarketBlacklistVersion()
+  const localExclusionsVersion = useLocalMarketExclusionsVersion()
   const decisionsVersion = useCollateralDecisionsVersion()
 
   const rows = useMemo(() => {
-    void blacklistVersion
+    void localExclusionsVersion
     void decisionsVersion
     return buildBlacklistRecapRows()
-  }, [blacklistVersion, decisionsVersion])
+  }, [decisionsVersion, localExclusionsVersion])
 
   const onRemove = (row: BlacklistRecapRow) => {
     if (row.kind === 'local_blacklist') {

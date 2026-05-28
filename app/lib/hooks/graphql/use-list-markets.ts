@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
-import { useMemo } from 'react'
-import { filterBlacklistedMarkets, useMarketBlacklistVersion } from '~/lib/market-blacklist'
+import { useCallback, useMemo } from 'react'
+import { useFilteredBlacklistedMarkets } from '~/lib/market-blacklist'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
 
@@ -183,7 +183,6 @@ export function useMarkets({
   skip = 0,
   staleTime = 1 * 60 * 1000, // 1 minute
 }: UseMarketsProps) {
-  const blacklistVersion = useMarketBlacklistVersion()
   const query = useQuery<QueryMarketsResult>({
     queryKey: ['markets', where, orderBy, orderDirection, first, skip],
     queryFn: async () => {
@@ -198,28 +197,29 @@ export function useMarkets({
     staleTime,
   })
 
+  const getMarketBlacklistArgs = useCallback((market: MorphoMarket) => ({
+    uniqueKey: market.uniqueKey,
+    loanAssetAddress: market.loanAsset?.address,
+    collateralAssetAddress: market.collateralAsset?.address,
+    loanAssetSymbol: market.loanAsset?.symbol,
+    collateralAssetSymbol: market.collateralAsset?.symbol,
+    oracleAddress: market.oracleAddress,
+    chainId: market.morphoBlue?.chain?.id,
+  }), [])
+  const locallyVisibleMarkets = useFilteredBlacklistedMarkets(query.data?.markets.items, getMarketBlacklistArgs)
+
   const filteredData = useMemo<QueryMarketsResult | undefined>(() => {
-    void blacklistVersion
     const data = query.data
     if (!data)
       return data
 
-    const markets = data.markets.items || []
     return {
       ...data,
       markets: {
-        items: filterBlacklistedMarkets(markets, market => ({
-          uniqueKey: market.uniqueKey,
-          loanAssetAddress: market.loanAsset?.address,
-          collateralAssetAddress: market.collateralAsset?.address,
-          loanAssetSymbol: market.loanAsset?.symbol,
-          collateralAssetSymbol: market.collateralAsset?.symbol,
-          oracleAddress: market.oracleAddress,
-          chainId: market.morphoBlue?.chain?.id,
-        })).filter(market => !isOracleMisconfiguredWarning(market.warnings)),
+        items: locallyVisibleMarkets.filter(market => !isOracleMisconfiguredWarning(market.warnings)),
       },
     }
-  }, [blacklistVersion, query.data])
+  }, [locallyVisibleMarkets, query.data])
 
   return {
     ...query,
