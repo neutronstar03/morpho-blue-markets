@@ -31,7 +31,7 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
   } = opts
 
   const query = useQuery<SupplyMarketData[]>({
-    queryKey: ['markets-by-chain', chainId, loanAssetAddrLower, minNetSupplyApy, maxNetSupplyApy, minBorrowUsd, blacklistVersion],
+    queryKey: ['markets-by-chain', chainId, loanAssetAddrLower, minNetSupplyApy, maxNetSupplyApy, minBorrowUsd],
     queryFn: async () => {
       if (!chainId)
         return []
@@ -71,15 +71,7 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
         skip += first
       }
 
-      return filterBlacklistedMarkets(markets, market => ({
-        uniqueKey: market.uniqueKey,
-        loanAssetAddress: market.loanAsset?.address,
-        collateralAssetAddress: market.collateralAsset?.address,
-        loanAssetSymbol: market.loanAsset?.symbol,
-        collateralAssetSymbol: market.collateralAsset?.symbol,
-        oracleAddress: market.oracleAddress,
-        chainId,
-      })).filter(m => !isOracleMisconfiguredWarning(m.warnings))
+      return markets
     },
     enabled: !!chainId,
     staleTime: STALE_TIME_LONG_MS,
@@ -89,17 +81,26 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
   // Defensive: during chain/asset switching, React Query can briefly surface previous data.
   // Filter by the requested loanAssetAddress so we never render mismatched markets.
   const filteredData = useMemo(() => {
+    void blacklistVersion
     const data = query.data
     if (!data)
       return data
 
-    let out = data
+    let out = filterBlacklistedMarkets(data, market => ({
+      uniqueKey: market.uniqueKey,
+      loanAssetAddress: market.loanAsset?.address,
+      collateralAssetAddress: market.collateralAsset?.address,
+      loanAssetSymbol: market.loanAsset?.symbol,
+      collateralAssetSymbol: market.collateralAsset?.symbol,
+      oracleAddress: market.oracleAddress,
+      chainId,
+    })).filter(m => !isOracleMisconfiguredWarning(m.warnings))
 
     if (loanAssetAddrLower)
       out = out.filter(m => (m.loanAsset?.address || '').toLowerCase() === loanAssetAddrLower)
 
     return out
-  }, [chainId, loanAssetAddrLower, query.data])
+  }, [blacklistVersion, chainId, loanAssetAddrLower, query.data])
 
   return {
     ...query,

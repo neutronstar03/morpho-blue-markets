@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
+import { useMemo } from 'react'
 import { filterBlacklistedMarkets, useMarketBlacklistVersion } from '~/lib/market-blacklist'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
@@ -183,32 +184,45 @@ export function useMarkets({
   staleTime = 1 * 60 * 1000, // 1 minute
 }: UseMarketsProps) {
   const blacklistVersion = useMarketBlacklistVersion()
-  return useQuery<QueryMarketsResult>({
-    queryKey: ['markets', where, orderBy, orderDirection, first, skip, blacklistVersion],
+  const query = useQuery<QueryMarketsResult>({
+    queryKey: ['markets', where, orderBy, orderDirection, first, skip],
     queryFn: async () => {
-      const result = await graphqlClient.request<QueryMarketsResult>(QUERY_LIST_MARKETS, {
+      return await graphqlClient.request<QueryMarketsResult>(QUERY_LIST_MARKETS, {
         where,
         orderBy,
         orderDirection,
         first,
         skip,
       })
-      const markets = result.markets.items || []
-      return {
-        ...result,
-        markets: {
-          items: filterBlacklistedMarkets(markets, market => ({
-            uniqueKey: market.uniqueKey,
-            loanAssetAddress: market.loanAsset?.address,
-            collateralAssetAddress: market.collateralAsset?.address,
-            loanAssetSymbol: market.loanAsset?.symbol,
-            collateralAssetSymbol: market.collateralAsset?.symbol,
-            oracleAddress: market.oracleAddress,
-            chainId: market.morphoBlue?.chain?.id,
-          })).filter(market => !isOracleMisconfiguredWarning(market.warnings)),
-        },
-      }
     },
     staleTime,
   })
+
+  const filteredData = useMemo<QueryMarketsResult | undefined>(() => {
+    void blacklistVersion
+    const data = query.data
+    if (!data)
+      return data
+
+    const markets = data.markets.items || []
+    return {
+      ...data,
+      markets: {
+        items: filterBlacklistedMarkets(markets, market => ({
+          uniqueKey: market.uniqueKey,
+          loanAssetAddress: market.loanAsset?.address,
+          collateralAssetAddress: market.collateralAsset?.address,
+          loanAssetSymbol: market.loanAsset?.symbol,
+          collateralAssetSymbol: market.collateralAsset?.symbol,
+          oracleAddress: market.oracleAddress,
+          chainId: market.morphoBlue?.chain?.id,
+        })).filter(market => !isOracleMisconfiguredWarning(market.warnings)),
+      },
+    }
+  }, [blacklistVersion, query.data])
+
+  return {
+    ...query,
+    data: filteredData,
+  }
 }

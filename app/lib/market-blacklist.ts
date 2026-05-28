@@ -273,6 +273,8 @@ export function subscribeMarketBlacklist(listener: () => void) {
   }
 }
 
+// React subscription token for module-level blacklist state. Use this to
+// recompute local derived values, not as part of remote query keys.
 export function useMarketBlacklistVersion() {
   return useSyncExternalStore(
     subscribeMarketBlacklist,
