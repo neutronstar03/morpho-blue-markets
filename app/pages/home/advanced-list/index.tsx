@@ -1,12 +1,12 @@
 import type { MarketChainFilter, MarketData, MarketSide } from './shared'
 import type { MorphoMarket, MarketFilters as TypeMarketFilters } from '~/lib/hooks/graphql/use-list-markets'
 import type { LiveAprMarketInput } from '~/lib/hooks/rpc/use-live-market-apr'
+import type { MarketRiskInput } from '~/lib/market-risk/types'
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { getSupportedChainName, supportedChainIdMap } from '~/lib/addresses'
-import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
 import {
   MarketOrderBy,
@@ -16,9 +16,7 @@ import {
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
-import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
-import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
-import { getMarketRisk } from '~/lib/market-risk/market-risk'
+import { useMarketRiskStatusMap } from '~/lib/market-risk/hooks'
 import { OpportunityRecap } from '~/pages/home/opportunity-recap'
 import { MarketFilters } from './market-filters'
 import { MarketTable } from './market-table'
@@ -152,30 +150,19 @@ export function AdvancedList() {
     }))
   }, [displayRateType, marketsData])
 
-  const decisionsVersion = useCollateralDecisionsVersion()
-  const whitelistVersion = useCollateralWhitelistVersion()
-  const blacklistVersion = useMarketBlacklistVersion()
-
-  const riskStatusByKey = useMemo(() => {
-    void decisionsVersion
-    void whitelistVersion
-    void blacklistVersion
-    const out: Record<string, 'white' | 'blue' | 'yellow' | 'purple' | 'black' | undefined> = {}
-    for (const m of markets) {
-      const key = `${m.chainId}:${m.id.toLowerCase()}`
-      out[key] = getMarketRisk({
-        chainId: m.chainId,
-        uniqueKey: m.id,
-        loanAssetAddress: m.loanAddress,
-        collateralAssetAddress: m.collateralAddress,
-        loanAssetSymbol: m.marketLabel.split('/')[1]?.trim(),
-        collateralAssetSymbol: m.marketLabel.split('/')[0]?.trim(),
-        warnings: m.warnings,
-        oracleAddress: m.oracleAddress,
-      }).status
-    }
-    return out
-  }, [blacklistVersion, decisionsVersion, markets, whitelistVersion])
+  const riskMarkets = useMemo<MarketRiskInput[]>(() => {
+    return markets.map(m => ({
+      chainId: m.chainId,
+      uniqueKey: m.id,
+      loanAssetAddress: m.loanAddress,
+      collateralAssetAddress: m.collateralAddress,
+      loanAssetSymbol: m.marketLabel.split('/')[1]?.trim(),
+      collateralAssetSymbol: m.marketLabel.split('/')[0]?.trim(),
+      warnings: m.warnings,
+      oracleAddress: m.oracleAddress,
+    }))
+  }, [markets])
+  const riskStatusByKey = useMarketRiskStatusMap(riskMarkets)
 
   const visibleMarkets = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
