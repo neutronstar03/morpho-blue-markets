@@ -34,10 +34,14 @@ export function SupplyAprOptimizer() {
     selectedOption,
     symbol,
     walletBalanceRaw,
+    optimizerChainId,
+    optimizerChainName,
+    optimizerChainOptions,
     maxMarketsInput,
     setMaxMarketsInput,
     strategyInput,
     onChangeStrategy,
+    onChangeOptimizerChain,
     onChangeLoanAsset,
     onChangeMarketApr,
     onFillMaxDeposit,
@@ -75,7 +79,7 @@ export function SupplyAprOptimizer() {
             onClick={ctx.run.isRunning
               ? onCancelOptimize
               : () => {
-                  trackEvent('optimizer_results_cleared', { loanAsset: selectedOption?.symbol, chainId: chain?.id })
+                  trackEvent('optimizer_results_cleared', { loanAsset: selectedOption?.symbol, chainId: optimizerChainId ?? chain?.id })
                   ctx.clear()
                 }}
             className={cn(
@@ -85,7 +89,7 @@ export function SupplyAprOptimizer() {
             title={ctx.run.isRunning ? 'Cancel' : 'Clear'}
           >
             <X className="h-3.5 w-3.5" />
-            {ctx.run.isRunning ? 'Cancel' : 'Clear'}
+            <span className="hidden sm:inline">{ctx.run.isRunning ? 'Cancel' : 'Clear'}</span>
           </Button>
         )}
       />
@@ -121,6 +125,10 @@ export function SupplyAprOptimizer() {
                   onFillMaxDeposit={onFillMaxDeposit}
                   onFillZeroDeposit={onFillZeroDeposit}
                   walletBalanceRaw={walletBalanceRaw}
+                  optimizerChainId={optimizerChainId}
+                  optimizerChainName={optimizerChainName}
+                  optimizerChainOptions={optimizerChainOptions}
+                  onChangeOptimizerChain={onChangeOptimizerChain}
                   symbol={symbol}
                   maxMarketsInput={maxMarketsInput ?? ''}
                   setMaxMarketsInput={setMaxMarketsInput}

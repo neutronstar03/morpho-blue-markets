@@ -1,4 +1,4 @@
-import type { LoanAssetOption } from './shared'
+import type { LoanAssetOption, OptimizerChainOption } from './shared'
 import type { OptimizerStrategy } from '~/lib/optimizer/supply-optimizer-runner'
 import { Button } from '~/components/ui/button'
 import { InfoTooltip } from '~/components/ui/info-tooltip'
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { StepperInput } from '~/components/ui/stepper-input'
+import { CHAIN_ICON_BY_ID } from '~/lib/chain-icons'
 import { fmtToken } from '~/lib/optimizer/supply-optimizer-ui-utils'
 
 interface SupplyAprOptimizerFormProps {
@@ -32,6 +33,10 @@ interface SupplyAprOptimizerFormProps {
   onFillMaxDeposit: () => void
   onFillZeroDeposit: () => void
   walletBalanceRaw?: bigint
+  optimizerChainId?: number
+  optimizerChainName?: string
+  optimizerChainOptions: OptimizerChainOption[]
+  onChangeOptimizerChain: (chainId: number) => void
   symbol: string
   maxMarketsInput: string
   setMaxMarketsInput: (value: string) => void
@@ -60,6 +65,10 @@ export function SupplyAprOptimizerForm({
   onFillMaxDeposit,
   onFillZeroDeposit,
   walletBalanceRaw,
+  optimizerChainId,
+  optimizerChainName,
+  optimizerChainOptions,
+  onChangeOptimizerChain,
   symbol,
   maxMarketsInput,
   setMaxMarketsInput,
@@ -73,6 +82,7 @@ export function SupplyAprOptimizerForm({
 }: SupplyAprOptimizerFormProps) {
   const unownedPopularOptions = popularLoanAssetOptions
     .filter(o => !ownedLoanAssetOptions.some(x => x.address.toLowerCase() === o.address.toLowerCase()))
+  const OptimizerChainIcon = optimizerChainId ? CHAIN_ICON_BY_ID[optimizerChainId] : undefined
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-2 md:gap-4 items-start" data-testid="supply-apr-optimizer-form">
@@ -80,41 +90,70 @@ export function SupplyAprOptimizerForm({
         <div className="h-5 flex items-center">
           <Label>Asset to optimize</Label>
         </div>
-        <Select
-          value={selectedOption?.address ?? selectedLoanAssetAddress ?? undefined}
-          onValueChange={onChangeLoanAsset}
-        >
-          <SelectTrigger className="w-full h-10 bg-gray-900 border-gray-700 text-white text-sm data-[placeholder]:text-gray-500">
-            <SelectValue placeholder="Select an asset" />
-          </SelectTrigger>
-          <SelectContent>
-            {ownedLoanAssetOptions.length > 0 && (
+        <div className="flex gap-2">
+          <Select value={optimizerChainId != null ? String(optimizerChainId) : ''} onValueChange={value => onChangeOptimizerChain(Number(value))}>
+            <SelectTrigger
+              className="h-10 w-14 shrink-0 border-gray-700 bg-gray-900 px-2 text-white"
+              title={optimizerChainName ? `Optimizer network: ${optimizerChainName}` : 'Optimizer network'}
+              aria-label={optimizerChainName ? `Optimizer network ${optimizerChainName}` : 'Optimizer network'}
+            >
+              {OptimizerChainIcon
+                ? <OptimizerChainIcon size={18} variant="branded" className="h-[18px] w-[18px]" />
+                : <span className="text-xs font-semibold">{optimizerChainName?.slice(0, 1) ?? '?'}</span>}
+            </SelectTrigger>
+            <SelectContent align="start">
               <SelectGroup>
-                <SelectLabel>Owned assets</SelectLabel>
-                {ownedLoanAssetOptions.map(o => (
-                  <SelectItem key={o.address} value={o.address}>
-                    {o.symbol}
-                  </SelectItem>
-                ))}
+                <SelectLabel>Network</SelectLabel>
+                {optimizerChainOptions.map((option) => {
+                  const Icon = CHAIN_ICON_BY_ID[option.chainId]
+                  return (
+                    <SelectItem key={option.chainId} value={String(option.chainId)}>
+                      {Icon
+                        ? <Icon size={16} variant="branded" className="h-4 w-4" />
+                        : <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[10px] text-white">{option.name.slice(0, 1)}</span>}
+                      <span>{option.name}</span>
+                    </SelectItem>
+                  )
+                })}
               </SelectGroup>
-            )}
-            {unownedPopularOptions.length > 0 && (
-              <SelectGroup>
-                <SelectLabel>Popular assets</SelectLabel>
-                {unownedPopularOptions.map(o => (
-                  <SelectItem key={o.address} value={o.address}>
-                    {o.symbol}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            )}
-            {ownedLoanAssetOptions.length === 0 && popularLoanAssetOptions.length === 0 && loanAssetOptions.map(o => (
-              <SelectItem key={o.address} value={o.address}>
-                {o.symbol}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            </SelectContent>
+          </Select>
+          <Select
+            value={selectedOption?.address ?? selectedLoanAssetAddress ?? ''}
+            onValueChange={onChangeLoanAsset}
+          >
+            <SelectTrigger className="h-10 min-w-0 flex-1 bg-gray-900 border-gray-700 text-white text-sm data-[placeholder]:text-gray-500">
+              <SelectValue placeholder="Select an asset" />
+            </SelectTrigger>
+            <SelectContent>
+              {ownedLoanAssetOptions.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>Owned assets</SelectLabel>
+                  {ownedLoanAssetOptions.map(o => (
+                    <SelectItem key={o.address} value={o.address}>
+                      {o.symbol}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+              {unownedPopularOptions.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>Popular assets</SelectLabel>
+                  {unownedPopularOptions.map(o => (
+                    <SelectItem key={o.address} value={o.address}>
+                      {o.symbol}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+              {ownedLoanAssetOptions.length === 0 && popularLoanAssetOptions.length === 0 && loanAssetOptions.map(o => (
+                <SelectItem key={o.address} value={o.address}>
+                  {o.symbol}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="text-xs text-gray-500 min-h-0 md:h-4">
           {selectedOption && (
             <>

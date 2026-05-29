@@ -1,4 +1,4 @@
-import type { AutoStepInfo, LoanAssetOption, OptimizerMarketMeta } from './shared'
+import type { AutoStepInfo, LoanAssetOption, OptimizerChainOption, OptimizerMarketMeta } from './shared'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import type { SupplyOptimizerDebugRequest } from '~/lib/optimizer/supply-apr-optimizer-debugger'
 import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
@@ -37,6 +37,7 @@ import { buildMoveSizeCacheKey, trimTrailingZerosDecimalString } from '~/lib/opt
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
+import { configuredWagmiChainIds } from '~/lib/wagmi'
 
 // Orchestrates the supply optimizer end-to-end: asset selection, live/onchain reads, worker runs, cached auto-step heuristics, result shaping, and preset/debug wiring.
 
@@ -72,6 +73,11 @@ export function useSupplyAprOptimizerController() {
   const consumeFreshPrecomputedResult = useHomeMagicOptimizerStore(state => state.consumeFreshPrecomputedResult)
   const effectiveUserAddress = viewingAddress ?? userAddress
   const effectiveChainId = optimizerPreset?.chainId ?? ctx.selection.chainId ?? chain?.id ?? walletChainId
+  const optimizerChainOptions = useMemo<OptimizerChainOption[]>(() => {
+    return [...configuredWagmiChainIds]
+      .map(chainId => ({ chainId, name: getSupportedChainName(chainId) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [])
   const newDepositAmount = ctx.inputs.newDepositAmount
   const setDerived = ctx.setDerived
   const setNewDepositAmount = ctx.setNewDepositAmount
@@ -341,6 +347,8 @@ export function useSupplyAprOptimizerController() {
     lastNonNullChainIdRef.current = currentChainId
     if (previousNonNull == null || previousNonNull === currentChainId)
       return
+    if (ctx.selection.chainId === currentChainId)
+      return
     // The worker, derived positions, and cached move heuristics are chain-specific, so reset everything before the next run starts on the new chain.
     stopOptimizerWorker()
     ctx.clear()
@@ -500,6 +508,18 @@ export function useSupplyAprOptimizerController() {
     ctx.setMarketApr(resolveMarketAprByAssetSymbol(opt?.symbol, marketAprBySymbol))
     ctx.setNewDepositAmount(undefined)
   }, [ctx, effectiveChainId, loanAssetOptions, marketAprBySymbol])
+
+  const onChangeOptimizerChain = useCallback((nextChainId: number) => {
+    stopOptimizerWorker()
+    setOptimizeRequest(null)
+    setAutoStepInfo(null)
+    setRunProgressLabel(null)
+    setRunProgressPercent(null)
+    heuristicCacheRef.current.clear()
+    ctx.clear()
+    ctx.setSelection({ chainId: nextChainId })
+    ctx.setMarketApr(DEFAULT_MARKET_APR)
+  }, [ctx, stopOptimizerWorker])
 
   const onChangeMarketApr = useCallback((value: string) => {
     ctx.setMarketApr(value)
@@ -827,10 +847,14 @@ export function useSupplyAprOptimizerController() {
     selectedOption,
     symbol,
     walletBalanceRaw,
+    optimizerChainId: effectiveChainId,
+    optimizerChainName: effectiveChainId ? getSupportedChainName(effectiveChainId) : undefined,
+    optimizerChainOptions,
     maxMarketsInput,
     setMaxMarketsInput,
     strategyInput,
     onChangeStrategy,
+    onChangeOptimizerChain,
     onChangeLoanAsset,
     onChangeMarketApr,
     onFillMaxDeposit,

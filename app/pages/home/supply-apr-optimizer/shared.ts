@@ -5,6 +5,11 @@ export interface LoanAssetOption {
   priceUsd?: number | null
 }
 
+export interface OptimizerChainOption {
+  chainId: number
+  name: string
+}
+
 export interface AutoStepInfo {
   stepAssets: bigint
   stepRatioWad: bigint
