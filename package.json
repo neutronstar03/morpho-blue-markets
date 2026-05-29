@@ -15,10 +15,10 @@
   },
   "scripts": {
     "build": "react-router build",
-    "dev": "bun run --parallel dev:app dev:wrangler",
+    "dev": "react-router dev",
     "dev:app": "react-router dev --host 127.0.0.1 --port 5173 --strictPort",
     "dev:frontend": "react-router dev",
-    "dev:wrangler": "wrangler pages dev --proxy 5173 --compatibility-date=2025-04-13 --kv USER_BLACKLIST",
+    "dev:wrangler": "wrangler pages dev --proxy 5173 --compatibility-date=2025-04-13 --kv USER_BLACKLIST --show-interactive-dev-session=false",
     "start": "react-router-serve ./build/server/index.js",
     "lint": "eslint . --fix",
     "typecheck": "react-router typegen && tsc",

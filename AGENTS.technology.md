@@ -17,6 +17,7 @@
 - Production is deployed on Cloudflare Pages at `https://mbm.ns03.dev`.
 - Static build output is `build/client` (`wrangler.toml` sets `pages_build_output_dir = "./build/client"`).
 - Main build command is `bun run build` (`react-router build`).
+- Normal local dev is `bun run dev` (`react-router dev`) with Vite middleware shims for Pages Functions; this intentionally avoids `wrangler pages dev --proxy` because Wrangler can spin an idle Node child on Windows after rebuild/HMR.
 - Cloudflare Pages Functions live in `functions/` and must be copied into the deploy artifact before preview/deploy:
   - local preview: `bun run preview:cf`
   - deploy: `bun run deploy:cf`
