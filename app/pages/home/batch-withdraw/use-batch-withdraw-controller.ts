@@ -13,6 +13,7 @@ import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
 import { useMarketParamsById } from '~/lib/bundler3/use-market-params-by-id'
 import { useBatchWithdraw } from '~/lib/contexts/batch-withdraw.context'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
+import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
 import { useMarketIdBlacklistPredicate } from '~/lib/market-blacklist'
@@ -42,13 +43,35 @@ export function useBatchWithdrawController() {
   const [executeError, setExecuteError] = useState<string | undefined>(undefined)
   const [isRunningFlow, setIsRunningFlow] = useState(false)
   const { startFlow, runSwitchChainStep, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
+  const { data: crossChainPositions } = useUserPositionsAcrossChains(effectiveUserAddress)
 
-  const chainOptions = useMemo(() => {
+  const allChainOptions = useMemo(() => {
     return [...configuredWagmiChainIds]
       .filter(optionChainId => !!getBundler3Config(optionChainId))
       .map(optionChainId => ({ chainId: optionChainId, name: getSupportedChainName(optionChainId) }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [])
+
+  const indexedChainIds = useMemo(() => {
+    return new Set((crossChainPositions ?? []).map(position => position.chainId))
+  }, [crossChainPositions])
+
+  const chainOptions = useMemo(() => {
+    if (indexedChainIds.size === 0)
+      return allChainOptions
+    return allChainOptions.filter(option => indexedChainIds.has(option.chainId))
+  }, [allChainOptions, indexedChainIds])
+
+  useEffect(() => {
+    if (indexedChainIds.size === 0 || !chainId || chainOptions.some(option => option.chainId === chainId))
+      return
+    const firstOption = chainOptions[0]
+    if (!firstOption)
+      return
+    ctx.setSelection({ chainId: firstOption.chainId })
+    ctx.setWithdrawAmount(undefined)
+    setExecuteError(undefined)
+  }, [chainId, chainOptions, ctx, indexedChainIds])
 
   const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions({ address: effectiveUserAddress, chainId })
   const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()
