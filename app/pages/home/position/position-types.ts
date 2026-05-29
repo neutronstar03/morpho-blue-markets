@@ -1,5 +1,5 @@
 import type { ChainIconComponent } from '~/lib/chain-icons'
-import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
+import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 
 export interface Portfolio {
   dailyUsd: number | undefined

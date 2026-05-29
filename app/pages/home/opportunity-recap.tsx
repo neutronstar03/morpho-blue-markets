@@ -1,6 +1,6 @@
-import { NetworkIcon } from '@web3icons/react/dynamic'
 import { Link } from 'react-router-dom'
 import { useSwitchChain } from 'wagmi'
+import { CHAIN_ICON_BY_ID } from '~/lib/chain-icons'
 import { formatUsd } from '~/lib/formatters'
 
 const OPPORTUNITY_TARGET_UTILIZATION = 0.9
@@ -125,6 +125,13 @@ function buildOpportunityRecaps(markets: OpportunityRecapMarket[]): OpportunityR
   })
 }
 
+function RecapChainIcon({ chainId }: { chainId: number }) {
+  const ChainIcon = CHAIN_ICON_BY_ID[chainId]
+  return ChainIcon
+    ? <ChainIcon size={18} variant="branded" className="h-[18px] w-[18px]" />
+    : null
+}
+
 export function OpportunityRecap({ markets }: { markets: OpportunityRecapMarket[] }) {
   const { switchChain } = useSwitchChain()
   const recaps = buildOpportunityRecaps(markets)
@@ -168,7 +175,7 @@ export function OpportunityRecap({ markets }: { markets: OpportunityRecapMarket[
                     switchChain({ chainId: recap.chainId })
                   }}
                 >
-                  <NetworkIcon chainId={recap.chainId} size={18} variant="branded" className="h-[18px] w-[18px]" />
+                  <RecapChainIcon chainId={recap.chainId} />
                   <span>{recap.chainName}</span>
                 </button>
                 <p className="mt-1 text-sm text-gray-300">

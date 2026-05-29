@@ -2,16 +2,17 @@ import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits, parseUnits } from 'viem'
-import { useAccount } from 'wagmi'
+import { useAccount, useWriteContract } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { MarketAprPreview } from '~/components/ui/market-apr-preview'
+import { getSupportedChainName } from '~/lib/addresses'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatTokenAmountShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket, useUserPosition, useWithdraw } from '~/lib/hooks/rpc/use-morpho'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
-import { isConfirmationDelayedError, useChainedTransactionFlow } from '~/lib/transactions/use-chained-transaction-flow'
+import { isConfirmationDelayedError, useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
 import { ModeToggleSuffix } from './market-action-form/mode-toggle-suffix'
 import { InlineNotice } from './market-action-form/status-message'
 import { SubmitButton } from './market-action-form/submit-button'
@@ -32,11 +33,14 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
   const [percentage, setPercentage] = useState('')
   // asset amount string (token decimals)
   const [assetAmount, setAssetAmount] = useState('')
-  const { address: connectedAddress } = useAccount()
+  const { address: connectedAddress, chainId: walletChainId } = useAccount()
   const { viewingAddress, isViewingWallet } = useViewingWallet()
   const address = viewingAddress ?? connectedAddress
   const [isSubmittingFlow, setIsSubmittingFlow] = useState(false)
-  const { startFlow, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
+  const { startFlow, runSwitchChainStep, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
+  const { writeContractAsync } = useWriteContract()
+  const actionChainId = market.morphoBlue.chain.id
+  const needsNetworkSwitch = walletChainId !== actionChainId
 
   const appliedPrefillKeyRef = useRef<string | null>(null)
   useEffect(() => {
@@ -232,8 +236,20 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
     isPending: isWithdrawing,
     error: withdrawError,
     isSimulating: isSimulatingWithdraw,
-    withdrawAsync,
+    withdrawRequest,
   } = useWithdraw(market, sharesToWithdrawForTx)
+
+  const latestStateRef = useRef({
+    canWithdraw,
+    withdrawRequest,
+  })
+
+  useEffect(() => {
+    latestStateRef.current = {
+      canWithdraw,
+      withdrawRequest,
+    }
+  }, [canWithdraw, withdrawRequest])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -243,35 +259,54 @@ export function WithdrawForm({ market, loanTokenSymbol, prefill, onSuccess }: Wi
       return
 
     const marketLabel = `${market.collateralAsset.symbol} / ${loanTokenSymbol}`
+    const steps = [] as Array<{ key: string, label: string }>
+    if (needsNetworkSwitch)
+      steps.push({ key: 'switchNetwork', label: `Switch to ${getSupportedChainName(actionChainId)}` })
+    steps.push({ key: 'withdrawWallet', label: 'Confirm withdrawal in wallet' })
+    steps.push({ key: 'withdrawConfirm', label: 'Confirming withdrawal onchain' })
     const scope = startFlow({
       kind: 'withdraw',
       title: `Withdraw ${withdrawAssetsShort} ${loanTokenSymbol}`,
       summary: 'Preparing withdrawal',
-      steps: [
-        { key: 'withdrawWallet', label: 'Confirm withdrawal in wallet' },
-        { key: 'withdrawConfirm', label: 'Confirming withdrawal onchain' },
-      ],
+      chainId: actionChainId,
+      steps,
     })
 
     try {
-      if (!canWithdraw)
-        throw new Error('Withdrawal transaction is not ready yet')
       setIsSubmittingFlow(true)
+
+      if (needsNetworkSwitch) {
+        await runSwitchChainStep({
+          scope,
+          stepKey: 'switchNetwork',
+          chainId: actionChainId,
+          chainName: getSupportedChainName(actionChainId),
+        })
+      }
+
+      const withdrawRequest = await waitForTruthy(() => latestStateRef.current.withdrawRequest, {
+        errorMessage: 'Withdrawal transaction is not ready yet',
+      })
+
+      if (!latestStateRef.current.canWithdraw)
+        throw new Error('Withdrawal transaction is not ready yet')
 
       const txHash = await runTransactionStep({
         scope,
         walletStepKey: 'withdrawWallet',
         confirmStepKey: 'withdrawConfirm',
+        chainId: actionChainId,
         walletSummary: 'Waiting for withdrawal confirmation in wallet',
         confirmSummary: 'Confirming withdrawal onchain',
         fallbackError: 'Withdrawal failed',
-        run: withdrawAsync,
+        run: () => writeContractAsync(withdrawRequest as any),
       })
 
       finishFlow(scope, {
         title: `Withdrew ${withdrawAssetsShort} ${loanTokenSymbol}`,
         summary: `Withdrawal completed from ${marketLabel}.`,
         txHash,
+        chainId: actionChainId,
         facts: [
           { label: 'Market', value: marketLabel },
           { label: 'Amount', value: `${withdrawAssetsShort} ${loanTokenSymbol}` },

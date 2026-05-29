@@ -1,6 +1,5 @@
 import type { Address } from 'viem'
-import type { BatchWithdrawExecutionState, BatchWithdrawPlanState, LoanAssetOption, MarketPlanItem } from './shared'
-import type { SupplyOptimizerMarketSnapshot } from '~/lib/optimizer/supply-optimizer'
+import type { BatchWithdrawExecutionState, LoanAssetOption } from './shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits } from 'viem'
 import { useAccount, useChainId, useReadContract, useReadContracts, useSimulateContract, useWriteContract } from 'wagmi'
@@ -14,14 +13,14 @@ import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
 import { useMarketParamsById } from '~/lib/bundler3/use-market-params-by-id'
 import { useBatchWithdraw } from '~/lib/contexts/batch-withdraw.context'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
+import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
 import { useMarketIdBlacklistPredicate } from '~/lib/market-blacklist'
-import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
-import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
 import { isConfirmationDelayedError, useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
-import { max0, minBigint } from './shared'
+import { configuredWagmiChainIds } from '~/lib/wagmi'
+import { buildBatchWithdrawMarketItems, buildBatchWithdrawPlan } from './batch-withdraw-plan'
 
 // Builds a lowest-APR-first batch withdraw plan from live positions, then drives the guided Bundler3 execution flow when that plan is executable.
 
@@ -38,21 +37,41 @@ export function useBatchWithdrawController() {
   const walletChainId = useChainId()
   const { viewingAddress, isViewingWallet } = useViewingWallet()
   const effectiveUserAddress = viewingAddress ?? userAddress
-  const chainId = chain?.id ?? walletChainId
+  const chainId = ctx.selection.chainId ?? chain?.id ?? walletChainId
   const chainNameForLinks = chainId ? getSupportedChainName(chainId) : undefined
 
   const [executeError, setExecuteError] = useState<string | undefined>(undefined)
   const [isRunningFlow, setIsRunningFlow] = useState(false)
-  const { startFlow, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
+  const { startFlow, runSwitchChainStep, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
+  const { data: crossChainPositions } = useUserPositionsAcrossChains(effectiveUserAddress)
+
+  const allChainOptions = useMemo(() => {
+    return [...configuredWagmiChainIds]
+      .filter(optionChainId => !!getBundler3Config(optionChainId))
+      .map(optionChainId => ({ chainId: optionChainId, name: getSupportedChainName(optionChainId) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [])
+
+  const indexedChainIds = useMemo(() => {
+    return new Set((crossChainPositions ?? []).map(position => position.chainId))
+  }, [crossChainPositions])
+
+  const chainOptions = useMemo(() => {
+    if (indexedChainIds.size === 0)
+      return allChainOptions
+    return allChainOptions.filter(option => indexedChainIds.has(option.chainId))
+  }, [allChainOptions, indexedChainIds])
 
   useEffect(() => {
-    if (!chainId)
+    if (indexedChainIds.size === 0 || !chainId || chainOptions.some(option => option.chainId === chainId))
       return
-    const stored = ctx.selection.chainId
-    // A stored selection from another chain would point at the wrong markets and approvals, so drop the whole plan on chain switch.
-    if (stored != null && stored !== chainId)
-      ctx.clear()
-  }, [chainId, ctx])
+    const firstOption = chainOptions[0]
+    if (!firstOption)
+      return
+    ctx.setSelection({ chainId: firstOption.chainId })
+    ctx.setWithdrawAmount(undefined)
+    setExecuteError(undefined)
+  }, [chainId, chainOptions, ctx, indexedChainIds])
 
   const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions({ address: effectiveUserAddress, chainId })
   const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()
@@ -99,6 +118,12 @@ export function useBatchWithdrawController() {
     setExecuteError(undefined)
   }, [chainId, ctx])
 
+  const onChangeChain = useCallback((nextChainId: number) => {
+    ctx.setSelection({ chainId: nextChainId })
+    ctx.setWithdrawAmount(undefined)
+    setExecuteError(undefined)
+  }, [ctx])
+
   const selectedUserMarkets = useMemo(() => {
     if (!selectedOption)
       return []
@@ -117,11 +142,12 @@ export function useBatchWithdrawController() {
       return []
     return selectedUserMarkets.map(m => ({
       address: morphoAddress,
+      chainId,
       abi: SIMPLIFIED_MORPHO_BLUE_ABI,
       functionName: 'market' as const,
       args: [m.market.uniqueKey as `0x${string}`] as const,
     }))
-  }, [morphoAddress, selectedUserMarkets])
+  }, [chainId, morphoAddress, selectedUserMarkets])
 
   const marketStatesRead = useReadContracts({
     contracts: marketStateContracts as any,
@@ -137,11 +163,12 @@ export function useBatchWithdrawController() {
       return []
     return selectedUserMarkets.map(m => ({
       address: m.market.irmAddress as `0x${string}`,
+      chainId,
       abi: IRM_RATE_AT_TARGET_ABI,
       functionName: 'rateAtTarget' as const,
       args: [m.market.uniqueKey as `0x${string}`] as const,
     }))
-  }, [selectedUserMarkets])
+  }, [chainId, selectedUserMarkets])
 
   const rateAtTargetRead = useReadContracts({
     contracts: rateAtTargetContracts as any,
@@ -164,236 +191,17 @@ export function useBatchWithdrawController() {
   const nowSec = useMemo(() => BigInt(Math.floor(Date.now() / 1000)), [selectedOption?.address, chainId, selectedUserMarkets.length])
 
   const computedMarkets = useMemo(() => {
-    if (!selectedOption)
-      return { ok: false as const, error: undefined, items: [] as MarketPlanItem[] }
-    if (selectedUserMarkets.length === 0)
-      return { ok: false as const, error: 'No supply positions for this asset', items: [] as MarketPlanItem[] }
-
-    const marketReads = marketStatesRead.data
-    const rateReads = rateAtTargetRead.data
-    if (!marketReads || marketReads.length !== selectedUserMarkets.length)
-      return { ok: false as const, error: 'Loading market state…', items: [] as MarketPlanItem[] }
-    if (!rateReads || rateReads.length !== selectedUserMarkets.length)
-      return { ok: false as const, error: 'Loading IRM rates…', items: [] as MarketPlanItem[] }
-
-    const items: MarketPlanItem[] = []
-
-    for (let i = 0; i < selectedUserMarkets.length; i++) {
-      const p = selectedUserMarkets[i]
-      const mRes = marketReads[i]
-      const rRes = rateReads[i]
-      if (mRes?.status !== 'success' || !mRes.result)
-        return { ok: false as const, error: 'Missing onchain market data (retry)', items: [] as MarketPlanItem[] }
-      if (rRes?.status !== 'success' || rRes.result == null)
-        return { ok: false as const, error: 'Missing IRM data (retry)', items: [] as MarketPlanItem[] }
-
-      const st = normalizeMorphoMarketState(mRes.result)
-      if (!st)
-        return { ok: false as const, error: 'Failed to decode market state', items: [] as MarketPlanItem[] }
-
-      const totalSupplyAssets = st.totalSupplyAssets
-      const totalSupplyShares = st.totalSupplyShares
-      const totalBorrowAssets = st.totalBorrowAssets
-      const userSupplyShares = p.userState.supplyShares
-      if (totalSupplyShares <= 0n || userSupplyShares <= 0n)
-        continue
-
-      const suppliedAssets = (userSupplyShares * totalSupplyAssets) / totalSupplyShares
-      if (suppliedAssets <= 0n)
-        continue
-
-      const liquidityAssets = max0(totalSupplyAssets - totalBorrowAssets)
-      const liquidityShares = totalSupplyAssets > 0n
-        ? (liquidityAssets * totalSupplyShares) / totalSupplyAssets
-        : 0n
-      const maxWithdrawSharesRaw = minBigint(userSupplyShares, liquidityShares)
-      let maxWithdrawShares = maxWithdrawSharesRaw
-      // Back off slightly from the raw liquidity edge so share rounding does not turn a barely-withdrawable plan into a revert.
-      if (maxWithdrawSharesRaw > 0n && maxWithdrawSharesRaw < userSupplyShares) {
-        let percentHundredths = (maxWithdrawSharesRaw * 10_000n) / userSupplyShares
-        if (percentHundredths > 10_000n)
-          percentHundredths = 10_000n
-        if (percentHundredths > 0n && percentHundredths < 10_000n)
-          percentHundredths -= 1n
-
-        const safeShares = (userSupplyShares * percentHundredths) / 10_000n
-        maxWithdrawShares = minBigint(maxWithdrawSharesRaw, safeShares)
-      }
-
-      if (maxWithdrawShares > 0n && maxWithdrawShares === liquidityShares && maxWithdrawShares < userSupplyShares)
-        maxWithdrawShares -= 1n
-      const maxWithdrawAssets = totalSupplyShares > 0n && maxWithdrawShares > 0n
-        ? (maxWithdrawShares * totalSupplyAssets) / totalSupplyShares
-        : 0n
-
-      const snapshot: SupplyOptimizerMarketSnapshot = {
-        marketId: p.market.uniqueKey as `0x${string}`,
-        uniqueKey: p.market.uniqueKey as `0x${string}`,
-        totalSupplyAssets,
-        totalBorrowAssets,
-        lastUpdate: st.lastUpdate,
-        feeWad: st.fee,
-        rateAtTarget: rRes.result as bigint,
-      }
-
-      const apr = computeSupplyAfterDeltaWad({ market: snapshot, deltaSupplyAssets: 0n, timestamp: nowSec }).supplyAprWad
-
-      items.push({
-        marketId: p.market.uniqueKey as `0x${string}`,
-        collateralSymbol: p.market.collateralAsset.symbol,
-        userSupplyShares,
-        suppliedAssets,
-        marketTotalSupplyAssets: totalSupplyAssets,
-        marketTotalSupplyShares: totalSupplyShares,
-        liquidityAssets,
-        liquidityShares,
-        maxWithdrawShares,
-        maxWithdrawAssets,
-        supplyAprWad: apr,
-        plannedWithdrawAssets: 0n,
-        plannedWithdrawShares: 0n,
-        fullExit: false,
-      })
-    }
-
-    if (items.length === 0) {
-      return {
-        ok: false as const,
-        error: `No ${selectedOption.symbol} is currently withdrawable. Your supply is still deposited, but all visible liquidity is borrowed right now. Try again later or withdraw from individual markets as liquidity returns.`,
-        items: [] as MarketPlanItem[],
-      }
-    }
-
-    return { ok: true as const, error: undefined, items }
+    return buildBatchWithdrawMarketItems({
+      selectedOption,
+      selectedUserMarkets,
+      marketReads: marketStatesRead.data,
+      rateReads: rateAtTargetRead.data,
+      nowSec,
+    })
   }, [marketStatesRead.data, nowSec, rateAtTargetRead.data, selectedOption, selectedUserMarkets])
 
-  const plan = useMemo<BatchWithdrawPlanState>(() => {
-    if (!computedMarkets.ok)
-      return { ok: false, error: computedMarkets.error, items: [], remaining: 0n, overWithdrawAssets: 0n, totalSupplied: 0n, totalWithdrawable: 0n }
-    const base = computedMarkets.items
-
-    const totalSupplied = base.reduce((sum, x) => sum + x.suppliedAssets, 0n)
-    const totalWithdrawable = base.reduce((sum, x) => sum + x.maxWithdrawAssets, 0n)
-
-    if (!selectedOption)
-      return { ok: false, error: undefined, items: [], remaining: 0n, overWithdrawAssets: 0n, totalSupplied, totalWithdrawable }
-    if (parsedWithdrawAssets <= 0n)
-      return { ok: false, error: undefined, items: [], remaining: 0n, overWithdrawAssets: 0n, totalSupplied, totalWithdrawable }
-
-    const sorted = [...base].sort((a, b) => {
-      if (a.supplyAprWad === b.supplyAprWad)
-        return a.marketId.localeCompare(b.marketId)
-      return a.supplyAprWad < b.supplyAprWad ? -1 : 1
-    })
-
-    if (parsedWithdrawAssets >= totalWithdrawable) {
-      const out = sorted
-        .filter(m => m.maxWithdrawShares > 0n)
-        .map(m => ({
-          ...m,
-          plannedWithdrawShares: m.maxWithdrawShares,
-          plannedWithdrawAssets: m.maxWithdrawAssets,
-          fullExit: m.maxWithdrawShares === m.userSupplyShares,
-        }))
-      return { ok: true, error: undefined, items: out, remaining: 0n, overWithdrawAssets: 0n, totalSupplied, totalWithdrawable }
-    }
-
-    const assetsFromShares = (m: MarketPlanItem, shares: bigint): bigint => {
-      if (shares <= 0n || m.marketTotalSupplyShares <= 0n)
-        return 0n
-      return (shares * m.marketTotalSupplyAssets) / m.marketTotalSupplyShares
-    }
-
-    const ceilDiv = (a: bigint, b: bigint): bigint => {
-      if (b <= 0n || a <= 0n)
-        return 0n
-      return (a + (b - 1n)) / b
-    }
-
-    let remainingAssets = parsedWithdrawAssets
-    const plannedSharesById = new Map<string, bigint>()
-
-    for (const m of sorted) {
-      if (remainingAssets <= 0n)
-        break
-      if (m.maxWithdrawShares <= 0n)
-        continue
-
-      const desiredShares = m.marketTotalSupplyAssets > 0n
-        ? (remainingAssets * m.marketTotalSupplyShares) / m.marketTotalSupplyAssets
-        : 0n
-
-      const sharesToWithdraw = minBigint(desiredShares, m.maxWithdrawShares)
-      if (sharesToWithdraw <= 0n)
-        continue
-
-      plannedSharesById.set(m.marketId.toLowerCase(), sharesToWithdraw)
-      remainingAssets -= assetsFromShares(m, sharesToWithdraw)
-    }
-
-    let dustPass = 0
-    // A few cleanup passes reclaim leftover assets caused by share/asset rounding without overcomplicating the planner.
-    while (remainingAssets > 0n && dustPass < 5) {
-      dustPass++
-      let progressed = false
-
-      for (const m of sorted) {
-        if (remainingAssets <= 0n)
-          break
-        const id = m.marketId.toLowerCase()
-        const currentShares = plannedSharesById.get(id) ?? 0n
-        const slack = m.maxWithdrawShares - currentShares
-        if (slack <= 0n)
-          continue
-
-        const currentAssets = assetsFromShares(m, currentShares)
-        const targetAssets = currentAssets + remainingAssets
-        const requiredShares = ceilDiv(targetAssets * m.marketTotalSupplyShares, m.marketTotalSupplyAssets)
-        let deltaShares = requiredShares - currentShares
-        if (deltaShares <= 0n)
-          continue
-        if (deltaShares > slack)
-          deltaShares = slack
-
-        const nextShares = currentShares + deltaShares
-        const nextAssets = assetsFromShares(m, nextShares)
-        const deltaAssets = nextAssets - currentAssets
-        if (deltaAssets <= 0n)
-          continue
-
-        plannedSharesById.set(id, nextShares)
-        remainingAssets -= deltaAssets
-        progressed = true
-      }
-
-      if (!progressed)
-        break
-    }
-
-    const out: MarketPlanItem[] = []
-    for (const m of sorted) {
-      const shares = plannedSharesById.get(m.marketId.toLowerCase()) ?? 0n
-      if (shares <= 0n)
-        continue
-      out.push({
-        ...m,
-        plannedWithdrawShares: shares,
-        plannedWithdrawAssets: assetsFromShares(m, shares),
-        fullExit: shares === m.userSupplyShares,
-      })
-    }
-
-    const overWithdrawAssets = remainingAssets < 0n ? -remainingAssets : 0n
-
-    return {
-      ok: true,
-      error: undefined,
-      items: out,
-      remaining: remainingAssets > 0n ? remainingAssets : 0n,
-      overWithdrawAssets,
-      totalSupplied,
-      totalWithdrawable,
-    }
+  const plan = useMemo(() => {
+    return buildBatchWithdrawPlan({ computedMarkets, selectedOption, parsedWithdrawAssets })
   }, [computedMarkets, parsedWithdrawAssets, selectedOption])
 
   const hasPlan = plan.ok && plan.items.length > 0
@@ -416,7 +224,7 @@ export function useBatchWithdrawController() {
     return [...ids.values()].map(x => x as `0x${string}`)
   }, [hasPlan, plan.items])
 
-  const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress as Address | undefined, executeMarketIds)
+  const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress as Address | undefined, executeMarketIds, chainId)
 
   const isMorphoAuthorizedRead = useReadContract({
     chainId,
@@ -562,6 +370,9 @@ export function useBatchWithdrawController() {
     })
 
     const steps = [] as Array<{ key: string, label: string }>
+    const needsNetworkSwitch = chain?.id !== chainId
+    if (chainId && needsNetworkSwitch)
+      steps.push({ key: 'switchNetwork', label: `Switch to ${getSupportedChainName(chainId)}` })
     if (!latestStateRef.current.isMorphoAuthorized) {
       steps.push({ key: 'authorizeWallet', label: 'Confirm adapter authorization in wallet' })
       steps.push({ key: 'authorizeConfirm', label: 'Confirming adapter authorization onchain' })
@@ -578,6 +389,15 @@ export function useBatchWithdrawController() {
     })
 
     try {
+      if (chainId && needsNetworkSwitch) {
+        await runSwitchChainStep({
+          scope,
+          stepKey: 'switchNetwork',
+          chainId,
+          chainName: getSupportedChainName(chainId),
+        })
+      }
+
       if (!latestStateRef.current.isMorphoAuthorized) {
         const authorizeRequest = latestStateRef.current.authorizeRequest
         if (!authorizeRequest)
@@ -645,7 +465,7 @@ export function useBatchWithdrawController() {
     finally {
       setIsRunningFlow(false)
     }
-  }, [chainId, failTransactionFlow, finishFlow, getErrorMessage, plan.items.length, plannedTotal, refreshExecutionState, resetAfterSuccess, runTransactionStep, selectedOption, startFlow, writeContractAsync])
+  }, [chain?.id, chainId, failTransactionFlow, finishFlow, getErrorMessage, plan.items.length, plannedTotal, refreshExecutionState, resetAfterSuccess, runSwitchChainStep, runTransactionStep, selectedOption, startFlow, writeContractAsync])
 
   const execution: BatchWithdrawExecutionState = {
     bundlerCfg,
@@ -676,6 +496,7 @@ export function useBatchWithdrawController() {
     isViewingWallet,
     chainId,
     chainNameForLinks,
+    chainOptions,
     isLoadingPositions,
     loanAssetOptions,
     selectedLoanAssetAddress,
@@ -689,6 +510,7 @@ export function useBatchWithdrawController() {
     execution,
     executeError,
     clear,
+    onChangeChain,
     onChangeLoanAsset,
     onChangeWithdrawAmount: ctx.setWithdrawAmount,
     hasSomethingToClear: !!selectedLoanAssetAddress || !!withdrawAmount || !!executeError,

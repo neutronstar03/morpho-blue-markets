@@ -1,201 +1,122 @@
 import type { Portfolio } from './position-types'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
-import type { MarketRiskInput } from '~/lib/market-risk/types'
-import { Wallet } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { useAccount, useChainId, useSwitchChain } from 'wagmi'
+import { RefreshCw, Wallet } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import { useAccount } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
-import { trackEvent } from '~/lib/analytics'
+import { supportedChainMap } from '~/lib/addresses'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
-import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
-import { formatBigintShort, formatTimeAgo, formatUsd } from '~/lib/formatters'
+import { formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
-import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
-import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
-import { useMarketIdBlacklistPredicate } from '~/lib/market-blacklist'
-import { useMarketRiskStatusMap } from '~/lib/market-risk/hooks'
-import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
-import { PositionChainPills } from './position-chain-pills'
-import { PositionGroups } from './position-groups'
-import { getMarketSupplyUsd, getPositionSuppliedAssets, hasVisibleSupplyPosition } from './position-utils'
-import { usePositionChainPills } from './use-position-chain-pills'
-import { usePositionGroups } from './use-position-groups'
+import { configuredWagmiChainIds } from '~/lib/wagmi'
+import { PositionNetworkSection } from './position-network-section'
 
-const OPEN_SUPPLY_APR_OPTIMIZER_EVENT = 'open-supply-apr-optimizer'
+interface ChainPortfolioState {
+  portfolio: Portfolio
+  positionCount: number
+  isLoading: boolean
+}
 
 // This component is the general position in the homepage
 
 function PositionClient() {
-  const { address: userAddress, isConnected, chain } = useAccount()
-  const walletChainId = useChainId()
+  const { address: userAddress, isConnected } = useAccount()
   const { viewingAddress, isViewingWallet } = useViewingWallet()
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain()
   const effectiveAddress = viewingAddress ?? userAddress
-  const chainId = chain?.id ?? walletChainId
-  const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
   const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
+  const [chainPortfolioById, setChainPortfolioById] = useState<Record<number, ChainPortfolioState>>({})
+  const [liveRefreshKey, setLiveRefreshKey] = useState(0)
+  const storage = typeof window === 'undefined' ? undefined : window.sessionStorage
+  const [openChainIdsById, setOpenChainIdsById] = useLocalStorage<Record<string, boolean> | null>(
+    `positions:open-networks:${effectiveAddress?.toLowerCase() ?? 'none'}`,
+    null,
+    { prefix: 'use-ss:', storage, sync: false },
+  )
   const {
-    data: positions,
+    data: crossChainPositions,
     isLoading,
     refetch,
     dataUpdatedAt,
-  } = useLiveMarketPositions({ address: effectiveAddress, chainId })
-  const { data: crossChainPositions } = useUserPositionsAcrossChains(effectiveAddress)
+  } = useUserPositionsAcrossChains(effectiveAddress)
+  const handlePositionsRefresh = useCallback(async () => {
+    await refetch()
+    setLiveRefreshKey(key => key + 1)
+  }, [refetch])
+  const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(handlePositionsRefresh)
 
-  const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
-  const { aprByMarketKey } = useLiveMarketApr(markets)
+  const timeAgo = dataUpdatedAt > 0 ? formatTimeAgo(dataUpdatedAt) : ''
+  const chainDiscoveryStats = useMemo(() => {
+    const statsByChainId: Record<number, { positionCount: number }> = {}
+    for (const position of crossChainPositions ?? []) {
+      if (!supportedChainMap.has(position.chainId) || !configuredWagmiChainIds.has(position.chainId))
+        continue
+      const stats = statsByChainId[position.chainId] ?? { positionCount: 0 }
+      stats.positionCount += 1
+      statsByChainId[position.chainId] = stats
+    }
+    return statsByChainId
+  }, [crossChainPositions])
 
-  const riskMarkets = useMemo<MarketRiskInput[]>(() => {
-    if (!chainId)
-      return []
-    return (positions ?? []).map(p => ({
-      chainId,
-      uniqueKey: p.market.uniqueKey,
-      loanAssetAddress: p.market.loanAsset?.address,
-      loanAssetSymbol: p.market.loanAsset?.symbol,
-      collateralAssetAddress: p.market.collateralAsset?.address,
-      collateralAssetSymbol: p.market.collateralAsset?.symbol,
-      warnings: p.market.warnings,
-      oracleAddress: p.market.oracleAddress,
-    }))
-  }, [chainId, positions])
-  const riskStatusByKey = useMarketRiskStatusMap(riskMarkets)
-  const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()
+  const networkChainIds = useMemo(() => {
+    const seen = new Set<number>()
+    for (const position of crossChainPositions ?? []) {
+      if (!supportedChainMap.has(position.chainId) || !configuredWagmiChainIds.has(position.chainId))
+        continue
+      seen.add(position.chainId)
+    }
+    return [...seen.values()].sort((a, b) => {
+      const aPortfolio = chainPortfolioById[a]
+      const bPortfolio = chainPortfolioById[b]
+      const aAssets = aPortfolio?.portfolio.totalAssetsUsd ?? -1
+      const bAssets = bPortfolio?.portfolio.totalAssetsUsd ?? -1
+      if (aAssets !== bAssets)
+        return bAssets - aAssets
 
-  const visiblePositions = useMemo(() => {
-    if (!positions || !chainId)
-      return positions ?? []
-    // System market blacklist is the strong hide list: exclude it from UI, totals, and pills.
-    return positions.filter((position) => {
-      if (isMarketIdBlacklisted(position.market.uniqueKey, chainId))
-        return false
+      const aPositions = aPortfolio?.positionCount ?? chainDiscoveryStats[a]?.positionCount ?? 0
+      const bPositions = bPortfolio?.positionCount ?? chainDiscoveryStats[b]?.positionCount ?? 0
+      if (aPositions !== bPositions)
+        return bPositions - aPositions
 
-      const hasNonSupplyPosition = position.userState.borrowShares > 0n || position.userState.collateral > 0n
-      return hasNonSupplyPosition || hasVisibleSupplyPosition(position)
+      return (supportedChainMap.get(a) ?? '').localeCompare(supportedChainMap.get(b) ?? '')
     })
-  }, [chainId, isMarketIdBlacklisted, positions])
+  }, [chainDiscoveryStats, chainPortfolioById, crossChainPositions])
 
-  const [timeAgo, setTimeAgo] = useState('')
-  const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'native' | 'yearly'>('total')
-  const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
+  const handleChainPortfolioChange = useCallback((chainId: number, state: ChainPortfolioState) => {
+    setChainPortfolioById(prev => ({ ...prev, [chainId]: state }))
+  }, [])
 
-  useEffect(() => {
-    if (dataUpdatedAt > 0) {
-      setTimeAgo(formatTimeAgo(dataUpdatedAt))
-      const interval = setInterval(() => {
-        setTimeAgo(formatTimeAgo(dataUpdatedAt))
-      }, 5000)
-      return () => clearInterval(interval)
-    }
-  }, [dataUpdatedAt])
+  const handleChainOpenChange = useCallback((chainId: number, isOpen: boolean) => {
+    setOpenChainIdsById(prev => ({ ...(prev ?? {}), [chainId]: isOpen }))
+  }, [setOpenChainIdsById])
 
-  const portfolio = useMemo((): Portfolio => {
-    if (!visiblePositions || !visiblePositions.length)
-      return { dailyUsd: undefined, yearlyUsd: undefined, weightedAprPct: undefined, totalAssets: undefined, totalAssetsUsd: undefined, totalAssetsSymbol: undefined, totalAssetsDecimals: undefined }
+  const globalPortfolio = useMemo(() => {
+    let positionCount = 0
+    let totalAssetsUsd = 0
+    let yearlyUsd = 0
+    let dailyUsd = 0
 
-    let totalAssets: bigint | undefined
-    let totalAssetsSymbol: string | undefined
-    let totalAssetsDecimals: number | undefined
-
-    let totalPrincipalUsd = 0
-    let totalDailyUsd = 0
-    let totalAprWeighted = 0
-
-    const firstLoanAssetAddress = visiblePositions[0]?.market.loanAsset.address
-    const firstLoanAssetSymbol = visiblePositions[0]?.market.loanAsset.symbol
-    const firstLoanAssetDecimals = visiblePositions[0]?.market.loanAsset.decimals ?? 18
-    const allSameAsset = visiblePositions.every(p => p.market.loanAsset.address === firstLoanAssetAddress)
-
-    if (allSameAsset && firstLoanAssetAddress) {
-      totalAssets = 0n
-      totalAssetsSymbol = firstLoanAssetSymbol
-      totalAssetsDecimals = firstLoanAssetDecimals
+    for (const chainId of networkChainIds) {
+      const state = chainPortfolioById[chainId]
+      if (!state)
+        continue
+      positionCount += state.positionCount
+      totalAssetsUsd += state.portfolio.totalAssetsUsd ?? 0
+      yearlyUsd += state.portfolio.yearlyUsd ?? 0
+      dailyUsd += state.portfolio.dailyUsd ?? 0
     }
 
-    for (const p of visiblePositions) {
-      const marketSupplyShares = BigInt(p.market.state.supplyShares)
-      const userSupplyShares = BigInt(p.userState.supplyShares)
-      const marketSupplyUsd = getMarketSupplyUsd(p)
-
-      if (marketSupplyShares === 0n || marketSupplyUsd == null)
-        continue
-
-      const shareRatio = Number(userSupplyShares) / Number(marketSupplyShares)
-      if (!Number.isFinite(shareRatio) || shareRatio <= 0)
-        continue
-
-      const userPrincipalUsd = marketSupplyUsd * shareRatio
-      const marketApr = aprByMarketKey[p.market.uniqueKey]?.apr
-      if (marketApr == null)
-        continue
-      const dailyRate = marketApr / 365
-      const dailyUsd = userPrincipalUsd * dailyRate
-
-      totalPrincipalUsd += userPrincipalUsd
-      totalDailyUsd += dailyUsd
-      totalAprWeighted += userPrincipalUsd * marketApr
-
-      if (allSameAsset && totalAssets !== undefined) {
-        totalAssets += getPositionSuppliedAssets(p)
-      }
-    }
-
-    const weightedAprPct = totalPrincipalUsd > 0 ? (totalAprWeighted / totalPrincipalUsd) * 100 : undefined
     return {
-      dailyUsd: totalDailyUsd || undefined,
-      yearlyUsd: totalAprWeighted || undefined,
-      weightedAprPct,
-      totalAssets: totalAssets === 0n ? undefined : totalAssets,
-      totalAssetsUsd: totalPrincipalUsd || undefined,
-      totalAssetsSymbol,
-      totalAssetsDecimals,
+      positionCount,
+      totalAssetsUsd: totalAssetsUsd || undefined,
+      yearlyUsd: yearlyUsd || undefined,
+      dailyUsd: dailyUsd || undefined,
+      weightedAprPct: totalAssetsUsd > 0 ? (yearlyUsd / totalAssetsUsd) * 100 : undefined,
     }
-  }, [visiblePositions, aprByMarketKey])
-
-  const groupedPositions = usePositionGroups(visiblePositions, chainId, aprByMarketKey)
-  const chainPills = usePositionChainPills(crossChainPositions, chainId)
-
-  const handleChainPillClick = (chainId: number) => {
-    // Cross-chain pills act like quick navigation: switch chain and bring the user back to the top summary.
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    switchChain({ chainId })
-  }
-
-  const handleOpenOptimizerForGroup = (group: typeof groupedPositions[number]) => {
-    const firstPosition = group.positions[0]
-    if (!chainId || !firstPosition)
-      return
-
-    trackEvent('position_optimize_clicked', {
-      loanAsset: group.loanAssetSymbol,
-      chainId,
-    })
-
-    setOptimizerPreset({
-      chainId,
-      loanAssetAddress: firstPosition.market.loanAsset.address,
-      loanAssetSymbol: group.loanAssetSymbol,
-      loanAssetDecimals: firstPosition.market.loanAsset.decimals ?? 18,
-      marketApr: resolveMarketAprByAssetSymbol(group.loanAssetSymbol, marketAprBySymbol),
-      newDepositAmount: '0',
-      maxMarketsUsed: 6,
-      usePrecomputedIfFresh: false,
-    })
-
-    window.dispatchEvent(new Event(OPEN_SUPPLY_APR_OPTIMIZER_EVENT))
-
-    window.requestAnimationFrame(() => {
-      const el = document.querySelector('[data-testid="supply-apr-optimizer-card"]') as HTMLElement | null
-      if (!el)
-        return
-      const top = el.getBoundingClientRect().top + window.scrollY - 88
-      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
-    })
-  }
+  }, [chainPortfolioById, networkChainIds])
 
   if (!isConnected && !isViewingWallet) {
     return (
@@ -217,7 +138,7 @@ function PositionClient() {
           <h2 className="text-xl font-bold text-white">Positions</h2>
         </div>
         <div className="p-6">
-          <p className="text-gray-400">Loading your positions...</p>
+          <p className="text-gray-400">Discovering your positions...</p>
         </div>
       </Card>
     )
@@ -225,30 +146,48 @@ function PositionClient() {
 
   return (
     <Card className="mb-8">
-      <div className="p-4 border-b border-gray-700 flex items-center">
-        <div className="flex flex-col items-start space-y-1 md:flex-row md:items-center md:space-x-4 md:space-y-0">
-          <h2 className="text-xl font-bold text-white">Positions</h2>
-          <span className="hidden md:inline-block text-sm text-gray-400 tabular-nums pr-4 w-32 text-right">{timeAgo || '—'}</span>
-          <span className="md:hidden text-xs text-gray-500">{timeAgo || '—'}</span>
-        </div>
-        <div className="ml-auto flex items-center space-x-3 sm:space-x-6">
-          <div className="text-right">
-            <p className="text-xs text-gray-400">Weighted APR</p>
-            <p className="text-xs sm:text-sm text-white">{portfolio.weightedAprPct != null ? `${portfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
+      <div className="border-b border-gray-700 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+          <div className="flex items-start gap-3 sm:contents">
+            <div className="min-w-0 flex-1 sm:flex sm:shrink-0 sm:items-baseline sm:gap-3">
+              <span className="block text-xs uppercase tracking-wide text-gray-500 sm:text-sm">Total Assets</span>
+              <span className="block truncate text-xl font-bold text-white sm:text-2xl">
+                {globalPortfolio.totalAssetsUsd != null ? formatUsd(globalPortfolio.totalAssetsUsd) : '—'}
+              </span>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 text-xs text-gray-500 sm:order-3 sm:ml-auto sm:text-sm">
+              <span className="tabular-nums">{timeAgo || '—'}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => handleRefresh()}
+                disabled={isRefreshing || isCooldown}
+                className="h-8 px-2 sm:px-3"
+                aria-label={isRefreshing ? 'Refreshing positions' : isCooldown ? 'Positions refreshed' : 'Refresh positions'}
+                title={isRefreshing ? 'Refreshing positions' : isCooldown ? 'Positions refreshed' : 'Refresh positions'}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+                <span className="hidden sm:inline">{isRefreshing ? 'Refreshing' : isCooldown ? 'Refreshed' : 'Refresh'}</span>
+              </Button>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-400">Daily USD</p>
-            <p className="text-xs sm:text-sm text-white">{portfolio.dailyUsd != null ? formatUsd(portfolio.dailyUsd) : '—'}</p>
+          <div className="order-2 flex items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950/40 px-3 py-2 sm:justify-start sm:gap-6 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+            <div className="flex items-baseline gap-1.5 sm:block">
+              <p className="text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">APR</p>
+              <p className="text-sm font-semibold text-white sm:text-base">{globalPortfolio.weightedAprPct != null ? `${globalPortfolio.weightedAprPct.toFixed(2)}%` : '—'}</p>
+            </div>
+            <div className="flex items-baseline gap-1.5 sm:block">
+              <p className="text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">Daily USD</p>
+              <p className="text-sm font-semibold text-white sm:text-base">{globalPortfolio.dailyUsd != null ? formatUsd(globalPortfolio.dailyUsd) : '—'}</p>
+            </div>
           </div>
-          <Button onClick={() => handleRefresh()} disabled={isRefreshing || isCooldown}>
-            {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
-          </Button>
         </div>
       </div>
       <div className="py-4 sm:py-6 px-3 sm:px-4">
         {isLoading
-          ? <p className="text-gray-400">Loading your positions...</p>
-          : visiblePositions && visiblePositions.length === 0
+          ? <p className="text-gray-400">Discovering your positions...</p>
+          : networkChainIds.length === 0
             ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mb-4">
@@ -258,52 +197,22 @@ function PositionClient() {
                   <p className="text-sm text-gray-500">Supply assets to a market to see your positions here.</p>
                 </div>
               )
-            : chainId && (
-              <PositionGroups
-                groups={groupedPositions}
-                chainId={chainId}
-                portfolioTotalAssetsUsd={portfolio.totalAssetsUsd}
-                aprByMarketKey={aprByMarketKey}
-                riskStatusByKey={riskStatusByKey}
-                summaryMode={assetSummaryMode}
-                onToggleSummaryMode={() => setAssetSummaryMode((mode) => {
-                  if (mode === 'total')
-                    return 'native'
-                  if (mode === 'native')
-                    return 'yearly'
-                  return 'total'
-                })}
-                onSelectLoanAsset={handleOpenOptimizerForGroup}
-              />
-            )}
-        {(chainPills.length > 0 || portfolio.totalAssetsUsd != null || (portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null)) && (
-          <div className="mx-4 mt-6 flex flex-col gap-3 border-t border-gray-700/50 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <PositionChainPills
-              items={chainPills}
-              currentChainId={chainId}
-              isSwitching={isSwitchingChain}
-              onSelectChain={handleChainPillClick}
-            />
-            {(portfolio.totalAssetsUsd != null || (portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null)) && (
-              <div className="flex flex-row items-center justify-center gap-1 sm:justify-end sm:gap-2">
-                <p className="text-xs whitespace-nowrap text-gray-400">Total Assets</p>
-                <p className="text-sm whitespace-nowrap text-white">
-                  {portfolio.totalAssets != null && portfolio.totalAssetsSymbol && portfolio.totalAssetsDecimals != null
-                    ? (
-                        <>
-                          {formatBigintShort(portfolio.totalAssets, portfolio.totalAssetsDecimals)}
-                          {' '}
-                          {portfolio.totalAssetsSymbol}
-                        </>
-                      )
-                    : portfolio.totalAssetsUsd != null
-                      ? formatUsd(portfolio.totalAssetsUsd)
-                      : '—'}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+            : (
+                <div className="space-y-3">
+                  {networkChainIds.map((networkChainId, index) => (
+                    <PositionNetworkSection
+                      key={networkChainId}
+                      chainId={networkChainId}
+                      address={effectiveAddress as `0x${string}`}
+                      isOpen={openChainIdsById == null ? index === 0 : !!openChainIdsById[networkChainId]}
+                      onOpenChange={isOpen => handleChainOpenChange(networkChainId, isOpen)}
+                      marketAprBySymbol={marketAprBySymbol}
+                      refreshKey={liveRefreshKey}
+                      onPortfolioChange={handleChainPortfolioChange}
+                    />
+                  ))}
+                </div>
+              )}
       </div>
     </Card>
   )

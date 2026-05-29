@@ -20,17 +20,19 @@ export function useMarketParamsById(
   enabled: boolean,
   morphoAddress: Address | undefined,
   marketIds: readonly `0x${string}`[],
+  chainId?: number,
 ): MarketParamsByIdResult {
   const marketParamsContracts = useMemo(() => {
     if (!enabled || !morphoAddress || marketIds.length === 0)
       return []
     return marketIds.map(id => ({
       address: morphoAddress,
+      chainId,
       abi: MORPHO_AUTH_ABI,
       functionName: 'idToMarketParams' as const,
       args: [id] as const,
     }))
-  }, [enabled, marketIds, morphoAddress])
+  }, [chainId, enabled, marketIds, morphoAddress])
 
   const marketParamsRead = useReadContracts({
     contracts: marketParamsContracts as any,

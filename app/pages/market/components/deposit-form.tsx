@@ -2,9 +2,10 @@ import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { useDebugValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useDebounce } from 'use-debounce'
 import { formatUnits, parseUnits } from 'viem'
-import { useAccount } from 'wagmi'
+import { useAccount, useWriteContract } from 'wagmi'
 import { AmountControl } from '~/components/ui/amount-control'
 import { MarketAprPreview } from '~/components/ui/market-apr-preview'
+import { getSupportedChainName } from '~/lib/addresses'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatBigintShort, formatDecimalStringShort } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
@@ -54,12 +55,15 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     assetAmount,
     setAssetAmount,
   } = useDepositFormState()
-  const { address: connectedAddress } = useAccount()
+  const { address: connectedAddress, chainId: walletChainId } = useAccount()
   const { viewingAddress, isViewingWallet } = useViewingWallet()
   const address = viewingAddress ?? connectedAddress
   const executionAddress = isViewingWallet ? undefined : connectedAddress
   const [isSubmittingFlow, setIsSubmittingFlow] = useState(false)
-  const { startFlow, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
+  const { startFlow, runSwitchChainStep, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
+  const { writeContractAsync } = useWriteContract()
+  const actionChainId = market.morphoBlue.chain.id
+  const needsNetworkSwitch = walletChainId !== actionChainId
 
   const { data: marketStateRaw } = useMarket(market.uniqueKey)
 
@@ -168,7 +172,6 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     refetch: refetchApproval,
     isSimulating: isSimulatingApproval,
     isAllowanceReady,
-    approveAsync,
     approveRequest,
   } = useTokenApproval(market.loanAsset.address, debouncedAmount, executionAddress, market.loanAsset.decimals)
   const effectiveNeedsApproval = !isViewingWallet && needsApproval
@@ -191,7 +194,6 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
     isPending: isSupplying,
     error: supplyError,
     isSimulating: isSimulatingSupply,
-    supplyAsync,
     supplyRequest,
   } = useSupply(market, guardedAmount, market.loanAsset.decimals!)
 
@@ -238,6 +240,8 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
 
     const marketLabel = `${market.collateralAsset.symbol} / ${loanTokenSymbol}`
     const steps = [] as Array<{ key: string, label: string }>
+    if (needsNetworkSwitch)
+      steps.push({ key: 'switchNetwork', label: `Switch to ${getSupportedChainName(actionChainId)}` })
     if (effectiveNeedsApproval) {
       steps.push({ key: 'approveWallet', label: `Confirm ${loanTokenSymbol} approval in wallet` })
       steps.push({ key: 'approveConfirm', label: 'Confirming approval onchain' })
@@ -248,21 +252,35 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       kind: 'deposit',
       title: `Deposit ${displayAmountShort} ${loanTokenSymbol}`,
       summary: 'Preparing guided deposit',
+      chainId: actionChainId,
       steps,
     })
 
     try {
       setIsSubmittingFlow(true)
 
+      if (needsNetworkSwitch) {
+        await runSwitchChainStep({
+          scope,
+          stepKey: 'switchNetwork',
+          chainId: actionChainId,
+          chainName: getSupportedChainName(actionChainId),
+        })
+      }
+
       if (effectiveNeedsApproval) {
+        const approveRequest = await waitForTruthy(() => latestStateRef.current.approveRequest, {
+          errorMessage: 'Approval transaction is not ready yet',
+        })
         await runTransactionStep({
           scope,
           walletStepKey: 'approveWallet',
           confirmStepKey: 'approveConfirm',
+          chainId: actionChainId,
           walletSummary: `Waiting for ${loanTokenSymbol} approval in wallet`,
           confirmSummary: 'Confirming approval onchain',
           fallbackError: 'Approval failed',
-          run: approveAsync,
+          run: () => writeContractAsync(approveRequest as any),
         })
         await refetchApproval?.()
         await waitForTruthy(() => {
@@ -279,20 +297,26 @@ export function DepositForm({ market, loanTokenSymbol, prefill, onSuccess }: Dep
       if (!latestStateRef.current.canSupply)
         throw new Error('Deposit transaction is not ready yet')
 
+      const supplyRequest = await waitForTruthy(() => latestStateRef.current.supplyRequest, {
+        errorMessage: 'Deposit transaction is not ready yet',
+      })
+
       const txHash = await runTransactionStep({
         scope,
         walletStepKey: 'depositWallet',
         confirmStepKey: 'depositConfirm',
+        chainId: actionChainId,
         walletSummary: 'Waiting for deposit confirmation in wallet',
         confirmSummary: 'Confirming deposit onchain',
         fallbackError: 'Deposit failed',
-        run: supplyAsync,
+        run: () => writeContractAsync(supplyRequest as any),
       })
 
       finishFlow(scope, {
         title: `Deposited ${displayAmountShort} ${loanTokenSymbol}`,
         summary: `Deposit completed on ${marketLabel}.`,
         txHash,
+        chainId: actionChainId,
         facts: [
           { label: 'Market', value: marketLabel },
           { label: 'Amount', value: `${displayAmountShort} ${loanTokenSymbol}` },

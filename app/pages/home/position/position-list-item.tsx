@@ -1,4 +1,4 @@
-import type { LiveMarketPosition } from '~/lib/hooks/rpc/use-live-market-positions'
+import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 import { Gauge, Scale } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'

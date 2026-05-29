@@ -66,11 +66,12 @@ function computeMarketId(p: LiveAprMarketInput): `0x${string}` | undefined {
  *
  * Uses a single multicall with `allowFailure` to keep UI resilient.
  */
-export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined) {
+export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined, options: { chainId?: number } = {}) {
   const { chainId: walletChainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
-  const chainId = requiredChainId ?? walletChainId
-  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
+  const explicitChainId = options.chainId
+  const chainId = explicitChainId ?? requiredChainId ?? walletChainId
+  const isWrongNetwork = explicitChainId == null && requiredChainId && walletChainId && walletChainId !== requiredChainId
 
   const MARKET_CHUNK_SIZE = 20
   const MAX_CHUNKS = 5 // matches default `useMarkets(first=100)`

@@ -1,4 +1,4 @@
-import type { BatchWithdrawPlanState, LoanAssetOption } from './shared'
+import type { BatchWithdrawChainOption, BatchWithdrawPlanState, LoanAssetOption } from './shared'
 import { Maximize2 } from 'lucide-react'
 import { formatUnits } from 'viem'
 import { Button } from '~/components/ui/button'
@@ -8,15 +8,21 @@ import { Label } from '~/components/ui/label'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { CHAIN_ICON_BY_ID } from '~/lib/chain-icons'
 import { formatBigintShort } from '~/lib/formatters'
 import { trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
 
 interface BatchWithdrawFormProps {
   isLoadingPositions: boolean
+  chainId?: number
+  chainName?: string
+  chainOptions: BatchWithdrawChainOption[]
   loanAssetOptions: LoanAssetOption[]
   selectedLoanAssetAddress: string
   selectedOption?: LoanAssetOption
@@ -24,12 +30,16 @@ interface BatchWithdrawFormProps {
   symbol: string
   plan: BatchWithdrawPlanState
   computedMarketsOk: boolean
+  onChangeChain: (chainId: number) => void
   onChangeLoanAsset: (address: string) => void
   onChangeWithdrawAmount: (value: string) => void
 }
 
 export function BatchWithdrawForm({
   isLoadingPositions,
+  chainId,
+  chainName,
+  chainOptions,
   loanAssetOptions,
   selectedLoanAssetAddress,
   selectedOption,
@@ -37,9 +47,12 @@ export function BatchWithdrawForm({
   symbol,
   plan,
   computedMarketsOk,
+  onChangeChain,
   onChangeLoanAsset,
   onChangeWithdrawAmount,
 }: BatchWithdrawFormProps) {
+  const ChainIcon = chainId ? CHAIN_ICON_BY_ID[chainId] : undefined
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 items-start" data-testid="batch-withdraw-form">
@@ -47,22 +60,55 @@ export function BatchWithdrawForm({
           <div className="h-5 flex items-center">
             <Label className="text-gray-200">Asset</Label>
           </div>
-          <Select
-            value={selectedLoanAssetAddress || undefined}
-            onValueChange={onChangeLoanAsset}
-            disabled={isLoadingPositions || loanAssetOptions.length === 0}
-          >
-            <SelectTrigger className="w-full h-10 bg-gray-900 border-gray-700 text-white text-sm">
-              <SelectValue placeholder={isLoadingPositions ? 'Loading…' : 'Select an asset'} />
-            </SelectTrigger>
-            <SelectContent>
-              {loanAssetOptions.map(o => (
-                <SelectItem key={o.address} value={o.address}>
-                  {o.symbol}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select value={chainId != null ? String(chainId) : ''} onValueChange={value => onChangeChain(Number(value))}>
+              <SelectTrigger
+                className="h-10 w-14 shrink-0 border-gray-700 bg-gray-900 px-2 text-white"
+                title={chainName ? `Withdraw network: ${chainName}` : 'Withdraw network'}
+                aria-label={chainName ? `Withdraw network ${chainName}` : 'Withdraw network'}
+              >
+                {ChainIcon
+                  ? <ChainIcon size={18} variant="branded" className="h-[18px] w-[18px]" />
+                  : <span className="text-xs font-semibold">{chainName?.slice(0, 1) ?? '?'}</span>}
+              </SelectTrigger>
+              <SelectContent
+                align="start"
+                position="popper"
+                className="z-[80] border-gray-700 bg-gray-950 text-white"
+              >
+                <SelectGroup>
+                  <SelectLabel>Network</SelectLabel>
+                  {chainOptions.map((option) => {
+                    const Icon = CHAIN_ICON_BY_ID[option.chainId]
+                    return (
+                      <SelectItem key={option.chainId} value={String(option.chainId)}>
+                        {Icon
+                          ? <Icon size={16} variant="branded" className="h-4 w-4" />
+                          : <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[10px] text-white">{option.name.slice(0, 1)}</span>}
+                        <span>{option.name}</span>
+                      </SelectItem>
+                    )
+                  })}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Select
+              value={selectedLoanAssetAddress || undefined}
+              onValueChange={onChangeLoanAsset}
+              disabled={isLoadingPositions || loanAssetOptions.length === 0}
+            >
+              <SelectTrigger className="h-10 min-w-0 flex-1 border-gray-700 bg-gray-900 text-sm text-white">
+                <SelectValue placeholder={isLoadingPositions ? 'Loading…' : 'Select an asset'} />
+              </SelectTrigger>
+              <SelectContent>
+                {loanAssetOptions.map(o => (
+                  <SelectItem key={o.address} value={o.address}>
+                    {o.symbol}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="h-0 md:h-4" />
         </div>
 

@@ -55,7 +55,6 @@ export function useMarketPreview(args: {
   const { chainId: walletChainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
   const chainId = requiredChainId ?? walletChainId
-  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
 
   const marketState = useMemo(() => normalizeMorphoMarketState(marketStateRaw), [marketStateRaw])
 
@@ -109,7 +108,7 @@ export function useMarketPreview(args: {
     return wadDivDown(after.totalBorrowAssets, after.totalSupplyAssets)
   }, [after])
 
-  const enabled = !!marketState && !isWrongNetwork && !!chainId
+  const enabled = !!marketState && !!chainId
 
   // Prefer local IRM math when possible:
   // - avoids hammering RPC while the user drags the slider

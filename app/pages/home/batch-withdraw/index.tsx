@@ -16,6 +16,7 @@ export function BatchWithdraw() {
     userAddress,
     chainId,
     chainNameForLinks,
+    chainOptions,
     isLoadingPositions,
     loanAssetOptions,
     selectedLoanAssetAddress,
@@ -28,6 +29,7 @@ export function BatchWithdraw() {
     plannedTotal,
     execution,
     clear,
+    onChangeChain,
     onChangeLoanAsset,
     onChangeWithdrawAmount,
     hasSomethingToClear,
@@ -66,6 +68,9 @@ export function BatchWithdraw() {
               <>
                 <BatchWithdrawForm
                   isLoadingPositions={isLoadingPositions}
+                  chainId={chainId}
+                  chainName={chainNameForLinks}
+                  chainOptions={chainOptions}
                   loanAssetOptions={loanAssetOptions}
                   selectedLoanAssetAddress={selectedLoanAssetAddress}
                   selectedOption={selectedOption}
@@ -73,6 +78,7 @@ export function BatchWithdraw() {
                   symbol={symbol}
                   plan={plan}
                   computedMarketsOk={computedMarkets.ok}
+                  onChangeChain={onChangeChain}
                   onChangeLoanAsset={onChangeLoanAsset}
                   onChangeWithdrawAmount={onChangeWithdrawAmount}
                 />

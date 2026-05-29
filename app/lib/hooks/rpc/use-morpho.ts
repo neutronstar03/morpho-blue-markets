@@ -43,10 +43,8 @@ export function formatTokenBalance(balance: bigint | undefined, decimals: number
 
 export function useTokenApproval(tokenAddress: string, amount: string, userAddress: string | undefined, decimals: number) {
   const activeChainId = useChainId()
-  const { chainId: walletChainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
   const chainId = requiredChainId ?? activeChainId
-  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
   const spender = getMorphoBlueAddress(chainId)
   const isValidAmount = !!amount && Number.parseFloat(amount) > 0
 
@@ -78,7 +76,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     functionName: 'allowance',
     args: userAddress ? [userAddress as `0x${string}`, spender] : undefined,
     query: {
-      enabled: !!userAddress && !isWrongNetwork,
+      enabled: !!userAddress,
     },
   })
 
@@ -99,7 +97,7 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
     functionName: 'approve',
     args: approveArgs,
     query: {
-      enabled: isValidAmount && !isWrongNetwork,
+      enabled: isValidAmount,
     },
   })
 
@@ -157,12 +155,10 @@ export function useTokenApproval(tokenAddress: string, amount: string, userAddre
 }
 
 // Hook for checking token balance in wallet
-export function useTokenBalance(tokenAddress: string, userAddress?: string) {
+export function useTokenBalance(tokenAddress: string, userAddress?: string, overrideChainId?: number) {
   const activeChainId = useChainId()
-  const { chainId: walletChainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
-  const chainId = requiredChainId ?? activeChainId
-  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
+  const chainId = overrideChainId ?? requiredChainId ?? activeChainId
   return useReadContract({
     chainId,
     address: tokenAddress as `0x${string}`,
@@ -170,7 +166,7 @@ export function useTokenBalance(tokenAddress: string, userAddress?: string) {
     functionName: 'balanceOf',
     args: userAddress ? [userAddress as `0x${string}`] : undefined,
     query: {
-      enabled: !!userAddress && !isWrongNetwork,
+      enabled: !!userAddress,
       refetchInterval: 5 * 1000, // Refetch every 5 seconds
     },
   })
@@ -178,11 +174,10 @@ export function useTokenBalance(tokenAddress: string, userAddress?: string) {
 
 // Hook for supplying to a market
 export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenDecimals: number) {
-  const { address: userAddress, chainId: walletChainId } = useAccount()
+  const { address: userAddress } = useAccount()
   const activeChainId = useChainId()
   const { requiredChainId } = useNetworkContext()
   const chainId = requiredChainId ?? activeChainId
-  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
   const isValidAmount = !!amount && Number.parseFloat(amount) > 0
 
   const supplyArgs = useMemo(() => {
@@ -214,7 +209,7 @@ export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenD
     functionName: 'supply',
     args: supplyArgs as any,
     query: {
-      enabled: isValidAmount && !!userAddress && !!market && !isWrongNetwork,
+      enabled: isValidAmount && !!userAddress && !!market,
     },
   })
 
@@ -246,11 +241,10 @@ export function useSupply(market: SingleMorphoMarket, amount: string, loanTokenD
 
 // Hook for withdrawing from a market
 export function useWithdraw(market: SingleMorphoMarket, sharesIn: string) {
-  const { address: userAddress, chainId: walletChainId } = useAccount()
+  const { address: userAddress } = useAccount()
   const activeChainId = useChainId()
   const { requiredChainId } = useNetworkContext()
   const chainId = requiredChainId ?? activeChainId
-  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
   const isValidAmount = !!sharesIn && Number.parseFloat(sharesIn) > 0
 
   const withdrawArgs = useMemo(() => {
@@ -282,7 +276,7 @@ export function useWithdraw(market: SingleMorphoMarket, sharesIn: string) {
     functionName: 'withdraw',
     args: withdrawArgs as any,
     query: {
-      enabled: isValidAmount && !!userAddress && !!market && !isWrongNetwork,
+      enabled: isValidAmount && !!userAddress && !!market,
     },
   })
 
@@ -314,10 +308,8 @@ export function useWithdraw(market: SingleMorphoMarket, sharesIn: string) {
 
 export function useUserPosition(marketKey: string, userAddress: string | undefined) {
   const activeChainId = useChainId()
-  const { chainId: walletChainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
   const chainId = requiredChainId ?? activeChainId
-  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
 
   return useReadContract({
     chainId,
@@ -329,17 +321,18 @@ export function useUserPosition(marketKey: string, userAddress: string | undefin
       userAddress as `0x${string}`,
     ],
     query: {
-      enabled: !!userAddress && !!marketKey && !isWrongNetwork,
+      enabled: !!userAddress && !!marketKey,
+      refetchOnMount: 'always',
+      refetchInterval: 20_000,
+      staleTime: 0,
     },
   })
 }
 
 export function useMarket(marketKey: string) {
   const activeChainId = useChainId()
-  const { chainId: walletChainId } = useAccount()
   const { requiredChainId } = useNetworkContext()
   const chainId = requiredChainId ?? activeChainId
-  const isWrongNetwork = requiredChainId && walletChainId && walletChainId !== requiredChainId
 
   return useReadContract({
     chainId,
@@ -348,7 +341,10 @@ export function useMarket(marketKey: string) {
     functionName: 'market',
     args: [marketKey as any],
     query: {
-      enabled: !!marketKey && !isWrongNetwork,
+      enabled: !!marketKey,
+      refetchOnMount: 'always',
+      refetchInterval: 20_000,
+      staleTime: 0,
     },
   })
 }

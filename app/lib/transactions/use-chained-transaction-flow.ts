@@ -5,8 +5,9 @@ import type {
   ScopedTransactionUpdate,
   TransactionSuccessPayload,
 } from '~/lib/contexts/transaction-feedback.types'
+import { waitForTransactionReceipt } from '@wagmi/core'
 import { useCallback } from 'react'
-import { usePublicClient } from 'wagmi'
+import { useAccount, useConfig, useSwitchChain } from 'wagmi'
 import { useTransactionFeedback } from '~/lib/contexts/transaction-feedback.context'
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -56,7 +57,9 @@ export async function waitForTruthy<T>(
 }
 
 export function useChainedTransactionFlow() {
-  const publicClient = usePublicClient()
+  const config = useConfig()
+  const { chainId: walletChainId } = useAccount()
+  const { switchChainAsync } = useSwitchChain()
   const {
     beginFlow,
     completeFlow,
@@ -79,6 +82,36 @@ export function useChainedTransactionFlow() {
   const markStepCompleted = useCallback((scope: ScopedTransactionUpdate, stepKey: string) => {
     setStepStatus(scope, stepKey, 'completed')
   }, [setStepStatus])
+
+  const runSwitchChainStep = useCallback(async ({
+    scope,
+    stepKey,
+    chainId,
+    chainName,
+  }: {
+    scope: ScopedTransactionUpdate
+    stepKey: string
+    chainId: number
+    chainName?: string
+  }) => {
+    if (walletChainId === chainId) {
+      markStepCompleted(scope, stepKey)
+      return
+    }
+
+    const label = chainName ?? `Chain ${chainId}`
+    activateStep(scope, stepKey, `Switch wallet to ${label}`, 'awaiting_wallet')
+
+    try {
+      await switchChainAsync({ chainId })
+      markStepCompleted(scope, stepKey)
+    }
+    catch (error) {
+      const message = getErrorMessage(error, `Switch to ${label} failed`)
+      failFlow(scope, message)
+      throw new Error(message)
+    }
+  }, [activateStep, failFlow, markStepCompleted, switchChainAsync, walletChainId])
 
   const runSignatureStep = useCallback(async <T>({
     scope,
@@ -125,9 +158,6 @@ export function useChainedTransactionFlow() {
     run: () => Promise<`0x${string}`>
     fallbackError: string
   }) => {
-    if (!publicClient)
-      throw new Error('Public client is not ready')
-
     activateStep(scope, walletStepKey, walletSummary, 'awaiting_wallet')
 
     try {
@@ -135,7 +165,7 @@ export function useChainedTransactionFlow() {
       setTxHash(scope, txHash, chainId)
       markStepCompleted(scope, walletStepKey)
       activateStep(scope, confirmStepKey, confirmSummary, 'confirming')
-      await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1 })
+      await waitForTransactionReceipt(config, { hash: txHash, chainId, confirmations: 1 })
       markStepCompleted(scope, confirmStepKey)
       return txHash
     }
@@ -154,7 +184,7 @@ export function useChainedTransactionFlow() {
       failFlow(scope, message)
       throw new Error(message)
     }
-  }, [activateStep, failFlow, markStepCompleted, publicClient, setTxHash, warnFlow])
+  }, [activateStep, config, failFlow, markStepCompleted, setTxHash, warnFlow])
 
   const finishFlow = useCallback((scope: ScopedTransactionUpdate, payload: TransactionSuccessPayload) => {
     completeFlow(scope, payload)
@@ -164,6 +194,7 @@ export function useChainedTransactionFlow() {
     startFlow,
     activateStep,
     markStepCompleted,
+    runSwitchChainStep,
     runSignatureStep,
     runTransactionStep,
     finishFlow,

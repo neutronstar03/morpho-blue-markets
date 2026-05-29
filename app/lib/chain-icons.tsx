@@ -1,16 +1,14 @@
 import type { ComponentType } from 'react'
-import {
-  NetworkArbitrumOne,
-  NetworkBase,
-  NetworkEthereum,
-  NetworkHyperEvm,
-  NetworkKatana,
-  NetworkMonad,
-  NetworkOptimism,
-  NetworkPolygon,
-  NetworkStable,
-  NetworkUnichain,
-} from '@web3icons/react'
+import NetworkArbitrumOne from '@web3icons/react/icons/networks/NetworkArbitrumOne'
+import NetworkBase from '@web3icons/react/icons/networks/NetworkBase'
+import NetworkEthereum from '@web3icons/react/icons/networks/NetworkEthereum'
+import NetworkHyperEvm from '@web3icons/react/icons/networks/NetworkHyperEvm'
+import NetworkKatana from '@web3icons/react/icons/networks/NetworkKatana'
+import NetworkMonad from '@web3icons/react/icons/networks/NetworkMonad'
+import NetworkOptimism from '@web3icons/react/icons/networks/NetworkOptimism'
+import NetworkPolygon from '@web3icons/react/icons/networks/NetworkPolygon'
+import NetworkStable from '@web3icons/react/icons/networks/NetworkStable'
+import NetworkUnichain from '@web3icons/react/icons/networks/NetworkUnichain'
 
 export type ChainIconComponent = ComponentType<{
   size?: string | number

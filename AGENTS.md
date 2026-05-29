@@ -7,7 +7,7 @@ Name of the project: MBM - Morpho Blue Markets
 Runtime/toolchain: Node 20 + bun
 
 - Install: bun install
-- Dev: bun run dev (React Router dev server plus Wrangler Pages dev proxy for local `/api/*` calls)
+- Dev: bun run dev (React Router dev server with local Vite shims for Pages Functions)
 - Frontend-only dev: bun run dev:frontend
 - Cloudflare Pages preview: bun run preview:cf
 - Typecheck (fast): bun run typecheck
@@ -29,6 +29,8 @@ For more technical information, refer to the `AGENTS.technology.md` file.
 - Do not commit secrets or credentials.
 - Do not edit generated outputs without a clear reason.
 - Avoid lockfile churn unless required by a dependency change.
+- Do not put `wrangler pages dev --proxy` back into the normal `bun run dev` path; on Windows it can spin a Wrangler Node child at about one full CPU core after rebuild/HMR.
+- Do not import from `@web3icons/react` barrel or dynamic entrypoints; use direct icon module imports or `CHAIN_ICON_BY_ID` to avoid thousands of Vite dev requests.
 
 ## Verification (before you say "done")
 - bun run typecheck

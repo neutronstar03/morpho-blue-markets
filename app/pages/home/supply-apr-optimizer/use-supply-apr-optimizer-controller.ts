@@ -1,4 +1,4 @@
-import type { AutoStepInfo, LoanAssetOption, OptimizerMarketMeta } from './shared'
+import type { AutoStepInfo, LoanAssetOption, OptimizerChainOption, OptimizerMarketMeta } from './shared'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import type { SupplyOptimizerDebugRequest } from '~/lib/optimizer/supply-apr-optimizer-debugger'
 import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
@@ -37,6 +37,7 @@ import { buildMoveSizeCacheKey, trimTrailingZerosDecimalString } from '~/lib/opt
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
+import { configuredWagmiChainIds } from '~/lib/wagmi'
 
 // Orchestrates the supply optimizer end-to-end: asset selection, live/onchain reads, worker runs, cached auto-step heuristics, result shaping, and preset/debug wiring.
 
@@ -67,8 +68,16 @@ export function useSupplyAprOptimizerController() {
   const { address: userAddress, chain } = useAccount()
   const walletChainId = useChainId()
   const { viewingAddress, isViewingWallet } = useViewingWallet()
+  const optimizerPreset = useHomeMagicOptimizerStore(state => state.optimizerPreset)
+  const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
+  const consumeFreshPrecomputedResult = useHomeMagicOptimizerStore(state => state.consumeFreshPrecomputedResult)
   const effectiveUserAddress = viewingAddress ?? userAddress
-  const effectiveChainId = chain?.id ?? walletChainId
+  const effectiveChainId = optimizerPreset?.chainId ?? ctx.selection.chainId ?? chain?.id ?? walletChainId
+  const optimizerChainOptions = useMemo<OptimizerChainOption[]>(() => {
+    return [...configuredWagmiChainIds]
+      .map(chainId => ({ chainId, name: getSupportedChainName(chainId) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [])
   const newDepositAmount = ctx.inputs.newDepositAmount
   const setDerived = ctx.setDerived
   const setNewDepositAmount = ctx.setNewDepositAmount
@@ -95,10 +104,6 @@ export function useSupplyAprOptimizerController() {
     const parsed = parseTokenAmount(raw, 16)
     return parsed >= 0n ? parsed : 2_500_000_000_000_000n
   }, [skipThreshold])
-  const optimizerPreset = useHomeMagicOptimizerStore(state => state.optimizerPreset)
-  const consumeOptimizerPreset = useHomeMagicOptimizerStore(state => state.consumeOptimizerPreset)
-  const consumeFreshPrecomputedResult = useHomeMagicOptimizerStore(state => state.consumeFreshPrecomputedResult)
-
   const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions({ address: effectiveUserAddress, chainId: effectiveChainId })
 
   const ownedLoanAssetOptions = useMemo<LoanAssetOption[]>(() => {
@@ -208,19 +213,20 @@ export function useSupplyAprOptimizerController() {
   })
   const topMarkets = topMarketsQuery.data
 
-  const { data: walletBalanceRaw } = useTokenBalance(selectedOption?.address ?? ZERO_ADDRESS, selectedOption ? effectiveUserAddress : undefined)
+  const { data: walletBalanceRaw } = useTokenBalance(selectedOption?.address ?? ZERO_ADDRESS, selectedOption ? effectiveUserAddress : undefined, effectiveChainId)
 
   const morphoAddress = useMemo(() => getMorphoBlueAddress(effectiveChainId), [effectiveChainId])
   const userMarketStateContracts = useMemo(() => {
     if (!selectedOption || selectedUserMarkets.length === 0)
       return []
     return selectedUserMarkets.map(m => ({
+      chainId: effectiveChainId,
       address: morphoAddress,
       abi: SIMPLIFIED_MORPHO_BLUE_ABI,
       functionName: 'market' as const,
       args: [m.market.uniqueKey as `0x${string}`] as const,
     }))
-  }, [selectedOption, selectedUserMarkets, morphoAddress])
+  }, [effectiveChainId, selectedOption, selectedUserMarkets, morphoAddress])
 
   const { data: userMarketStates } = useReadContracts({
     contracts: userMarketStateContracts as any,
@@ -341,6 +347,8 @@ export function useSupplyAprOptimizerController() {
     lastNonNullChainIdRef.current = currentChainId
     if (previousNonNull == null || previousNonNull === currentChainId)
       return
+    if (ctx.selection.chainId === currentChainId)
+      return
     // The worker, derived positions, and cached move heuristics are chain-specific, so reset everything before the next run starts on the new chain.
     stopOptimizerWorker()
     ctx.clear()
@@ -353,7 +361,7 @@ export function useSupplyAprOptimizerController() {
 
   useEffect(() => () => stopOptimizerWorker(), [stopOptimizerWorker])
 
-  const publicClient = usePublicClient()
+  const publicClient = usePublicClient({ chainId: effectiveChainId })
   const optimizeReadResult = useSupplyOptimizerReads({
     input: optimizeRequest,
     morphoAddress,
@@ -500,6 +508,18 @@ export function useSupplyAprOptimizerController() {
     ctx.setMarketApr(resolveMarketAprByAssetSymbol(opt?.symbol, marketAprBySymbol))
     ctx.setNewDepositAmount(undefined)
   }, [ctx, effectiveChainId, loanAssetOptions, marketAprBySymbol])
+
+  const onChangeOptimizerChain = useCallback((nextChainId: number) => {
+    stopOptimizerWorker()
+    setOptimizeRequest(null)
+    setAutoStepInfo(null)
+    setRunProgressLabel(null)
+    setRunProgressPercent(null)
+    heuristicCacheRef.current.clear()
+    ctx.clear()
+    ctx.setSelection({ chainId: nextChainId })
+    ctx.setMarketApr(DEFAULT_MARKET_APR)
+  }, [ctx, stopOptimizerWorker])
 
   const onChangeMarketApr = useCallback((value: string) => {
     ctx.setMarketApr(value)
@@ -777,7 +797,7 @@ export function useSupplyAprOptimizerController() {
   }, [])
 
   useEffect(() => {
-    if (!optimizerPreset || !effectiveChainId || optimizerPreset.chainId !== effectiveChainId)
+    if (!optimizerPreset || !effectiveChainId)
       return
 
     // Reuse a still-fresh precomputed result when possible so clicking an opportunity card can open the optimizer with an answer instead of forcing a rerun.
@@ -827,10 +847,14 @@ export function useSupplyAprOptimizerController() {
     selectedOption,
     symbol,
     walletBalanceRaw,
+    optimizerChainId: effectiveChainId,
+    optimizerChainName: effectiveChainId ? getSupportedChainName(effectiveChainId) : undefined,
+    optimizerChainOptions,
     maxMarketsInput,
     setMaxMarketsInput,
     strategyInput,
     onChangeStrategy,
+    onChangeOptimizerChain,
     onChangeLoanAsset,
     onChangeMarketApr,
     onFillMaxDeposit,

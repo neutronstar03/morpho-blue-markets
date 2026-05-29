@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { erc20Abi, formatUnits } from 'viem'
 import { useAccount, useReadContract, useSignTypedData, useSimulateContract, useWriteContract } from 'wagmi'
 import { MORPHO_AUTH_ABI, PERMIT2_ALLOWANCE_TRANSFER_ABI } from '~/lib/abis/bundler3'
+import { getSupportedChainName } from '~/lib/addresses'
 import { trackEvent } from '~/lib/analytics'
 import { getBundler3Config, PERMIT2_ADDRESS } from '~/lib/bundler3/addresses'
 import { makeBundler3MulticallRequest } from '~/lib/bundler3/multicall'
@@ -45,7 +46,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
   const [permit2Sig, setPermit2Sig] = useState<Hex | undefined>(undefined)
   const [executeError, setExecuteError] = useState<string | undefined>(undefined)
   const [isRunningFlow, setIsRunningFlow] = useState(false)
-  const { startFlow, runSignatureStep, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
+  const { startFlow, runSwitchChainStep, runSignatureStep, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
 
   const [frozenNowSec, setFrozenNowSec] = useState<bigint>(() => BigInt(Math.floor(Date.now() / 1000)))
   useEffect(() => {
@@ -64,7 +65,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
     return [...ids.values()].map(x => x as `0x${string}`)
   }, [displayResult.positions])
 
-  const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress, executeMarketIds)
+  const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress, executeMarketIds, chainId)
 
   const isMorphoAuthorizedRead = useReadContract({
     chainId,
@@ -189,7 +190,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
   })
 
   const USDT_MAINNET_ADDRESS = '0xdac17f958d2ee523a2206206994597c13d831ec7'
-  const isUsdtMainnet = chain?.id === 1 && loanToken.address.toLowerCase() === USDT_MAINNET_ADDRESS
+  const isUsdtMainnet = chainId === 1 && loanToken.address.toLowerCase() === USDT_MAINNET_ADDRESS
   // Mainnet USDT's approve is non-standard and returns no bool, so simulate it with a no-return ABI.
   const USDT_APPROVE_NO_RETURN_ABI = [
     {
@@ -304,6 +305,9 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
     })
 
     const steps = [] as Array<{ key: string, label: string }>
+    const needsNetworkSwitch = chain?.id !== chainId
+    if (needsNetworkSwitch)
+      steps.push({ key: 'switchNetwork', label: `Switch to ${getSupportedChainName(chainId)}` })
     if (!latestStateRef.current.isMorphoAuthorized) {
       steps.push({ key: 'authorizeWallet', label: 'Confirm adapter authorization in wallet' })
       steps.push({ key: 'authorizeConfirm', label: 'Confirming adapter authorization onchain' })
@@ -326,6 +330,15 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
     })
 
     try {
+      if (needsNetworkSwitch) {
+        await runSwitchChainStep({
+          scope,
+          stepKey: 'switchNetwork',
+          chainId,
+          chainName: getSupportedChainName(chainId),
+        })
+      }
+
       if (!latestStateRef.current.isMorphoAuthorized) {
         const authorizeRequest = latestStateRef.current.authorizeRequest
         if (!authorizeRequest)
@@ -432,7 +445,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
     finally {
       setIsRunningFlow(false)
     }
-  }, [bundleBuild, bundlerCfg, chainId, displayResult.positions.length, failTransactionFlow, finishFlow, getErrorMessage, loanToken.decimals, loanToken.symbol, onExecutedSuccess, refreshPrerequisites, resetExecutionState, runSignatureStep, runTransactionStep, signTypedDataAsync, startFlow, writeContractAsync])
+  }, [bundleBuild, bundlerCfg, chain?.id, chainId, displayResult.positions.length, failTransactionFlow, finishFlow, getErrorMessage, loanToken.decimals, loanToken.symbol, onExecutedSuccess, refreshPrerequisites, resetExecutionState, runSignatureStep, runSwitchChainStep, runTransactionStep, signTypedDataAsync, startFlow, writeContractAsync])
 
   return {
     bundlerCfg,

@@ -54,10 +54,10 @@ export const config = getDefaultConfig({
     ], { rank: false, retryCount: 2 }),
     [base.id]: fallback([
       http('https://1rpc.io/base'),
-      http('https://base.meowrpc.com'),
       http('https://base-rpc.publicnode.com'),
       http('https://base.drpc.org'),
       http('https://endpoints.omniatech.io/v1/base/mainnet/public'),
+      http('https://0xrpc.io/base'),
     ], { rank: false, retryCount: 2 }),
     [arbitrum.id]: fallback([
       http('https://arbitrum-one-rpc.publicnode.com'),
@@ -96,3 +96,5 @@ export const config = getDefaultConfig({
     ], { rank: false, retryCount: 2 }),
   },
 })
+
+export const configuredWagmiChainIds: ReadonlySet<number> = new Set(config.chains.map(chain => chain.id))

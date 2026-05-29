@@ -30,7 +30,7 @@ export function SupplyRatesCollapsible({ market }: Props) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+        className="flex w-full cursor-pointer items-center justify-between px-3 py-2.5 text-left"
       >
         <span className="text-sm font-medium text-gray-300">Supply Rates</span>
         <div className="flex items-center gap-2">
