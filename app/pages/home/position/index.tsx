@@ -11,6 +11,7 @@ import { formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
+import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { configuredWagmiChainIds } from '~/lib/wagmi'
 import { PositionNetworkSection } from './position-network-section'
 
@@ -36,6 +37,7 @@ function PositionClient() {
     refetch,
     dataUpdatedAt,
   } = useUserPositionsAcrossChains(effectiveAddress)
+  const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
 
   const timeAgo = dataUpdatedAt > 0 ? formatTimeAgo(dataUpdatedAt) : ''
   const networkChainIds = useMemo(() => {
@@ -122,8 +124,8 @@ function PositionClient() {
             <p className="text-xs text-gray-400">Networks</p>
             <p className="text-xs sm:text-sm text-white">{networkChainIds.length || '—'}</p>
           </div>
-          <Button onClick={() => void refetch()} disabled={isLoading}>
-            {isLoading ? 'Refreshing…' : 'Refresh'}
+          <Button onClick={() => handleRefresh()} disabled={isRefreshing || isCooldown}>
+            {isRefreshing ? 'Refreshing…' : isCooldown ? 'Refreshed' : 'Refresh'}
           </Button>
         </div>
       </div>
