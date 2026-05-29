@@ -31,13 +31,18 @@ function PositionClient() {
   const chainId = chain?.id ?? walletChainId
   const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
   const [chainPortfolioById, setChainPortfolioById] = useState<Record<number, ChainPortfolioState>>({})
+  const [liveRefreshKey, setLiveRefreshKey] = useState(0)
   const {
     data: crossChainPositions,
     isLoading,
     refetch,
     dataUpdatedAt,
   } = useUserPositionsAcrossChains(effectiveAddress)
-  const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
+  const handlePositionsRefresh = useCallback(async () => {
+    await refetch()
+    setLiveRefreshKey(key => key + 1)
+  }, [refetch])
+  const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(handlePositionsRefresh)
 
   const timeAgo = dataUpdatedAt > 0 ? formatTimeAgo(dataUpdatedAt) : ''
   const networkChainIds = useMemo(() => {
@@ -171,6 +176,7 @@ function PositionClient() {
                       address={effectiveAddress as `0x${string}`}
                       defaultOpen={networkChainId === chainId || index === 0}
                       marketAprBySymbol={marketAprBySymbol}
+                      refreshKey={liveRefreshKey}
                       onPortfolioChange={handleChainPortfolioChange}
                     />
                   ))}

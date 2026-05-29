@@ -3,7 +3,7 @@ import type { SupportedChain } from '~/lib/addresses'
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount, useReadContract, useReadContracts } from 'wagmi'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName, morphoAddressOnChain } from '~/lib/addresses'
@@ -43,10 +43,11 @@ interface RateAtTargetCall {
  *
  * This avoids iterating over all ~1000 markets on a chain.
  */
-export function useLiveMarketPositions(options: { address?: Address, chainId?: number } = {}) {
+export function useLiveMarketPositions(options: { address?: Address, chainId?: number, refreshKey?: number } = {}) {
   const { address: connectedAddress, chain } = useAccount()
   const userAddress = options.address ?? connectedAddress
   const chainId = options.chainId ?? chain?.id
+  const [readInstanceKey] = useState(() => Date.now())
   const [projectionTimestamp, setProjectionTimestamp] = useState(() => Math.floor(Date.now() / 1000))
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
   const {
     data: graphPositions,
     isLoading: isLoadingGraph,
+    isFetching: isFetchingGraph,
     refetch: refetchGraph,
     dataUpdatedAt: graphUpdatedAt,
   } = useUserPositions(userAddress, chainId)
@@ -117,15 +119,21 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
       }))
   }, [chainId, graphPositions])
 
+  const liveReadScopeKey = useMemo(() => {
+    return `live-market-positions:${chainId ?? 'none'}:${userAddress ?? 'none'}:${options.refreshKey ?? 0}:${readInstanceKey}`
+  }, [chainId, options.refreshKey, readInstanceKey, userAddress])
+
   // Step 3: Fetch live position data from RPC
   const {
     data: positionResults,
     isLoading: isLoadingPositions,
+    isFetching: isFetchingPositions,
     refetch: refetchPositions,
     dataUpdatedAt: rpcUpdatedAt,
   } = useReadContracts({
     contracts: multicallContracts,
     allowFailure: true,
+    scopeKey: `${liveReadScopeKey}:positions`,
     query: {
       enabled: !!graphPositions && graphPositions.length > 0 && !!userAddress && !!morphoAddress,
       refetchOnMount: 'always',
@@ -137,6 +145,7 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
   const {
     data: rateAtTargetResults,
     isLoading: isLoadingRateAtTarget,
+    isFetching: isFetchingRateAtTarget,
     refetch: refetchRateAtTarget,
     dataUpdatedAt: rateAtTargetUpdatedAt,
   } = useReadContracts({
@@ -151,11 +160,13 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
   const {
     data: marketResults,
     isLoading: isLoadingMarkets,
+    isFetching: isFetchingMarkets,
     refetch: refetchMarkets,
     dataUpdatedAt: marketsUpdatedAt,
   } = useReadContracts({
     contracts: marketContracts,
     allowFailure: true,
+    scopeKey: `${liveReadScopeKey}:markets`,
     query: {
       enabled: !!graphPositions && graphPositions.length > 0 && !!morphoAddress,
       refetchOnMount: 'always',
@@ -186,29 +197,18 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
       }
     }
 
-    // If RPC data is not ready yet, use GraphQL data for display
-    // This gives us immediate feedback while RPC is loading
-    if (!hasPositionResults && !hasMarketResults) {
-      return graphPositions
-        .map(gp => buildLiveMarketPosition({
-          metadata: liveMarketMetadataFromGraphPosition(gp),
-          graphUserState: gp.state,
-          projectionTimestamp,
-        }))
-        .filter((p): p is LiveMarketPosition => p !== null)
-    }
-
-    // Merge with live RPC data
     return graphPositions
       .map((gp, index): LiveMarketPosition | null => {
         const result = hasPositionResults ? positionResults[index] : undefined
         const marketResult = hasMarketResults ? marketResults[index] : undefined
+        if (result?.status !== 'success' || marketResult?.status !== 'success')
+          return null
 
         return buildLiveMarketPosition({
           metadata: liveMarketMetadataFromGraphPosition(gp),
           graphUserState: gp.state,
-          positionResult: result?.status === 'success' ? result.result : undefined,
-          marketResult: marketResult?.status === 'success' ? marketResult.result : undefined,
+          positionResult: result.result,
+          marketResult: marketResult.result,
           rateAtTarget: rateAtTargetByMarketKey.get(gp.market.uniqueKey),
           projectionTimestamp,
         })
@@ -217,16 +217,25 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
   }, [graphPositions, marketResults, positionResults, projectionTimestamp, rateAtTargetResults])
 
   // Combined refetch function
-  const refetch = async () => {
+  const refetch = useCallback(async () => {
     await refetchGraph()
     await refetchPositions()
     await refetchMarkets()
     await refetchRateAtTarget()
-  }
+  }, [refetchGraph, refetchMarkets, refetchPositions, refetchRateAtTarget])
+
+  useEffect(() => {
+    if (!options.refreshKey)
+      return
+    void refetch()
+  }, [options.refreshKey, refetch])
+
+  const hasPendingLiveReads = !!graphPositions?.length && (!positionResults || !marketResults)
 
   return {
     data: userPositions,
-    isLoading: isLoadingGraph || isLoadingPositions || isLoadingMarkets || isLoadingRateAtTarget,
+    isLoading: isLoadingGraph || isLoadingPositions || isLoadingMarkets || isLoadingRateAtTarget || hasPendingLiveReads,
+    isFetching: isFetchingGraph || isFetchingPositions || isFetchingMarkets || isFetchingRateAtTarget,
     refetch,
     dataUpdatedAt: Math.max(graphUpdatedAt, rpcUpdatedAt, marketsUpdatedAt, rateAtTargetUpdatedAt),
   }

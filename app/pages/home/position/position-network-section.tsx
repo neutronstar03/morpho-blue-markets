@@ -2,7 +2,7 @@ import type { Portfolio, PositionGroup } from './position-types'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import type { MarketRiskInput } from '~/lib/market-risk/types'
 import type { LiveMarketPosition } from '~/lib/morpho/live-position'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { getSupportedChainName } from '~/lib/addresses'
 import { trackEvent } from '~/lib/analytics'
@@ -91,12 +91,14 @@ export function PositionNetworkSection({
   address,
   defaultOpen,
   marketAprBySymbol,
+  refreshKey,
   onPortfolioChange,
 }: {
   chainId: number
   address: `0x${string}`
   defaultOpen: boolean
   marketAprBySymbol: MarketAprBySymbolMap
+  refreshKey?: number
   onPortfolioChange?: (chainId: number, state: { portfolio: Portfolio, positionCount: number, isLoading: boolean }) => void
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
@@ -105,7 +107,7 @@ export function PositionNetworkSection({
   const chainName = getSupportedChainName(chainId)
   const Icon = CHAIN_ICON_BY_ID[chainId]
 
-  const { data: positions, isLoading } = useLiveMarketPositions({ address, chainId })
+  const { data: positions, isLoading, isFetching } = useLiveMarketPositions({ address, chainId, refreshKey })
   const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
   const { aprByMarketKey } = useLiveMarketApr(markets, { chainId })
   const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()
@@ -206,9 +208,15 @@ export function PositionNetworkSection({
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-white sm:text-base">{chainName}</span>
           <span className="block text-xs text-gray-500">
-            {isLoading && visiblePositions.length === 0 ? 'Loading positions...' : positionSummary}
+            {isLoading && visiblePositions.length === 0 ? 'Loading live positions...' : positionSummary}
           </span>
         </span>
+        {isFetching && visiblePositions.length > 0 && (
+          <span className="hidden items-center gap-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200 sm:flex">
+            <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
+            Updating
+          </span>
+        )}
         <span className="grid shrink-0 grid-cols-2 gap-3 text-right sm:gap-6">
           <span>
             <span className="block text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">Assets</span>
@@ -233,7 +241,7 @@ export function PositionNetworkSection({
           {isLoading && visiblePositions.length === 0
             ? (
                 <p className="text-sm text-gray-400">
-                  Loading
+                  Loading live
                   {chainName}
                   {' '}
                   positions...
