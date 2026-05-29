@@ -101,7 +101,11 @@ export function SupplyAprOptimizerForm({
                 ? <OptimizerChainIcon size={18} variant="branded" className="h-[18px] w-[18px]" />
                 : <span className="text-xs font-semibold">{optimizerChainName?.slice(0, 1) ?? '?'}</span>}
             </SelectTrigger>
-            <SelectContent align="start">
+            <SelectContent
+              align="start"
+              position="popper"
+              className="z-[80] border-gray-700 bg-gray-950 text-white"
+            >
               <SelectGroup>
                 <SelectLabel>Network</SelectLabel>
                 {optimizerChainOptions.map((option) => {

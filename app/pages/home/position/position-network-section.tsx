@@ -89,19 +89,20 @@ function computePortfolio(
 export function PositionNetworkSection({
   chainId,
   address,
-  defaultOpen,
+  isOpen,
+  onOpenChange,
   marketAprBySymbol,
   refreshKey,
   onPortfolioChange,
 }: {
   chainId: number
   address: `0x${string}`
-  defaultOpen: boolean
+  isOpen: boolean
+  onOpenChange: (isOpen: boolean) => void
   marketAprBySymbol: MarketAprBySymbolMap
   refreshKey?: number
   onPortfolioChange?: (chainId: number, state: { portfolio: Portfolio, positionCount: number, isLoading: boolean }) => void
 }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
   const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'native' | 'yearly'>('total')
   const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
   const chainName = getSupportedChainName(chainId)
@@ -196,7 +197,7 @@ export function PositionNetworkSection({
     <section className="overflow-hidden rounded-xl border border-gray-800 bg-gray-950/30" data-testid="positions-chain-section">
       <button
         type="button"
-        onClick={() => setIsOpen(open => !open)}
+        onClick={() => onOpenChange(!isOpen)}
         className="flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-gray-900/70 sm:px-4"
         aria-expanded={isOpen}
       >
