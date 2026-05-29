@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.0 - 2026-05-29
+
+### Added
+- feat: Positions now discovers and displays live positions across configured networks without requiring wallet chain switching for reads.
+- feat: Supply APR optimizer and Batch withdraw now include explicit network selectors and switch wallet networks only when executing transactions.
+
+### Changed
+- ux: Positions summary now centers on Total Assets, orders networks by portfolio size, keeps opened networks sticky during navigation, and uses compact mobile refresh/earnings rows.
+- data: shared live-position normalization now powers both home Positions and Market user-position displays, with GraphQL used for discovery and live RPC required for balances.
+- perf: replaced `@web3icons/react` barrel/dynamic imports with direct chain-icon imports to avoid thousands of Vite dev icon requests.
+
+### Fixed
+- fix: cross-chain actions now wait for receipts on the action chain and switch networks before writes when needed.
+- fix: removed the rate-limited Base Meow RPC endpoint from the fallback list.
+
 ## v1.5.24 - 2026-05-28
 
 ### Changed

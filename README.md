@@ -8,14 +8,15 @@ This project focuses on practical Morpho market exploration and action tooling, 
 - Supply APR optimizer for rebalance and deposit planning, with wallet fallback defaults (10% baseline APR, with asset-specific overrides such as 4% for `WETH`) and sticky per-asset Market APR preferences
 - Batch withdraw flow for lower-APR-first exits
 - Position recap grouped by lent asset, with cross-chain quick-switch pills and market-level deposit/withdraw flows
+- Cross-network Positions, Supply APR optimizer, and Batch withdraw flows that read across chains and switch wallet networks only for writes
 - Opportunity recap for coarse chain-level deployable yield evaluation
 - Blacklist recap for reviewing user-hidden and unsafe collaterals, with optional wallet-authenticated sync across devices
 
 ## Recent updates
 
+- v1.6.0: Added multi-chain-native Positions, Supply APR optimizer, and Batch withdraw flows with explicit chain selection and live RPC reads.
 - v1.5.24: Switched Market price simulation to direct KyberSwap route quotes on supported chains, with 0x kept only as deprecated rollback code.
 - v1.5.23: Restored full-stack local dev through Wrangler Pages while pinning Wrangler to avoid idle CPU spin, and added Market header copy actions.
-- v1.5.22: Market page query failures now show a concise recoverable warning instead of raw GraphQL error payloads.
 
 ## Development
 
@@ -79,9 +80,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.6.0` (2026-05-29): Added multi-chain-native Positions, Supply APR optimizer, and Batch withdraw flows with explicit chain selection and live RPC reads.
 - `v1.5.24` (2026-05-28): Switched Market price simulation to direct KyberSwap route quotes on supported chains, with 0x kept only as deprecated rollback code.
 - `v1.5.23` (2026-05-28): Restored full-stack local dev through Wrangler Pages while pinning Wrangler to avoid idle CPU spin, and added Market header copy actions.
-- `v1.5.22` (2026-05-27): Market page query failures now show a concise recoverable warning instead of raw GraphQL error payloads.
 
 ## Live Version
 
