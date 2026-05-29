@@ -6,6 +6,11 @@ export interface LoanAssetOption {
   decimals: number
 }
 
+export interface BatchWithdrawChainOption {
+  chainId: number
+  name: string
+}
+
 export interface MarketPlanItem {
   marketId: `0x${string}`
   collateralSymbol: string

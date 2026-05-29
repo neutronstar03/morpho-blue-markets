@@ -65,7 +65,7 @@ export function useBundleOptimizerExecution(props: BundleOptimizerExecutionProps
     return [...ids.values()].map(x => x as `0x${string}`)
   }, [displayResult.positions])
 
-  const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress, executeMarketIds)
+  const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress, executeMarketIds, chainId)
 
   const isMorphoAuthorizedRead = useReadContract({
     chainId,

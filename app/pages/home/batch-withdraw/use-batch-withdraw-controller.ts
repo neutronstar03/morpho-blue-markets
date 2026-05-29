@@ -21,6 +21,7 @@ import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
 import { isConfirmationDelayedError, useChainedTransactionFlow, waitForTruthy } from '~/lib/transactions/use-chained-transaction-flow'
+import { configuredWagmiChainIds } from '~/lib/wagmi'
 import { max0, minBigint } from './shared'
 
 // Builds a lowest-APR-first batch withdraw plan from live positions, then drives the guided Bundler3 execution flow when that plan is executable.
@@ -38,21 +39,19 @@ export function useBatchWithdrawController() {
   const walletChainId = useChainId()
   const { viewingAddress, isViewingWallet } = useViewingWallet()
   const effectiveUserAddress = viewingAddress ?? userAddress
-  const chainId = chain?.id ?? walletChainId
+  const chainId = ctx.selection.chainId ?? chain?.id ?? walletChainId
   const chainNameForLinks = chainId ? getSupportedChainName(chainId) : undefined
 
   const [executeError, setExecuteError] = useState<string | undefined>(undefined)
   const [isRunningFlow, setIsRunningFlow] = useState(false)
   const { startFlow, runSwitchChainStep, runTransactionStep, finishFlow, failFlow: failTransactionFlow, getErrorMessage } = useChainedTransactionFlow()
 
-  useEffect(() => {
-    if (!chainId)
-      return
-    const stored = ctx.selection.chainId
-    // A stored selection from another chain would point at the wrong markets and approvals, so drop the whole plan on chain switch.
-    if (stored != null && stored !== chainId)
-      ctx.clear()
-  }, [chainId, ctx])
+  const chainOptions = useMemo(() => {
+    return [...configuredWagmiChainIds]
+      .filter(optionChainId => !!getBundler3Config(optionChainId))
+      .map(optionChainId => ({ chainId: optionChainId, name: getSupportedChainName(optionChainId) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [])
 
   const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions({ address: effectiveUserAddress, chainId })
   const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()
@@ -99,6 +98,12 @@ export function useBatchWithdrawController() {
     setExecuteError(undefined)
   }, [chainId, ctx])
 
+  const onChangeChain = useCallback((nextChainId: number) => {
+    ctx.setSelection({ chainId: nextChainId })
+    ctx.setWithdrawAmount(undefined)
+    setExecuteError(undefined)
+  }, [ctx])
+
   const selectedUserMarkets = useMemo(() => {
     if (!selectedOption)
       return []
@@ -117,11 +122,12 @@ export function useBatchWithdrawController() {
       return []
     return selectedUserMarkets.map(m => ({
       address: morphoAddress,
+      chainId,
       abi: SIMPLIFIED_MORPHO_BLUE_ABI,
       functionName: 'market' as const,
       args: [m.market.uniqueKey as `0x${string}`] as const,
     }))
-  }, [morphoAddress, selectedUserMarkets])
+  }, [chainId, morphoAddress, selectedUserMarkets])
 
   const marketStatesRead = useReadContracts({
     contracts: marketStateContracts as any,
@@ -137,11 +143,12 @@ export function useBatchWithdrawController() {
       return []
     return selectedUserMarkets.map(m => ({
       address: m.market.irmAddress as `0x${string}`,
+      chainId,
       abi: IRM_RATE_AT_TARGET_ABI,
       functionName: 'rateAtTarget' as const,
       args: [m.market.uniqueKey as `0x${string}`] as const,
     }))
-  }, [selectedUserMarkets])
+  }, [chainId, selectedUserMarkets])
 
   const rateAtTargetRead = useReadContracts({
     contracts: rateAtTargetContracts as any,
@@ -416,7 +423,7 @@ export function useBatchWithdrawController() {
     return [...ids.values()].map(x => x as `0x${string}`)
   }, [hasPlan, plan.items])
 
-  const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress as Address | undefined, executeMarketIds)
+  const { marketParamsRead, marketParamsById } = useMarketParamsById(!!bundlerCfg, morphoAddress as Address | undefined, executeMarketIds, chainId)
 
   const isMorphoAuthorizedRead = useReadContract({
     chainId,
@@ -688,6 +695,7 @@ export function useBatchWithdrawController() {
     isViewingWallet,
     chainId,
     chainNameForLinks,
+    chainOptions,
     isLoadingPositions,
     loanAssetOptions,
     selectedLoanAssetAddress,
@@ -701,6 +709,7 @@ export function useBatchWithdrawController() {
     execution,
     executeError,
     clear,
+    onChangeChain,
     onChangeLoanAsset,
     onChangeWithdrawAmount: ctx.setWithdrawAmount,
     hasSomethingToClear: !!selectedLoanAssetAddress || !!withdrawAmount || !!executeError,
