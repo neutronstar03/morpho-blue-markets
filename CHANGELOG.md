@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.1 - 2026-05-31
+
+### Fixed
+- fix: blacklist sync now preserves cross-device removals with deletion tombstones, preventing stale desktop/mobile sessions from resurrecting restored collaterals, oracles, and lost-value markets.
+- fix: blacklist sync pushes now pull, merge, and write remote state, with server-side merge protection for near-simultaneous device updates.
+
+### Tests
+- test: added focused blacklist sync merge coverage for tombstone conflicts and independent desktop/mobile changes.
+
 ## v1.6.0 - 2026-05-29
 
 ### Added

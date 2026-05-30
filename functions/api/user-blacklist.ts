@@ -11,12 +11,12 @@ interface TokenRecord {
 }
 
 interface UserBlacklistBlob {
-  // Compact KV shape: c=collaterals, o=oracles, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; s/n=symbol/name; p=provider; ls/cs=loan/collateral symbols; la/ca=loan/collateral addresses.
+  // Compact KV shape: c=collaterals, o=oracles, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; d=deleted tombstone.
   v: 1
   u: number
-  c?: Record<string, Record<string, { t: number, s?: string, n?: string }>>
-  o?: Record<string, Record<string, { t: number, p?: string, cs?: string }>>
-  w?: Record<string, Record<string, { t: number, ls?: string, cs?: string, la?: string, ca?: string }>>
+  c?: Record<string, Record<string, { t: number, s?: string, n?: string, d?: true }>>
+  o?: Record<string, Record<string, { t: number, p?: string, cs?: string, d?: true }>>
+  w?: Record<string, Record<string, { t: number, ls?: string, cs?: string, la?: string, ca?: string, d?: true }>>
 }
 
 const MAX_BODY_BYTES = 32 * 1024
@@ -75,6 +75,39 @@ function emptyBlob(): UserBlacklistBlob {
   return { v: 1, u: Date.now(), c: {}, o: {}, w: {} }
 }
 
+function mergeBlob(a: UserBlacklistBlob, b: UserBlacklistBlob): UserBlacklistBlob {
+  const merged = emptyBlob()
+
+  for (const blob of [a, b]) {
+    for (const [chainId, entries] of Object.entries(blob.c ?? {})) {
+      merged.c![chainId] ??= {}
+      for (const [address, entry] of Object.entries(entries)) {
+        const existing = merged.c![chainId][address]
+        if (!existing || entry.t >= existing.t)
+          merged.c![chainId][address] = entry
+      }
+    }
+    for (const [chainId, entries] of Object.entries(blob.o ?? {})) {
+      merged.o![chainId] ??= {}
+      for (const [address, entry] of Object.entries(entries)) {
+        const existing = merged.o![chainId][address]
+        if (!existing || entry.t >= existing.t)
+          merged.o![chainId][address] = entry
+      }
+    }
+    for (const [chainId, entries] of Object.entries(blob.w ?? {})) {
+      merged.w![chainId] ??= {}
+      for (const [marketId, entry] of Object.entries(entries)) {
+        const existing = merged.w![chainId][marketId]
+        if (!existing || entry.t >= existing.t)
+          merged.w![chainId][marketId] = entry
+      }
+    }
+  }
+
+  return merged
+}
+
 function validateBlob(raw: unknown): UserBlacklistBlob | null {
   if (!raw || typeof raw !== 'object')
     return null
@@ -98,15 +131,16 @@ function validateBlob(raw: unknown): UserBlacklistBlob | null {
         const address = normalizeAddress(rawAddress)
         if (!address || !entry || typeof entry !== 'object')
           return null
-        const value = entry as { t?: unknown, s?: unknown, n?: unknown }
+        const value = entry as { t?: unknown, s?: unknown, n?: unknown, d?: unknown }
         const t = normalizeTimestamp(value.t)
-        if (!t)
+        if (!t || (value.d != null && value.d !== true))
           return null
         blob.c![chainId] ??= {}
         blob.c![chainId][address] = {
           t,
           s: normalizeText(value.s, 32),
           n: normalizeText(value.n, 120),
+          d: value.d === true ? true : undefined,
         }
       }
     }
@@ -124,15 +158,16 @@ function validateBlob(raw: unknown): UserBlacklistBlob | null {
         const address = normalizeAddress(rawAddress)
         if (!address || !entry || typeof entry !== 'object')
           return null
-        const value = entry as { t?: unknown, p?: unknown, cs?: unknown }
+        const value = entry as { t?: unknown, p?: unknown, cs?: unknown, d?: unknown }
         const t = normalizeTimestamp(value.t)
-        if (!t)
+        if (!t || (value.d != null && value.d !== true))
           return null
         blob.o![chainId] ??= {}
         blob.o![chainId][address] = {
           t,
           p: normalizeText(value.p, 64),
           cs: normalizeText(value.cs, 32),
+          d: value.d === true ? true : undefined,
         }
       }
     }
@@ -150,9 +185,9 @@ function validateBlob(raw: unknown): UserBlacklistBlob | null {
         const marketId = normalizeMarketId(rawMarketId)
         if (!marketId || !entry || typeof entry !== 'object')
           return null
-        const value = entry as { t?: unknown, ls?: unknown, cs?: unknown, la?: unknown, ca?: unknown }
+        const value = entry as { t?: unknown, ls?: unknown, cs?: unknown, la?: unknown, ca?: unknown, d?: unknown }
         const t = normalizeTimestamp(value.t)
-        if (!t)
+        if (!t || (value.d != null && value.d !== true))
           return null
         const la = normalizeText(value.la, 64)
         const ca = normalizeText(value.ca, 64)
@@ -165,6 +200,7 @@ function validateBlob(raw: unknown): UserBlacklistBlob | null {
           cs: normalizeText(value.cs, 32),
           la: la ? normalizeAddress(la) : undefined,
           ca: ca ? normalizeAddress(ca) : undefined,
+          d: value.d === true ? true : undefined,
         }
       }
     }
@@ -282,6 +318,7 @@ export async function onRequestPut(context: EventContext<Env>): Promise<Response
   if (blob.u < stored.u - 5000)
     return errorResponse('Incoming blacklist blob is stale', 409)
 
-  await context.env.USER_BLACKLIST.put(`${BLOB_KEY_PREFIX}${wallet}`, JSON.stringify(blob))
-  return jsonResponse({ blob })
+  const merged = mergeBlob(stored, blob)
+  await context.env.USER_BLACKLIST.put(`${BLOB_KEY_PREFIX}${wallet}`, JSON.stringify(merged))
+  return jsonResponse({ blob: merged })
 }

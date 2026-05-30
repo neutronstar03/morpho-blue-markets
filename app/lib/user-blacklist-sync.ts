@@ -1,9 +1,12 @@
 // Orchestrates wallet-authenticated sync between local blacklist preferences and the backend blob.
 import { useEffect, useSyncExternalStore } from 'react'
 import {
-  listLocallyExcludedCollaterals,
-  listLocallyExcludedOracles,
-  listMarketsLocallyMarkedLostValue,
+  clearCollateralLocallyExcludedWithTimestamp,
+  clearMarketLocallyMarkedLostValueWithTimestamp,
+  clearOracleLocallyExcludedWithTimestamp,
+  listLocalCollateralExclusionSyncRecords,
+  listLocalMarketLostValueSyncRecords,
+  listLocalOracleExclusionSyncRecords,
   setCollateralLocallyExcludedWithTimestamp,
   setMarketLocallyMarkedLostValueWithTimestamp,
   setOracleLocallyExcludedWithTimestamp,
@@ -14,6 +17,7 @@ interface SyncCollateralEntry {
   t: number
   s?: string
   n?: string
+  d?: true
 }
 
 interface SyncMarketEntry {
@@ -22,16 +26,18 @@ interface SyncMarketEntry {
   cs?: string
   la?: string
   ca?: string
+  d?: true
 }
 
 interface SyncOracleEntry {
   t: number
   p?: string
   cs?: string
+  d?: true
 }
 
 export interface UserBlacklistBlob {
-  // Compact KV shape: c=collaterals, o=oracles, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; s/n=symbol/name; p=provider; ls/cs=loan/collateral symbols; la/ca=loan/collateral addresses.
+  // Compact KV shape: c=collaterals, o=oracles, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; d=deleted tombstone.
   v: 1
   u: number
   c: Record<string, Record<string, SyncCollateralEntry>>
@@ -57,6 +63,7 @@ const API_PATH = '/api/user-blacklist'
 let activeWallet: string | undefined
 let unsubscribeLocal: (() => void) | undefined
 let debounceTimer: ReturnType<typeof setTimeout> | undefined
+let isApplyingRemoteBlob = false
 const volatileStatusByWallet = new Map<string, Pick<UserBlacklistSyncState, 'busy' | 'error'>>()
 let lastSnapshotWallet: string | undefined
 let lastSnapshotSignature = ''
@@ -185,25 +192,27 @@ function emptyBlob(updatedAt = Date.now()): UserBlacklistBlob {
 
 function localBlob(updatedAt = Date.now()): UserBlacklistBlob {
   const blob = emptyBlob(updatedAt)
-  for (const entry of listLocallyExcludedCollaterals()) {
+  for (const entry of listLocalCollateralExclusionSyncRecords()) {
     const chainId = String(entry.chainId)
     blob.c[chainId] ??= {}
     blob.c[chainId][entry.collateralAddress.toLowerCase()] = {
       t: entry.ts,
       s: entry.symbol,
       n: entry.name,
+      d: entry.deleted ? true : undefined,
     }
   }
-  for (const entry of listLocallyExcludedOracles()) {
+  for (const entry of listLocalOracleExclusionSyncRecords()) {
     const chainId = String(entry.chainId)
     blob.o[chainId] ??= {}
     blob.o[chainId][entry.oracleAddress.toLowerCase()] = {
       t: entry.ts,
       p: entry.provider,
       cs: entry.collateralSymbol,
+      d: entry.deleted ? true : undefined,
     }
   }
-  for (const entry of listMarketsLocallyMarkedLostValue()) {
+  for (const entry of listLocalMarketLostValueSyncRecords()) {
     const chainId = String(entry.chainId)
     blob.w[chainId] ??= {}
     blob.w[chainId][entry.marketUniqueKey.toLowerCase()] = {
@@ -212,6 +221,7 @@ function localBlob(updatedAt = Date.now()): UserBlacklistBlob {
       cs: entry.collateralAssetSymbol,
       la: entry.loanAssetAddress?.toLowerCase(),
       ca: entry.collateralAssetAddress?.toLowerCase(),
+      d: entry.deleted ? true : undefined,
     }
   }
   return blob
@@ -219,7 +229,7 @@ function localBlob(updatedAt = Date.now()): UserBlacklistBlob {
 
 // Last-writer-wins merge: when two devices diverge (e.g., exclusions added on each since last sync),
 // pick the entry with the latest timestamp so the most recent action survives the merge.
-function mergeBlob(a: UserBlacklistBlob, b: UserBlacklistBlob): UserBlacklistBlob {
+export function mergeUserBlacklistBlobs(a: UserBlacklistBlob, b: UserBlacklistBlob): UserBlacklistBlob {
   const merged = emptyBlob(Date.now())
 
   for (const blob of [a, b]) {
@@ -253,43 +263,61 @@ function mergeBlob(a: UserBlacklistBlob, b: UserBlacklistBlob): UserBlacklistBlo
 }
 
 function applyBlobToLocal(blob: UserBlacklistBlob) {
-  for (const [chainId, entries] of Object.entries(blob.c ?? {})) {
-    const parsedChainId = Number(chainId)
-    if (!Number.isFinite(parsedChainId))
-      continue
-    for (const [address, entry] of Object.entries(entries)) {
-      setCollateralLocallyExcludedWithTimestamp(parsedChainId, address, {
-        ts: entry.t,
-        symbol: entry.s,
-        name: entry.n,
-      })
+  isApplyingRemoteBlob = true
+  try {
+    for (const [chainId, entries] of Object.entries(blob.c ?? {})) {
+      const parsedChainId = Number(chainId)
+      if (!Number.isFinite(parsedChainId))
+        continue
+      for (const [address, entry] of Object.entries(entries)) {
+        if (entry.d) {
+          clearCollateralLocallyExcludedWithTimestamp(parsedChainId, address, entry.t)
+          continue
+        }
+        setCollateralLocallyExcludedWithTimestamp(parsedChainId, address, {
+          ts: entry.t,
+          symbol: entry.s,
+          name: entry.n,
+        })
+      }
+    }
+    for (const [chainId, entries] of Object.entries(blob.o ?? {})) {
+      const parsedChainId = Number(chainId)
+      if (!Number.isFinite(parsedChainId))
+        continue
+      for (const [address, entry] of Object.entries(entries)) {
+        if (entry.d) {
+          clearOracleLocallyExcludedWithTimestamp(parsedChainId, address, entry.t)
+          continue
+        }
+        setOracleLocallyExcludedWithTimestamp(parsedChainId, address, {
+          ts: entry.t,
+          provider: entry.p,
+          collateralSymbol: entry.cs,
+        })
+      }
+    }
+    for (const [chainId, entries] of Object.entries(blob.w ?? {})) {
+      const parsedChainId = Number(chainId)
+      if (!Number.isFinite(parsedChainId))
+        continue
+      for (const [marketId, entry] of Object.entries(entries)) {
+        if (entry.d) {
+          clearMarketLocallyMarkedLostValueWithTimestamp(parsedChainId, marketId, entry.t)
+          continue
+        }
+        setMarketLocallyMarkedLostValueWithTimestamp(parsedChainId, marketId, {
+          ts: entry.t,
+          loanAssetSymbol: entry.ls,
+          collateralAssetSymbol: entry.cs,
+          loanAssetAddress: entry.la,
+          collateralAssetAddress: entry.ca,
+        })
+      }
     }
   }
-  for (const [chainId, entries] of Object.entries(blob.o ?? {})) {
-    const parsedChainId = Number(chainId)
-    if (!Number.isFinite(parsedChainId))
-      continue
-    for (const [address, entry] of Object.entries(entries)) {
-      setOracleLocallyExcludedWithTimestamp(parsedChainId, address, {
-        ts: entry.t,
-        provider: entry.p,
-        collateralSymbol: entry.cs,
-      })
-    }
-  }
-  for (const [chainId, entries] of Object.entries(blob.w ?? {})) {
-    const parsedChainId = Number(chainId)
-    if (!Number.isFinite(parsedChainId))
-      continue
-    for (const [marketId, entry] of Object.entries(entries)) {
-      setMarketLocallyMarkedLostValueWithTimestamp(parsedChainId, marketId, {
-        ts: entry.t,
-        loanAssetSymbol: entry.ls,
-        collateralAssetSymbol: entry.cs,
-        loanAssetAddress: entry.la,
-        collateralAssetAddress: entry.ca,
-      })
-    }
+  finally {
+    isApplyingRemoteBlob = false
   }
 }
 
@@ -352,7 +380,7 @@ export async function enableUserBlacklistSync(wallet: string, message: string, s
       throw new Error('Sync token was not returned')
 
     writeToken(normalized, data.token)
-    const merged = mergeBlob(data.blob ?? emptyBlob(), localBlob())
+    const merged = mergeUserBlacklistBlobs(data.blob ?? emptyBlob(), localBlob())
     applyBlobToLocal(merged)
     await putRemoteBlob(data.token, merged)
     setSyncResult(normalized)
@@ -371,7 +399,7 @@ export async function syncUserBlacklistNow(wallet: string) {
 
   setBusy(normalized, true)
   try {
-    const merged = mergeBlob(await fetchRemoteBlob(token), localBlob())
+    const merged = mergeUserBlacklistBlobs(await fetchRemoteBlob(token), localBlob())
     applyBlobToLocal(merged)
     await putRemoteBlob(token, merged)
     setSyncResult(normalized)
@@ -389,7 +417,9 @@ export async function pushUserBlacklistSync(wallet: string) {
     return
 
   try {
-    await putRemoteBlob(token, localBlob())
+    const merged = mergeUserBlacklistBlobs(await fetchRemoteBlob(token), localBlob())
+    applyBlobToLocal(merged)
+    await putRemoteBlob(token, merged)
     setSyncResult(normalized)
   }
   catch (error) {
@@ -409,7 +439,7 @@ export async function backgroundSyncUserBlacklist(wallet: string) {
 
   lastBackgroundSyncAt = Date.now()
   try {
-    const merged = mergeBlob(await fetchRemoteBlob(token), localBlob())
+    const merged = mergeUserBlacklistBlobs(await fetchRemoteBlob(token), localBlob())
     applyBlobToLocal(merged)
     await putRemoteBlob(token, merged)
     setSyncResult(normalized)
@@ -434,6 +464,8 @@ function ensureBackgroundListener() {
   if (typeof window === 'undefined' || unsubscribeLocal)
     return
   unsubscribeLocal = subscribeLocalMarketExclusions(() => {
+    if (isApplyingRemoteBlob)
+      return
     if (!activeWallet || !readToken(activeWallet))
       return
     if (debounceTimer)
