@@ -2,6 +2,7 @@ import type { Route } from './+types/home'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Header } from '~/components/header'
 import { Button } from '~/components/ui/button'
@@ -207,9 +208,14 @@ export default function HomePage() {
     <>
       {/* Header */}
       <Header>
-        <h1 className="text-xl font-semibold text-white">
-          mbm
-        </h1>
+        <div className="flex items-baseline gap-4">
+          <h1 className="text-xl font-semibold text-white">
+            mbm
+          </h1>
+          <Link to="/euler" className="text-sm font-medium text-gray-300 hover:text-blue-300">
+            Euler
+          </Link>
+        </div>
       </Header>
 
       {/* Main Content */}

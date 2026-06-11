@@ -3,5 +3,6 @@ import { index } from '@react-router/dev/routes'
 
 export default [
   index('routes/home.tsx'),
+  { path: 'euler', file: 'routes/euler.tsx' },
   { path: 'market/:uniqueKey/:chainId', file: 'routes/market.tsx' },
 ] satisfies RouteConfig
