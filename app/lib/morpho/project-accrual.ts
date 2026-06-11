@@ -1,6 +1,7 @@
 import type { MorphoMarketState } from './market-state'
 import { adaptiveCurveBorrowRateView } from '~/lib/irm/adaptive-curve-irm'
 import { clampRatePerSecondWad, WAD } from '~/lib/irm/apy-math'
+import { toMorphoSharesDown } from './share-math'
 
 function wTaylorCompounded(ratePerSecondWad: bigint, elapsedSeconds: bigint): bigint {
   if (ratePerSecondWad <= 0n || elapsedSeconds <= 0n)
@@ -11,12 +12,6 @@ function wTaylorCompounded(ratePerSecondWad: bigint, elapsedSeconds: bigint): bi
   const x2 = (x * x) / WAD
   const x3 = (x2 * x) / WAD
   return x + x2 / 2n + x3 / 6n
-}
-
-function toSharesDown(assets: bigint, totalAssets: bigint, totalShares: bigint): bigint {
-  if (assets <= 0n || totalAssets <= 0n || totalShares <= 0n)
-    return 0n
-  return (assets * totalShares) / totalAssets
 }
 
 export function projectMorphoMarketAccrual(args: {
@@ -53,7 +48,7 @@ export function projectMorphoMarketAccrual(args: {
 
   const feeAmount = (interest * market.fee) / WAD
   const feeShares = feeAmount > 0n && projectedTotalSupplyAssets > feeAmount
-    ? toSharesDown(feeAmount, projectedTotalSupplyAssets - feeAmount, market.totalSupplyShares)
+    ? toMorphoSharesDown(feeAmount, projectedTotalSupplyAssets - feeAmount, market.totalSupplyShares)
     : 0n
   return {
     ...market,

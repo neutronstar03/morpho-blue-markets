@@ -2,6 +2,8 @@ import type { BatchWithdrawPlanState, LoanAssetOption, MarketPlanItem } from './
 import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 import type { SupplyOptimizerMarketSnapshot } from '~/lib/optimizer/supply-optimizer'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
+import { projectMorphoMarketAccrual } from '~/lib/morpho/project-accrual'
+import { toMorphoAssetsDown, toMorphoSharesDown, toMorphoSharesUp } from '~/lib/morpho/share-math'
 import { computeSupplyAfterDeltaWad } from '~/lib/optimizer/supply-optimizer'
 import { max0, minBigint } from './shared'
 
@@ -47,9 +49,15 @@ export function buildBatchWithdrawMarketItems({
     if (rRes?.status !== 'success' || rRes.result == null)
       return { ok: false as const, error: 'Missing IRM data (retry)', items: [] as MarketPlanItem[] }
 
-    const st = normalizeMorphoMarketState(mRes.result)
-    if (!st)
+    const rawMarketState = normalizeMorphoMarketState(mRes.result)
+    if (!rawMarketState)
       return { ok: false as const, error: 'Failed to decode market state', items: [] as MarketPlanItem[] }
+    const st = projectMorphoMarketAccrual({
+      marketId: p.market.uniqueKey as `0x${string}`,
+      market: rawMarketState,
+      rateAtTarget: rRes.result as bigint,
+      timestamp: nowSec,
+    })
 
     const totalSupplyAssets = st.totalSupplyAssets
     const totalSupplyShares = st.totalSupplyShares
@@ -58,32 +66,18 @@ export function buildBatchWithdrawMarketItems({
     if (totalSupplyShares <= 0n || userSupplyShares <= 0n)
       continue
 
-    const suppliedAssets = (userSupplyShares * totalSupplyAssets) / totalSupplyShares
+    const suppliedAssets = toMorphoAssetsDown(userSupplyShares, totalSupplyAssets, totalSupplyShares)
     if (suppliedAssets <= 0n)
       continue
 
     const liquidityAssets = max0(totalSupplyAssets - totalBorrowAssets)
-    const liquidityShares = totalSupplyAssets > 0n
-      ? (liquidityAssets * totalSupplyShares) / totalSupplyAssets
-      : 0n
-    const maxWithdrawSharesRaw = minBigint(userSupplyShares, liquidityShares)
-    let maxWithdrawShares = maxWithdrawSharesRaw
-    // Back off slightly from the raw liquidity edge so share rounding does not turn a barely-withdrawable plan into a revert.
-    if (maxWithdrawSharesRaw > 0n && maxWithdrawSharesRaw < userSupplyShares) {
-      let percentHundredths = (maxWithdrawSharesRaw * 10_000n) / userSupplyShares
-      if (percentHundredths > 10_000n)
-        percentHundredths = 10_000n
-      if (percentHundredths > 0n && percentHundredths < 10_000n)
-        percentHundredths -= 1n
-
-      const safeShares = (userSupplyShares * percentHundredths) / 10_000n
-      maxWithdrawShares = minBigint(maxWithdrawSharesRaw, safeShares)
-    }
-
-    if (maxWithdrawShares > 0n && maxWithdrawShares === liquidityShares && maxWithdrawShares < userSupplyShares)
-      maxWithdrawShares -= 1n
+    const liquidityShares = toMorphoSharesDown(liquidityAssets, totalSupplyAssets, totalSupplyShares)
+    const maxWithdrawSharesRaw = suppliedAssets <= liquidityAssets
+      ? userSupplyShares
+      : minBigint(userSupplyShares, liquidityShares)
+    const maxWithdrawShares = maxWithdrawSharesRaw
     const maxWithdrawAssets = totalSupplyShares > 0n && maxWithdrawShares > 0n
-      ? (maxWithdrawShares * totalSupplyAssets) / totalSupplyShares
+      ? toMorphoAssetsDown(maxWithdrawShares, totalSupplyAssets, totalSupplyShares)
       : 0n
     const snapshot: SupplyOptimizerMarketSnapshot = {
       marketId: p.market.uniqueKey as `0x${string}`,
@@ -170,9 +164,7 @@ export function buildBatchWithdrawPlan({
     if (m.maxWithdrawShares <= 0n)
       continue
 
-    const desiredShares = m.marketTotalSupplyAssets > 0n
-      ? (remainingAssets * m.marketTotalSupplyShares) / m.marketTotalSupplyAssets
-      : 0n
+    const desiredShares = toMorphoSharesDown(remainingAssets, m.marketTotalSupplyAssets, m.marketTotalSupplyShares)
     const sharesToWithdraw = minBigint(desiredShares, m.maxWithdrawShares)
     if (sharesToWithdraw <= 0n)
       continue
@@ -198,7 +190,7 @@ export function buildBatchWithdrawPlan({
 
       const currentAssets = assetsFromShares(m, currentShares)
       const targetAssets = currentAssets + remainingAssets
-      const requiredShares = ceilDiv(targetAssets * m.marketTotalSupplyShares, m.marketTotalSupplyAssets)
+      const requiredShares = toMorphoSharesUp(targetAssets, m.marketTotalSupplyAssets, m.marketTotalSupplyShares)
       let deltaShares = requiredShares - currentShares
       if (deltaShares <= 0n)
         continue
@@ -249,11 +241,5 @@ export function buildBatchWithdrawPlan({
 function assetsFromShares(m: MarketPlanItem, shares: bigint): bigint {
   if (shares <= 0n || m.marketTotalSupplyShares <= 0n)
     return 0n
-  return (shares * m.marketTotalSupplyAssets) / m.marketTotalSupplyShares
-}
-
-function ceilDiv(a: bigint, b: bigint): bigint {
-  if (b <= 0n || a <= 0n)
-    return 0n
-  return (a + (b - 1n)) / b
+  return toMorphoAssetsDown(shares, m.marketTotalSupplyAssets, m.marketTotalSupplyShares)
 }

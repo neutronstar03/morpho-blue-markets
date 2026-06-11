@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.2 - 2026-06-11
+
+### Fixed
+- fix: Batch withdraw now plans maximum liquidity with Morpho Blue virtual-share math, preventing tight-liquidity Bundler3 simulations from reverting with `insufficient liquidity`.
+- fix: Batch withdraw now projects Morpho market accrual before calculating withdrawable liquidity, so stale raw market reads do not overstate current liquidity.
+
+### Tests
+- test: added focused Batch withdraw planner coverage for liquidity-limited withdrawals and full-exit cases.
+
 ## v1.6.1 - 2026-05-31
 
 ### Fixed

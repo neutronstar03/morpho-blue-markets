@@ -1,3 +1,5 @@
+import { toMorphoAssetsDown } from './share-math'
+
 function toBigint(value: bigint | string): bigint {
   return typeof value === 'bigint' ? value : BigInt(value || '0')
 }
@@ -14,7 +16,7 @@ export function getSuppliedAssetsFromShares(params: {
   if (userSupplyShares <= 0n || totalSupplyAssets <= 0n || totalSupplyShares <= 0n)
     return 0n
 
-  return (userSupplyShares * totalSupplyAssets) / totalSupplyShares
+  return toMorphoAssetsDown(userSupplyShares, totalSupplyAssets, totalSupplyShares)
 }
 
 export function hasVisibleSuppliedAssets(params: {
