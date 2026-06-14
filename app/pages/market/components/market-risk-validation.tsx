@@ -3,6 +3,7 @@ import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
 import { getExplorerUrl } from '~/lib/explorer'
+import { useCollateralReview } from '~/lib/hooks/use-collateral-review'
 import { setCollateralDecision } from '~/lib/market-risk/collateral-decisions'
 import { useMarketRiskStatus } from '~/lib/market-risk/hooks'
 
@@ -79,6 +80,7 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
 
   const chainId = market.morphoBlue.chain.id
   const collateralAddress = market.collateralAsset.address
+  const { data: review } = useCollateralReview(chainId, collateralAddress, market.oracleAddress)
   const status = useMarketRiskStatus({
     chainId,
     uniqueKey: market.uniqueKey,
@@ -86,6 +88,8 @@ export function MarketRiskValidation({ market }: MarketRiskValidationProps) {
     collateralAssetAddress: collateralAddress,
     loanAssetSymbol: market.loanAsset.symbol,
     collateralAssetSymbol: market.collateralAsset.symbol,
+    oracleAddress: market.oracleAddress,
+    hasCollateralReview: !!review?.collateralReview,
     warnings: market.warnings,
   })
 

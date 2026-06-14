@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.3 - 2026-06-14
+
+### Changed
+- feat: Market pages now treat collaterals with a curated collateral-review profile as review-approved, removing the unknown-collateral approval prompt while preserving stronger blacklist, unhealthy-market, oracle, and manual-ban blocks.
+
+### Tests
+- test: added focused market-risk coverage for the mainnet ROY-ST-apyUSD reviewed collateral path.
+
 ## v1.6.2 - 2026-06-11
 
 ### Fixed

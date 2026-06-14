@@ -90,6 +90,13 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     }
   }
 
+  if (input.hasCollateralReview) {
+    return {
+      status: 'white',
+      reasonCodes: ['collateral_review'],
+    }
+  }
+
   const reasons: MarketRiskReasonCode[] = ['unknown_collateral']
   return {
     status: 'yellow',
@@ -103,6 +110,7 @@ export interface MarketRiskStatusInput {
   loanAsset?: { address?: string | null, symbol?: string | null }
   collateralAsset?: { address?: string | null, symbol?: string | null }
   oracleAddress?: string | null
+  hasCollateralReview?: boolean
   warnings?: Array<{ type: string, level?: 'YELLOW' | 'RED' | string }>
 }
 
@@ -116,6 +124,7 @@ export function getMarketRiskStatus(input: MarketRiskStatusInput): MarketRiskSta
     loanAssetSymbol: input.loanAsset?.symbol,
     collateralAssetSymbol: input.collateralAsset?.symbol,
     oracleAddress: input.oracleAddress,
+    hasCollateralReview: input.hasCollateralReview,
     warnings: input.warnings,
   }).status
 }

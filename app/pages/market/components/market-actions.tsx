@@ -7,6 +7,7 @@ import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatMarketSize, formatPercent } from '~/lib/formatters'
 import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
+import { useCollateralReview } from '~/lib/hooks/use-collateral-review'
 import { useMarketRiskStatus } from '~/lib/market-risk/hooks'
 import { DepositForm } from './deposit-form'
 import { MarketPosition } from './market-position'
@@ -80,6 +81,11 @@ export function MarketActions({ market }: MarketActionsProps) {
   const supplyApr = live.supplyAprBefore
   const rateAtTargetApr = live.rateAtTargetApr
   const targetUtilization = 0.9
+  const { data: review } = useCollateralReview(
+    market.morphoBlue.chain.id,
+    market.collateralAsset.address,
+    market.oracleAddress,
+  )
   const missingLiquidityTo90Usd = utilization > targetUtilization
     ? Math.max(0, market.state.supplyAssetsUsd * (utilization / targetUtilization - 1))
     : 0
@@ -92,6 +98,7 @@ export function MarketActions({ market }: MarketActionsProps) {
     collateralAssetSymbol: market.collateralAsset.symbol,
     warnings: market.warnings,
     oracleAddress: market.oracleAddress,
+    hasCollateralReview: !!review?.collateralReview,
   })
   const isSupplyBlocked = marketRisk.status === 'black'
   const supplyBlockedMessage = marketRisk.reasonCodes.includes('system_unhealthy_borrowers')

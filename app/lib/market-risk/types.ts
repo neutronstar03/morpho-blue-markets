@@ -3,6 +3,7 @@ export type MarketRiskStatus = 'white' | 'blue' | 'yellow' | 'purple' | 'black'
 
 export type MarketRiskReasonCode
   = | 'ok'
+    | 'collateral_review'
     | 'unknown_collateral'
     | 'local_blacklist'
     | 'local_oracle_blacklist'
@@ -32,5 +33,6 @@ export interface MarketRiskInput {
   loanAssetSymbol?: string | null
   collateralAssetSymbol?: string | null
   oracleAddress?: string | null
+  hasCollateralReview?: boolean
   warnings?: Array<{ type: string, level?: 'YELLOW' | 'RED' | string }>
 }
