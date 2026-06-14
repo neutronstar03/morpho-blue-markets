@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.4 - 2026-06-14
+
+### Changed
+- feat: Advanced List now reuses collateral-review data for otherwise-unknown collaterals, so reviewed assets render as approved there as well as on Market pages.
+- perf: review approval checks are deduped per chain/collateral and share the existing React Query cache with Market page review loads.
+
 ## v1.6.3 - 2026-06-14
 
 ### Changed

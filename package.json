@@ -1,7 +1,7 @@
 {
   "name": "morpho-blue-markets",
   "type": "module",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "private": true,
   "description": "An alternative frontend for the Morpho Blue DEFI protocol.",
   "author": {

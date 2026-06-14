@@ -17,45 +17,51 @@ async function fetchDirectReview(chainId: number, collateralAddress: string) {
   return await res.json() as CollateralReview
 }
 
+export async function fetchCollateralReviewBundle(
+  chainId?: number,
+  collateralAddress?: string,
+  oracleAddress?: string,
+): Promise<MarketReviewBundle | null> {
+  if (!chainId || !collateralAddress)
+    return null
+
+  const params = new URLSearchParams({
+    chainId: String(chainId),
+    address: collateralAddress.toLowerCase(),
+  })
+  if (oracleAddress)
+    params.set('oracleAddress', oracleAddress.toLowerCase())
+
+  try {
+    const res = await fetch(`/api/collateral-review?${params}`)
+    if (res.ok) {
+      const data = await res.json() as CollateralReviewApiResponse
+      if (data.collateralReview || data.oracleReview) {
+        return {
+          collateralReview: data.collateralReview,
+          oracleReview: data.oracleReview,
+        }
+      }
+
+      return null
+    }
+
+    if (!import.meta.env.DEV)
+      throw new Error(`Collateral review fetch failed: ${res.status}`)
+  }
+  catch (error) {
+    if (!import.meta.env.DEV)
+      throw error
+  }
+
+  const collateralReview = await fetchDirectReview(chainId, collateralAddress)
+  return collateralReview ? { collateralReview, oracleReview: null } : null
+}
+
 export function useCollateralReview(chainId?: number, collateralAddress?: string, oracleAddress?: string) {
   return useQuery<MarketReviewBundle | null>({
     queryKey: ['collateral-review', chainId, collateralAddress?.toLowerCase(), oracleAddress?.toLowerCase()],
-    queryFn: async () => {
-      if (!chainId || !collateralAddress)
-        return null
-
-      const params = new URLSearchParams({
-        chainId: String(chainId),
-        address: collateralAddress.toLowerCase(),
-      })
-      if (oracleAddress)
-        params.set('oracleAddress', oracleAddress.toLowerCase())
-
-      try {
-        const res = await fetch(`/api/collateral-review?${params}`)
-        if (res.ok) {
-          const data = await res.json() as CollateralReviewApiResponse
-          if (data.collateralReview || data.oracleReview) {
-            return {
-              collateralReview: data.collateralReview,
-              oracleReview: data.oracleReview,
-            }
-          }
-
-          return null
-        }
-
-        if (!import.meta.env.DEV)
-          throw new Error(`Collateral review fetch failed: ${res.status}`)
-      }
-      catch (error) {
-        if (!import.meta.env.DEV)
-          throw error
-      }
-
-      const collateralReview = await fetchDirectReview(chainId, collateralAddress)
-      return collateralReview ? { collateralReview, oracleReview: null } : null
-    },
+    queryFn: () => fetchCollateralReviewBundle(chainId, collateralAddress, oracleAddress),
     enabled: !!chainId && !!collateralAddress,
     staleTime: STALE_TIME_MEDIUM_MS,
     retry: 1,

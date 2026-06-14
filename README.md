@@ -14,9 +14,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.6.4: Advanced List now reuses collateral-review data so reviewed unknown collaterals render as approved there too.
 - v1.6.3: Market pages now auto-approve collaterals with curated collateral-review profiles while preserving stronger risk blocks.
 - v1.6.2: Fixed Batch withdraw max-liquidity planning by matching Morpho Blue share math and projected market accrual.
-- v1.6.1: Hardened Blacklist Sync across desktop/mobile with deletion tombstones, pull-merge-push updates, and server-side merge protection.
 
 ## Development
 
@@ -80,9 +80,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.6.4` (2026-06-14): Advanced List now reuses collateral-review data so reviewed unknown collaterals render as approved there too.
 - `v1.6.3` (2026-06-14): Market pages now auto-approve collaterals with curated collateral-review profiles while preserving stronger risk blocks.
 - `v1.6.2` (2026-06-11): Fixed Batch withdraw max-liquidity planning by matching Morpho Blue share math and projected market accrual.
-- `v1.6.1` (2026-05-31): Hardened Blacklist Sync across desktop/mobile with deletion tombstones, pull-merge-push updates, and server-side merge protection.
 
 ## Live Version
 

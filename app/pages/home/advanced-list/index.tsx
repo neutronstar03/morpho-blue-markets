@@ -16,7 +16,7 @@ import {
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
-import { useMarketRiskStatusMap } from '~/lib/market-risk/hooks'
+import { useMarketRiskStatusMapWithCollateralReviews } from '~/lib/market-risk/hooks'
 import { OpportunityRecap } from '~/pages/home/opportunity-recap'
 import { MarketFilters } from './market-filters'
 import { MarketTable } from './market-table'
@@ -162,7 +162,7 @@ export function AdvancedList() {
       oracleAddress: m.oracleAddress,
     }))
   }, [markets])
-  const riskStatusByKey = useMarketRiskStatusMap(riskMarkets)
+  const riskStatusByKey = useMarketRiskStatusMapWithCollateralReviews(riskMarkets)
 
   const visibleMarkets = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
