@@ -30,6 +30,7 @@ For more technical information, refer to the `AGENTS.technology.md` file.
 - Do not edit generated outputs without a clear reason.
 - Avoid lockfile churn unless required by a dependency change.
 - Do not put `wrangler pages dev --proxy` back into the normal `bun run dev` path; on Windows it can spin a Wrangler Node child at about one full CPU core after rebuild/HMR.
+- When adding a Pages Function under `functions/api/`, also wire it into `DEV_API_HANDLERS` in `vite.config.ts` so `bun run dev` serves it locally.
 - Do not import from `@web3icons/react` barrel or dynamic entrypoints; use direct icon module imports or `CHAIN_ICON_BY_ID` to avoid thousands of Vite dev requests.
 
 ## Verification (before you say "done")

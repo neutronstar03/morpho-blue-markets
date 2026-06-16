@@ -35,6 +35,8 @@ export interface MarketReviewBundle {
   oracleReview: OracleReview | null
 }
 
+export type ReviewedCollateralListItem = [chainId: number, collateralAddress: string]
+
 export type CollateralReviewApiResponse = {
   found: true
   profile: CollateralReview

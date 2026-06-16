@@ -1,5 +1,6 @@
 import type { AutoStepInfo, LoanAssetOption, OptimizerChainOption, OptimizerMarketMeta } from './shared'
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
+import type { MarketRiskInput } from '~/lib/market-risk/types'
 import type { SupplyOptimizerDebugRequest } from '~/lib/optimizer/supply-apr-optimizer-debugger'
 import type { OptimizeSupplyWithPositionsResult, UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import type { OptimizerStrategy } from '~/lib/optimizer/supply-optimizer-runner'
@@ -11,7 +12,6 @@ import { useAccount, useChainId, usePublicClient, useReadContracts } from 'wagmi
 import { SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName } from '~/lib/addresses'
 import { trackEvent } from '~/lib/analytics'
-import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import {
@@ -26,9 +26,7 @@ import { usePopularLoanAssetsByChain } from '~/lib/hooks/graphql/use-popular-loa
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount, useTokenBalance } from '~/lib/hooks/rpc/use-morpho'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
-import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
-import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
-import { getMarketRiskStatus } from '~/lib/market-risk/market-risk'
+import { useMarketRiskStatusMapWithCollateralReviews } from '~/lib/market-risk/hooks'
 import { ZERO_ADDRESS } from '~/lib/morpho/market-id'
 import { normalizeMorphoMarketState } from '~/lib/morpho/market-state'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
@@ -55,6 +53,10 @@ function sumSupplyRewardAprWad(rewards?: Array<{ supplyApr?: number | null }> | 
   if (!rewards?.length)
     return 0n
   return rewards.reduce((sum, reward) => sum + decimalAprToWad(reward.supplyApr), 0n)
+}
+
+function marketRiskMapKey(chainId?: number, uniqueKey?: string) {
+  return chainId && uniqueKey ? `${chainId}:${uniqueKey.toLowerCase()}` : ''
 }
 
 export function useSupplyAprOptimizerController() {
@@ -176,28 +178,59 @@ export function useSupplyAprOptimizerController() {
     }) && p.market.loanAsset.address.toLowerCase() === selectedLoanAddr)
   }, [livePositions, selectedLoanAddr])
 
-  const decisionsVersion = useCollateralDecisionsVersion()
-  const whitelistVersion = useCollateralWhitelistVersion()
-  const blacklistVersion = useMarketBlacklistVersion()
-  const selectedUserMarkets = useMemo(() => {
-    // These version hooks exist only to invalidate this memo when risk lists change, even though getMarketRisk reads the backing state directly.
-    void decisionsVersion
-    void whitelistVersion
-    void blacklistVersion
+  const topMarketsQuery = useMarketsByChain(selectedLoanAddr ? effectiveChainId : undefined, selectedLoanAddr, {
+    minNetSupplyApy: MIN_CANDIDATE_NET_SUPPLY_APY,
+    maxNetSupplyApy: MAX_CANDIDATE_NET_SUPPLY_APY,
+    minBorrowUsd: MIN_CANDIDATE_BORROW_USD,
+  })
+  const topMarkets = topMarketsQuery.data
+
+  const optimizerRiskMarkets = useMemo<MarketRiskInput[]>(() => {
     if (!effectiveChainId)
-      return selectedUserMarketsAll
-    return selectedUserMarketsAll.filter((p) => {
-      const status = getMarketRiskStatus({
+      return []
+
+    const out: MarketRiskInput[] = []
+    for (const m of (topMarkets ?? [])) {
+      out.push({
+        chainId: effectiveChainId,
+        uniqueKey: m.uniqueKey,
+        loanAssetAddress: m.loanAsset?.address,
+        collateralAssetAddress: m.collateralAsset?.address,
+        loanAssetSymbol: m.loanAsset?.symbol,
+        collateralAssetSymbol: m.collateralAsset?.symbol,
+        warnings: m.warnings,
+        oracleAddress: m.oracleAddress,
+      })
+    }
+    for (const p of selectedUserMarketsAll) {
+      out.push({
         chainId: effectiveChainId,
         uniqueKey: p.market.uniqueKey,
-        loanAsset: p.market.loanAsset,
-        collateralAsset: p.market.collateralAsset,
+        loanAssetAddress: p.market.loanAsset?.address,
+        collateralAssetAddress: p.market.collateralAsset?.address,
+        loanAssetSymbol: p.market.loanAsset?.symbol,
+        collateralAssetSymbol: p.market.collateralAsset?.symbol,
         warnings: p.market.warnings,
         oracleAddress: p.market.oracleAddress,
       })
+    }
+    return out
+  }, [effectiveChainId, selectedUserMarketsAll, topMarkets])
+
+  const riskStatusByKey = useMarketRiskStatusMapWithCollateralReviews(optimizerRiskMarkets)
+  const getOptimizerRiskStatus = useCallback((uniqueKey?: string) => {
+    const key = marketRiskMapKey(effectiveChainId, uniqueKey)
+    return key ? riskStatusByKey[key] : undefined
+  }, [effectiveChainId, riskStatusByKey])
+
+  const selectedUserMarkets = useMemo(() => {
+    if (!effectiveChainId)
+      return selectedUserMarketsAll
+    return selectedUserMarketsAll.filter((p) => {
+      const status = getOptimizerRiskStatus(p.market.uniqueKey)
       return status !== 'black'
     })
-  }, [blacklistVersion, decisionsVersion, effectiveChainId, selectedUserMarketsAll, whitelistVersion])
+  }, [effectiveChainId, getOptimizerRiskStatus, selectedUserMarketsAll])
 
   const userSupplySharesByMarketId = useMemo(() => {
     const map = new Map<string, bigint>()
@@ -205,13 +238,6 @@ export function useSupplyAprOptimizerController() {
       map.set(p.market.uniqueKey.toLowerCase(), p.userState.supplyShares)
     return map
   }, [selectedUserMarkets])
-
-  const topMarketsQuery = useMarketsByChain(selectedLoanAddr ? effectiveChainId : undefined, selectedLoanAddr, {
-    minNetSupplyApy: MIN_CANDIDATE_NET_SUPPLY_APY,
-    maxNetSupplyApy: MAX_CANDIDATE_NET_SUPPLY_APY,
-    minBorrowUsd: MIN_CANDIDATE_BORROW_USD,
-  })
-  const topMarkets = topMarketsQuery.data
 
   const { data: walletBalanceRaw } = useTokenBalance(selectedOption?.address ?? ZERO_ADDRESS, selectedOption ? effectiveUserAddress : undefined, effectiveChainId)
 
@@ -634,16 +660,7 @@ export function useSupplyAprOptimizerController() {
     const universe = new Map<string, { uniqueKey: `0x${string}`, irmAddress: `0x${string}`, rewardSupplyAprWad?: bigint }>()
     for (const m of (topMarkets ?? [])) {
       const id = m.uniqueKey.toLowerCase()
-      const status = effectiveChainId
-        ? getMarketRiskStatus({
-            chainId: effectiveChainId,
-            uniqueKey: m.uniqueKey,
-            loanAsset: m.loanAsset,
-            collateralAsset: m.collateralAsset,
-            warnings: m.warnings,
-            oracleAddress: m.oracleAddress,
-          })
-        : undefined
+      const status = getOptimizerRiskStatus(m.uniqueKey)
       if (status === 'black')
         continue
       const rewardSupplyAprWad = sumSupplyRewardAprWad(m.state?.rewards)
@@ -651,16 +668,7 @@ export function useSupplyAprOptimizerController() {
     }
     for (const p of selectedUserMarkets) {
       const id = p.market.uniqueKey.toLowerCase()
-      const status = effectiveChainId
-        ? getMarketRiskStatus({
-            chainId: effectiveChainId,
-            uniqueKey: p.market.uniqueKey,
-            loanAsset: p.market.loanAsset,
-            collateralAsset: p.market.collateralAsset,
-            warnings: p.market.warnings,
-            oracleAddress: p.market.oracleAddress,
-          })
-        : undefined
+      const status = getOptimizerRiskStatus(p.market.uniqueKey)
       if (status === 'black')
         continue
       const rewardSupplyAprWad = sumSupplyRewardAprWad(p.market.state?.rewards)
@@ -695,7 +703,7 @@ export function useSupplyAprOptimizerController() {
       setSupplyOptimizerDebugState({ request: debugRequest })
 
     setOptimizeRequest(requestPayload)
-  }, [beginRun, ctx, effectiveChainId, effectiveUserAddress, finishRun, maxMarketsInput, selectedOption, selectedUserMarkets, strategyInput, topMarkets, topMarketsQuery])
+  }, [beginRun, ctx, effectiveChainId, effectiveUserAddress, finishRun, getOptimizerRiskStatus, maxMarketsInput, selectedOption, selectedUserMarkets, strategyInput, topMarkets, topMarketsQuery])
 
   const result = ctx.result
   const parsedNewDepositAssets = useMemo(() => {
@@ -729,35 +737,17 @@ export function useSupplyAprOptimizerController() {
     for (const m of (topMarkets ?? [])) {
       map.set(m.uniqueKey.toLowerCase(), {
         collateralSymbol: m.collateralAsset?.symbol,
-        status: effectiveChainId
-          ? getMarketRiskStatus({
-              chainId: effectiveChainId,
-              uniqueKey: m.uniqueKey,
-              loanAsset: m.loanAsset,
-              collateralAsset: m.collateralAsset,
-              warnings: m.warnings,
-              oracleAddress: m.oracleAddress,
-            })
-          : undefined,
+        status: getOptimizerRiskStatus(m.uniqueKey),
       })
     }
     for (const p of selectedUserMarkets) {
       map.set(p.market.uniqueKey.toLowerCase(), {
         collateralSymbol: p.market.collateralAsset?.symbol,
-        status: effectiveChainId
-          ? getMarketRiskStatus({
-              chainId: effectiveChainId,
-              uniqueKey: p.market.uniqueKey,
-              loanAsset: p.market.loanAsset,
-              collateralAsset: p.market.collateralAsset,
-              warnings: p.market.warnings,
-              oracleAddress: p.market.oracleAddress,
-            })
-          : undefined,
+        status: getOptimizerRiskStatus(p.market.uniqueKey),
       })
     }
     return map
-  }, [effectiveChainId, selectedUserMarkets, topMarkets])
+  }, [getOptimizerRiskStatus, selectedUserMarkets, topMarkets])
 
   useEffect(() => {
     if (import.meta.env.PROD)

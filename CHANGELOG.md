@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.5 - 2026-06-16
+
+### Changed
+- feat: Supply APR optimizer and background magic scans now use the shared collateral-review allowlist so reviewed unknown collaterals render as approved there too.
+- infra: added a compact `/api/reviewed-collaterals` Pages Function backed by the collateral-review repo tree, with a 5-minute edge/client cache and local Vite dev shim support.
+
+### Tests
+- test: added focused reviewed-collateral list parser coverage for Git tree extraction, chain filtering, compact API responses, and malformed data rejection.
+
 ## v1.6.4 - 2026-06-14
 
 ### Changed

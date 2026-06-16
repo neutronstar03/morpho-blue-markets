@@ -1,9 +1,7 @@
 import type { MarketRiskInput, MarketRiskStatus } from './types'
-import { useQueries } from '@tanstack/react-query'
 import { useMemo, useSyncExternalStore } from 'react'
 import { useCollateralWhitelistVersion } from '../collateral-whitelist'
-import { STALE_TIME_MEDIUM_MS } from '../hooks/query-stale-times'
-import { fetchCollateralReviewBundle } from '../hooks/use-collateral-review'
+import { useReviewedCollateralKeySet } from '../hooks/use-reviewed-collaterals'
 import { useMarketBlacklistVersion } from '../market-blacklist'
 import { getCollateralDecisionsVersion, subscribeCollateralDecisions } from './collateral-decisions'
 import { getExecutionGuard, getMarketRisk } from './market-risk'
@@ -12,7 +10,6 @@ interface CollateralReviewCandidate {
   key: string
   chainId: number
   collateralAddress: string
-  oracleAddress?: string
 }
 
 function normalizeAddress(address?: string | null) {
@@ -93,29 +90,36 @@ export function useMarketRiskStatusMapWithCollateralReviews(markets: MarketRiskI
         key,
         chainId: market.chainId,
         collateralAddress,
-        oracleAddress: normalizeAddress(market.oracleAddress) || undefined,
       })
     }
     return out
   }, [blacklistVersion, markets, version, whitelistVersion])
 
-  const reviewResults = useQueries({
-    queries: candidates.map(candidate => ({
-      queryKey: ['collateral-review', candidate.chainId, candidate.collateralAddress, candidate.oracleAddress],
-      queryFn: () => fetchCollateralReviewBundle(candidate.chainId, candidate.collateralAddress, candidate.oracleAddress),
-      staleTime: STALE_TIME_MEDIUM_MS,
-      retry: 1,
-    })),
+  const candidateChainId = useMemo(() => {
+    if (candidates.length === 0)
+      return undefined
+
+    const chainId = candidates[0].chainId
+    return candidates.every(candidate => candidate.chainId === chainId) ? chainId : undefined
+  }, [candidates])
+
+  const reviewedCollateralKeys = useReviewedCollateralKeySet({
+    chainId: candidateChainId,
+    enabled: candidates.length > 0,
   })
 
   const reviewedKeys = useMemo(() => {
     const out = new Set<string>()
-    candidates.forEach((candidate, index) => {
-      if (reviewResults[index]?.data?.collateralReview)
+    const keySet = reviewedCollateralKeys.data
+    if (!keySet)
+      return out
+
+    candidates.forEach((candidate) => {
+      if (keySet.has(candidate.key))
         out.add(candidate.key)
     })
     return out
-  }, [candidates, reviewResults])
+  }, [candidates, reviewedCollateralKeys.data])
 
   const marketsWithReviewSignals = useMemo(() => {
     if (reviewedKeys.size === 0)

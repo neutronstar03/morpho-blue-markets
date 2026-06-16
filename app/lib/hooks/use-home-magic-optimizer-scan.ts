@@ -1,16 +1,14 @@
 import type { MarketAprBySymbolMap } from '~/lib/default-market-apr'
+import type { MarketRiskInput } from '~/lib/market-risk/types'
 import type { UserSupplyPosition } from '~/lib/optimizer/supply-optimizer'
 import type { SupplyOptimizerWorkerResponse } from '~/lib/optimizer/supply-optimizer-worker-types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAccount, usePublicClient } from 'wagmi'
-import { useCollateralWhitelistVersion } from '~/lib/collateral-whitelist'
 import { getDefaultMarketAprByAssetSymbol, resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
-import { useMarketBlacklistVersion } from '~/lib/market-blacklist'
-import { useCollateralDecisionsVersion } from '~/lib/market-risk/hooks'
-import { getMarketRiskStatus } from '~/lib/market-risk/market-risk'
+import { useMarketRiskStatusMapWithCollateralReviews } from '~/lib/market-risk/hooks'
 import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
@@ -42,6 +40,10 @@ const OPTIMIZER_READ_CACHE_TTL_MS = 30_000
 const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
 const MAX_CANDIDATE_NET_SUPPLY_APY = 6
 const MIN_CANDIDATE_BORROW_USD = 5
+
+function marketRiskMapKey(chainId?: number, uniqueKey?: string) {
+  return chainId && uniqueKey ? `${chainId}:${uniqueKey.toLowerCase()}` : ''
+}
 
 export function useHomeMagicOptimizerScan() {
   const { isConnected, address: userAddress, chain } = useAccount()
@@ -105,27 +107,59 @@ export function useHomeMagicOptimizerScan() {
     }) && p.market.loanAsset.address.toLowerCase() === addr)
   }, [activeAsset, livePositions])
 
-  const decisionsVersion = useCollateralDecisionsVersion()
-  const whitelistVersion = useCollateralWhitelistVersion()
-  const blacklistVersion = useMarketBlacklistVersion()
-  const selectedUserMarketsSafe = useMemo(() => {
-    void decisionsVersion
-    void whitelistVersion
-    void blacklistVersion
+  const topMarketsQuery = useMarketsByChain(activeAsset ? chainId : undefined, activeAsset?.address, {
+    minNetSupplyApy: MIN_CANDIDATE_NET_SUPPLY_APY,
+    maxNetSupplyApy: MAX_CANDIDATE_NET_SUPPLY_APY,
+    minBorrowUsd: MIN_CANDIDATE_BORROW_USD,
+  })
+  const topMarkets = topMarketsQuery.data
+
+  const scanRiskMarkets = useMemo<MarketRiskInput[]>(() => {
     if (!chainId)
-      return selectedUserMarkets
-    return selectedUserMarkets.filter((p) => {
-      const status = getMarketRiskStatus({
+      return []
+
+    const out: MarketRiskInput[] = []
+    for (const m of (topMarkets ?? [])) {
+      out.push({
+        chainId,
+        uniqueKey: m.uniqueKey,
+        loanAssetAddress: m.loanAsset?.address,
+        collateralAssetAddress: m.collateralAsset?.address,
+        loanAssetSymbol: m.loanAsset?.symbol,
+        collateralAssetSymbol: m.collateralAsset?.symbol,
+        warnings: m.warnings,
+        oracleAddress: m.oracleAddress,
+      })
+    }
+    for (const p of selectedUserMarkets) {
+      out.push({
         chainId,
         uniqueKey: p.market.uniqueKey,
-        loanAsset: p.market.loanAsset,
-        collateralAsset: p.market.collateralAsset,
+        loanAssetAddress: p.market.loanAsset?.address,
+        collateralAssetAddress: p.market.collateralAsset?.address,
+        loanAssetSymbol: p.market.loanAsset?.symbol,
+        collateralAssetSymbol: p.market.collateralAsset?.symbol,
         warnings: p.market.warnings,
         oracleAddress: p.market.oracleAddress,
       })
+    }
+    return out
+  }, [chainId, selectedUserMarkets, topMarkets])
+
+  const riskStatusByKey = useMarketRiskStatusMapWithCollateralReviews(scanRiskMarkets)
+  const getScanRiskStatus = useCallback((uniqueKey?: string) => {
+    const key = marketRiskMapKey(chainId, uniqueKey)
+    return key ? riskStatusByKey[key] : undefined
+  }, [chainId, riskStatusByKey])
+
+  const selectedUserMarketsSafe = useMemo(() => {
+    if (!chainId)
+      return selectedUserMarkets
+    return selectedUserMarkets.filter((p) => {
+      const status = getScanRiskStatus(p.market.uniqueKey)
       return status !== 'black'
     })
-  }, [blacklistVersion, chainId, decisionsVersion, selectedUserMarkets, whitelistVersion])
+  }, [chainId, getScanRiskStatus, selectedUserMarkets])
 
   const positions = useMemo<UserSupplyPosition[]>(() => {
     const out: UserSupplyPosition[] = []
@@ -170,13 +204,6 @@ export function useHomeMagicOptimizerScan() {
 
     return totalPrincipalUsd
   }, [selectedUserMarketsSafe])
-
-  const topMarketsQuery = useMarketsByChain(activeAsset ? chainId : undefined, activeAsset?.address, {
-    minNetSupplyApy: MIN_CANDIDATE_NET_SUPPLY_APY,
-    maxNetSupplyApy: MAX_CANDIDATE_NET_SUPPLY_APY,
-    minBorrowUsd: MIN_CANDIDATE_BORROW_USD,
-  })
-  const topMarkets = topMarketsQuery.data
 
   const optimizeReadResult = useSupplyOptimizerReads({
     input: request,
@@ -324,14 +351,7 @@ export function useHomeMagicOptimizerScan() {
 
     for (const m of topMarkets) {
       const id = m.uniqueKey.toLowerCase()
-      const status = getMarketRiskStatus({
-        chainId,
-        uniqueKey: m.uniqueKey,
-        loanAsset: m.loanAsset,
-        collateralAsset: m.collateralAsset,
-        warnings: m.warnings,
-        oracleAddress: m.oracleAddress,
-      })
+      const status = getScanRiskStatus(m.uniqueKey)
       if (status === 'black')
         continue
       universe.set(id, {
@@ -341,14 +361,7 @@ export function useHomeMagicOptimizerScan() {
     }
     for (const p of selectedUserMarketsSafe) {
       const id = p.market.uniqueKey.toLowerCase()
-      const status = getMarketRiskStatus({
-        chainId,
-        uniqueKey: p.market.uniqueKey,
-        loanAsset: p.market.loanAsset,
-        collateralAsset: p.market.collateralAsset,
-        warnings: p.market.warnings,
-        oracleAddress: p.market.oracleAddress,
-      })
+      const status = getScanRiskStatus(p.market.uniqueKey)
       if (status === 'black')
         continue
       universe.set(id, {
@@ -366,7 +379,7 @@ export function useHomeMagicOptimizerScan() {
       positions,
       markets: [...universe.values()],
     })
-  }, [activeAsset, chainId, isScanning, positions, request, selectedUserMarketsSafe, topMarkets, topMarketsQuery.isError, topMarketsQuery.isFetching, topMarketsQuery.isLoading])
+  }, [activeAsset, chainId, getScanRiskStatus, isScanning, positions, request, selectedUserMarketsSafe, topMarkets, topMarketsQuery.isError, topMarketsQuery.isFetching, topMarketsQuery.isLoading])
 
   useEffect(() => {
     if (!request || !optimizeReadResult || !activeAsset)
