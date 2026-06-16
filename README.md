@@ -14,9 +14,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.6.6: Footer now shows a tiny blacklist sync freshness marker, and local blacklist changes push immediately instead of waiting on the old debounce.
 - v1.6.5: Supply APR optimizer now reuses the compact reviewed-collateral list so reviewed unknown collaterals render as approved there too.
 - v1.6.4: Advanced List now reuses collateral-review data so reviewed unknown collaterals render as approved there too.
-- v1.6.3: Market pages now auto-approve collaterals with curated collateral-review profiles while preserving stronger risk blocks.
 
 ## Development
 
@@ -80,9 +80,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.6.6` (2026-06-16): Footer now shows a tiny blacklist sync freshness marker, and local blacklist changes push immediately instead of waiting on the old debounce.
 - `v1.6.5` (2026-06-16): Supply APR optimizer now reuses the compact reviewed-collateral list so reviewed unknown collaterals render as approved there too.
 - `v1.6.4` (2026-06-14): Advanced List now reuses collateral-review data so reviewed unknown collaterals render as approved there too.
-- `v1.6.3` (2026-06-14): Market pages now auto-approve collaterals with curated collateral-review profiles while preserving stronger risk blocks.
 
 ## Live Version
 

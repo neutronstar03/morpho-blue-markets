@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.6 - 2026-06-16
+
+### Changed
+- ux: footer now shows a tiny blacklist sync freshness marker (`sync 5s`, `sync 2m`, `sync 1h5m`, `sync err`) next to Advanced so stale device state is visible on mobile without opening settings.
+- sync: local blacklist changes now push immediately instead of waiting on the 1200ms debounce; overlapping pushes queue one follow-up write so the latest local state still reaches the backend.
+
+### Tests
+- test: added focused compact sync-age formatter coverage.
+
 ## v1.6.5 - 2026-06-16
 
 ### Changed

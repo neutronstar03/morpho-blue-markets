@@ -62,7 +62,8 @@ const API_PATH = '/api/user-blacklist'
 // useEffect below; unsubscribeLocal prevents double-subscription across remounts.
 let activeWallet: string | undefined
 let unsubscribeLocal: (() => void) | undefined
-let debounceTimer: ReturnType<typeof setTimeout> | undefined
+let pushInFlight = false
+let pushQueued = false
 let isApplyingRemoteBlob = false
 const volatileStatusByWallet = new Map<string, Pick<UserBlacklistSyncState, 'busy' | 'error'>>()
 let lastSnapshotWallet: string | undefined
@@ -159,6 +160,25 @@ function setBusy(wallet: string, busy: boolean) {
 // the user still wants to see when their blacklist was last in sync.
 function setSyncResult(wallet: string, error?: string) {
   writeStatus(wallet, { busy: false, lastSyncAt: error ? readStoredStatus(wallet).lastSyncAt : Date.now(), error })
+}
+
+export function formatUserBlacklistSyncAge(timestamp: number, now = Date.now()) {
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000))
+  if (seconds < 60)
+    return `${seconds}s`
+
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60)
+    return `${minutes}m`
+
+  const hours = Math.floor(minutes / 60)
+  const remainderMinutes = minutes % 60
+  if (hours < 24)
+    return `${hours}h${remainderMinutes > 0 ? `${remainderMinutes}m` : ''}`
+
+  const days = Math.floor(hours / 24)
+  const remainderHours = hours % 24
+  return `${days}d${remainderHours > 0 ? `${remainderHours}h` : ''}`
 }
 
 export function getUserBlacklistSyncState(wallet?: string | null): UserBlacklistSyncState {
@@ -457,23 +477,35 @@ export function disableUserBlacklistSyncOnDevice(wallet: string) {
   writeStatus(normalized, { busy: false })
 }
 
+function requestUserBlacklistPush() {
+  if (!activeWallet || !readToken(activeWallet))
+    return
+  if (pushInFlight) {
+    pushQueued = true
+    return
+  }
+
+  const wallet = activeWallet
+  pushInFlight = true
+  void pushUserBlacklistSync(wallet).finally(() => {
+    pushInFlight = false
+    if (pushQueued) {
+      pushQueued = false
+      requestUserBlacklistPush()
+    }
+  })
+}
+
 // Installs a single module-level listener (not per-component) that pushes local changes
-// to the backend. Debounced at 1200ms to coalesce rapid edits (e.g., bulk-blacklisting)
-// into one PUT instead of hammering the endpoint on every keystroke.
+// to the backend immediately. If another local change happens while a push is already
+// in flight, queue exactly one follow-up push so the latest local state is not skipped.
 function ensureBackgroundListener() {
   if (typeof window === 'undefined' || unsubscribeLocal)
     return
   unsubscribeLocal = subscribeLocalMarketExclusions(() => {
     if (isApplyingRemoteBlob)
       return
-    if (!activeWallet || !readToken(activeWallet))
-      return
-    if (debounceTimer)
-      clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
-      if (activeWallet)
-        void pushUserBlacklistSync(activeWallet)
-    }, 1200)
+    requestUserBlacklistPush()
   })
 }
 
@@ -528,9 +560,19 @@ export function useUserBlacklistSyncEngine(wallet?: string | null) {
   useBlacklistSyncEffects(normalized)
 }
 
+const serverSyncState: UserBlacklistSyncState = { enabled: false, busy: false }
+
+export function useUserBlacklistSyncStatus(wallet?: string | null) {
+  const normalized = normalizeWallet(wallet)
+  return useSyncExternalStore(
+    subscribeUserBlacklistSync,
+    () => getUserBlacklistSyncState(normalized),
+    () => serverSyncState,
+  )
+}
+
 export function useUserBlacklistSync(wallet?: string | null) {
   const normalized = normalizeWallet(wallet)
-  const serverState: UserBlacklistSyncState = { enabled: false, busy: false }
   useBlacklistSyncEffects(normalized)
 
   // gSSP form with a static server snapshot prevents hydration mismatches:
@@ -539,6 +581,6 @@ export function useUserBlacklistSync(wallet?: string | null) {
   return useSyncExternalStore(
     subscribeUserBlacklistSync,
     () => getUserBlacklistSyncState(normalized),
-    () => serverState,
+    () => serverSyncState,
   )
 }

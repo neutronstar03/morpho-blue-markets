@@ -1,6 +1,9 @@
 import type { MouseEvent } from 'react'
 import { Settings2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useAccount } from 'wagmi'
 import pkg from '../../package.json'
+import { formatUserBlacklistSyncAge, useUserBlacklistSyncStatus } from '../lib/user-blacklist-sync'
 import { Container } from './ui/container'
 
 function getRepoUrl(repository: unknown): string | null {
@@ -59,6 +62,51 @@ function getAuthorInfo(author: unknown): { name: string, url: string | null } | 
   }
 
   return null
+}
+
+function BlacklistSyncMiniStatus() {
+  const { address } = useAccount()
+  const syncState = useUserBlacklistSyncStatus(address)
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!syncState.enabled)
+      return
+
+    const interval = window.setInterval(() => setNow(Date.now()), 5000)
+    return () => window.clearInterval(interval)
+  }, [syncState.enabled])
+
+  if (!syncState.enabled)
+    return null
+
+  const ageMs = syncState.lastSyncAt ? Math.max(0, now - syncState.lastSyncAt) : undefined
+  const isStale = ageMs != null && ageMs > 5 * 60 * 1000
+  const label = syncState.busy
+    ? 'syncing'
+    : syncState.error
+      ? 'sync err'
+      : syncState.lastSyncAt
+        ? `sync ${formatUserBlacklistSyncAge(syncState.lastSyncAt, now)}`
+        : 'sync --'
+  const title = syncState.error
+    ? syncState.error
+    : syncState.lastSyncAt
+      ? `Last blacklist sync: ${new Date(syncState.lastSyncAt).toLocaleString()}`
+      : 'Blacklist sync enabled; no completed sync yet'
+  const tone = syncState.error
+    ? 'text-orange-300/80'
+    : syncState.busy
+      ? 'text-blue-300/70'
+      : isStale
+        ? 'text-yellow-300/70'
+        : 'text-gray-500'
+
+  return (
+    <span className={`font-mono text-[10px] leading-none tabular-nums ${tone}`} title={title} aria-label={title}>
+      {label}
+    </span>
+  )
 }
 
 export function Footer() {
@@ -154,6 +202,7 @@ export function Footer() {
               : <span />}
 
             <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+              <BlacklistSyncMiniStatus />
               <a
                 href="#advanced-settings"
                 onClick={onOpenAdvancedSettings}

@@ -1,6 +1,6 @@
 import type { UserBlacklistBlob } from '../app/lib/user-blacklist-sync'
 import { describe, expect, test } from 'bun:test'
-import { mergeUserBlacklistBlobs } from '../app/lib/user-blacklist-sync'
+import { formatUserBlacklistSyncAge, mergeUserBlacklistBlobs } from '../app/lib/user-blacklist-sync'
 
 function blob(overrides: Partial<UserBlacklistBlob>): UserBlacklistBlob {
   return {
@@ -12,6 +12,23 @@ function blob(overrides: Partial<UserBlacklistBlob>): UserBlacklistBlob {
     ...overrides,
   }
 }
+
+describe('user blacklist sync age label', () => {
+  test('formats compact seconds, minutes, and hours', () => {
+    const now = 1_000_000
+
+    expect(formatUserBlacklistSyncAge(now - 4_000, now)).toBe('4s')
+    expect(formatUserBlacklistSyncAge(now - 125_000, now)).toBe('2m')
+    expect(formatUserBlacklistSyncAge(now - 3_900_000, now)).toBe('1h5m')
+  })
+
+  test('uses zero seconds for future or same-time timestamps', () => {
+    const now = 1_000_000
+
+    expect(formatUserBlacklistSyncAge(now, now)).toBe('0s')
+    expect(formatUserBlacklistSyncAge(now + 30_000, now)).toBe('0s')
+  })
+})
 
 describe('user blacklist sync merge', () => {
   test('keeps newer deletion tombstones over stale remote entries', () => {
