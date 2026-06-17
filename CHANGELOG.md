@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.7 - 2026-06-18
+
+### Fixed
+- sync: manual unknown-collateral approve/ban decisions now sync across devices alongside local collateral, oracle, and lost-value market exclusions.
+- sync: collateral decision removals now use deletion tombstones so older devices do not resurrect cleared approve/ban choices.
+
+### Changed
+- sync: synced collateral decisions now use a compact numeric wire value (`1` approve, `0` ban) while still accepting the earlier string form for compatibility.
+
+### Tests
+- test: expanded blacklist sync merge coverage for collateral approval decisions and decision tombstones.
+
 ## v1.6.6 - 2026-06-16
 
 ### Changed

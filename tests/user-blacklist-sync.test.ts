@@ -9,6 +9,7 @@ function blob(overrides: Partial<UserBlacklistBlob>): UserBlacklistBlob {
     c: {},
     o: {},
     w: {},
+    r: {},
     ...overrides,
   }
 }
@@ -93,5 +94,47 @@ describe('user blacklist sync merge', () => {
 
     expect(merged.o['1']['0x3333333333333333333333333333333333333333']).toEqual({ t: 100, p: 'Provider A' })
     expect(merged.c['8453']['0x4444444444444444444444444444444444444444']).toEqual({ t: 110, s: 'TOKEN' })
+  })
+
+  test('syncs newer collateral approval decisions', () => {
+    const remote = blob({
+      r: {
+        1: {
+          '0x5555555555555555555555555555555555555555': { t: 100, x: 'ban', s: 'OLD' },
+        },
+      },
+    })
+    const local = blob({
+      r: {
+        1: {
+          '0x5555555555555555555555555555555555555555': { t: 200, x: 1, s: 'TOKEN' },
+        },
+      },
+    })
+
+    const merged = mergeUserBlacklistBlobs(remote, local)
+
+    expect(merged.r['1']['0x5555555555555555555555555555555555555555']).toEqual({ t: 200, x: 1, s: 'TOKEN' })
+  })
+
+  test('keeps newer collateral decision tombstones', () => {
+    const remote = blob({
+      r: {
+        8453: {
+          '0x6666666666666666666666666666666666666666': { t: 100, x: 1, s: 'TOKEN' },
+        },
+      },
+    })
+    const local = blob({
+      r: {
+        8453: {
+          '0x6666666666666666666666666666666666666666': { t: 200, d: true },
+        },
+      },
+    })
+
+    const merged = mergeUserBlacklistBlobs(remote, local)
+
+    expect(merged.r['8453']['0x6666666666666666666666666666666666666666']).toEqual({ t: 200, d: true })
   })
 })

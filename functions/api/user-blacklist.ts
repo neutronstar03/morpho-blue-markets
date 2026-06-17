@@ -11,12 +11,13 @@ interface TokenRecord {
 }
 
 interface UserBlacklistBlob {
-  // Compact KV shape: c=collaterals, o=oracles, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; d=deleted tombstone.
+  // Compact KV shape: c=collaterals, o=oracles, w=lost-value writeoffs, r=collateral risk decisions; u=blob timestamp; t=entry timestamp; d=deleted tombstone; r.x: 1=approve, 0=ban.
   v: 1
   u: number
   c?: Record<string, Record<string, { t: number, s?: string, n?: string, d?: true }>>
   o?: Record<string, Record<string, { t: number, p?: string, cs?: string, d?: true }>>
   w?: Record<string, Record<string, { t: number, ls?: string, cs?: string, la?: string, ca?: string, d?: true }>>
+  r?: Record<string, Record<string, { t: number, x?: 0 | 1 | 'approve' | 'ban', s?: string, n?: string, d?: true }>>
 }
 
 const MAX_BODY_BYTES = 32 * 1024
@@ -71,8 +72,16 @@ function normalizeTimestamp(value: unknown) {
   return Number.isFinite(timestamp) && timestamp > 0 ? Math.round(timestamp) : 0
 }
 
+function normalizeDecisionValue(value: unknown): 0 | 1 | undefined {
+  if (value === 1 || value === 'approve')
+    return 1
+  if (value === 0 || value === 'ban')
+    return 0
+  return undefined
+}
+
 function emptyBlob(): UserBlacklistBlob {
-  return { v: 1, u: Date.now(), c: {}, o: {}, w: {} }
+  return { v: 1, u: Date.now(), c: {}, o: {}, w: {}, r: {} }
 }
 
 function mergeBlob(a: UserBlacklistBlob, b: UserBlacklistBlob): UserBlacklistBlob {
@@ -103,6 +112,14 @@ function mergeBlob(a: UserBlacklistBlob, b: UserBlacklistBlob): UserBlacklistBlo
           merged.w![chainId][marketId] = entry
       }
     }
+    for (const [chainId, entries] of Object.entries(blob.r ?? {})) {
+      merged.r![chainId] ??= {}
+      for (const [address, entry] of Object.entries(entries)) {
+        const existing = merged.r![chainId][address]
+        if (!existing || entry.t >= existing.t)
+          merged.r![chainId][address] = entry
+      }
+    }
   }
 
   return merged
@@ -117,7 +134,7 @@ function validateBlob(raw: unknown): UserBlacklistBlob | null {
   if (input.v !== 1 || !updatedAt)
     return null
 
-  const blob: UserBlacklistBlob = { v: 1, u: updatedAt, c: {}, o: {}, w: {} }
+  const blob: UserBlacklistBlob = { v: 1, u: updatedAt, c: {}, o: {}, w: {}, r: {} }
 
   if (input.c != null) {
     // Sanitize collateral exclusions keyed as c[chainId][collateralAddress] with timestamp, symbol, and name metadata.
@@ -200,6 +217,37 @@ function validateBlob(raw: unknown): UserBlacklistBlob | null {
           cs: normalizeText(value.cs, 32),
           la: la ? normalizeAddress(la) : undefined,
           ca: ca ? normalizeAddress(ca) : undefined,
+          d: value.d === true ? true : undefined,
+        }
+      }
+    }
+  }
+
+  if (input.r != null) {
+    // Sanitize collateral risk decisions keyed as r[chainId][collateralAddress] with timestamp, decision, and metadata.
+    if (typeof input.r !== 'object')
+      return null
+    for (const [rawChainId, entries] of Object.entries(input.r)) {
+      const chainId = normalizeChainId(rawChainId)
+      if (!chainId || !entries || typeof entries !== 'object')
+        return null
+      for (const [rawAddress, entry] of Object.entries(entries)) {
+        const address = normalizeAddress(rawAddress)
+        if (!address || !entry || typeof entry !== 'object')
+          return null
+        const value = entry as { t?: unknown, x?: unknown, s?: unknown, n?: unknown, d?: unknown }
+        const t = normalizeTimestamp(value.t)
+        if (!t || (value.d != null && value.d !== true))
+          return null
+        const decision = normalizeDecisionValue(value.x)
+        if (value.d !== true && decision == null)
+          return null
+        blob.r![chainId] ??= {}
+        blob.r![chainId][address] = {
+          t,
+          x: value.d === true ? undefined : decision,
+          s: normalizeText(value.s, 32),
+          n: normalizeText(value.n, 120),
           d: value.d === true ? true : undefined,
         }
       }

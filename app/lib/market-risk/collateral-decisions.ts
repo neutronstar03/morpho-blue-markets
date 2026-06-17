@@ -14,6 +14,24 @@ export interface CollateralDecisionRecord extends CollateralDecisionEntry {
   collateralAddress: string
 }
 
+export interface CollateralDecisionSyncRecord {
+  chainId: number
+  collateralAddress: string
+  ts: number
+  decision?: CollateralDecision
+  symbol?: string
+  name?: string
+  deleted?: boolean
+}
+
+interface StoredCollateralDecisionEntry {
+  decision?: CollateralDecision
+  ts: number
+  symbol?: string
+  name?: string
+  deleted?: boolean
+}
+
 const KEY_PREFIX = 'collateral-decision:v1:'
 const CHANGE_EVENT = 'collateral-decisions:changed'
 
@@ -41,15 +59,23 @@ function parseKey(key: string): { chainId: number, collateralAddress: string } |
   return { chainId, collateralAddress }
 }
 
-function safeRead(key: string): CollateralDecisionEntry | undefined {
+function readStoredEntry(key: string): StoredCollateralDecisionEntry | undefined {
   if (typeof window === 'undefined')
     return undefined
   try {
     const raw = window.localStorage.getItem(key)
     if (!raw)
       return undefined
-    const parsed = JSON.parse(raw) as Partial<CollateralDecisionEntry>
-    if (!parsed || (parsed.decision !== 'approve' && parsed.decision !== 'ban'))
+    const parsed = JSON.parse(raw) as Partial<StoredCollateralDecisionEntry>
+    if (!parsed)
+      return undefined
+    if (parsed.deleted === true) {
+      return {
+        ts: typeof parsed.ts === 'number' ? parsed.ts : 0,
+        deleted: true,
+      }
+    }
+    if (parsed.decision !== 'approve' && parsed.decision !== 'ban')
       return undefined
     return {
       decision: parsed.decision,
@@ -63,7 +89,19 @@ function safeRead(key: string): CollateralDecisionEntry | undefined {
   }
 }
 
-function safeWrite(key: string, value: CollateralDecisionEntry | undefined) {
+function safeRead(key: string): CollateralDecisionEntry | undefined {
+  const entry = readStoredEntry(key)
+  if (!entry || entry.deleted || !entry.decision)
+    return undefined
+  return {
+    decision: entry.decision,
+    ts: entry.ts,
+    symbol: entry.symbol,
+    name: entry.name,
+  }
+}
+
+function safeWrite(key: string, value: StoredCollateralDecisionEntry | undefined) {
   if (typeof window === 'undefined')
     return
   try {
@@ -77,6 +115,10 @@ function safeWrite(key: string, value: CollateralDecisionEntry | undefined) {
   catch {
     // ignore storage errors
   }
+}
+
+function normalizeTimestamp(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value) : Date.now()
 }
 
 function emitChange() {
@@ -102,10 +144,23 @@ export function setCollateralDecision(
   decision: CollateralDecision,
   metadata?: { symbol?: string | null, name?: string | null },
 ) {
+  setCollateralDecisionWithTimestamp(chainId, collateralAddress, decision, {
+    ts: Date.now(),
+    symbol: metadata?.symbol,
+    name: metadata?.name,
+  })
+}
+
+export function setCollateralDecisionWithTimestamp(
+  chainId: number,
+  collateralAddress: string,
+  decision: CollateralDecision,
+  metadata?: { ts?: number, symbol?: string | null, name?: string | null },
+) {
   const key = makeKey(chainId, collateralAddress)
   safeWrite(key, {
     decision,
-    ts: Date.now(),
+    ts: normalizeTimestamp(metadata?.ts),
     symbol: typeof metadata?.symbol === 'string' && metadata.symbol.trim() ? metadata.symbol.trim() : undefined,
     name: typeof metadata?.name === 'string' && metadata.name.trim() ? metadata.name.trim() : undefined,
   })
@@ -113,8 +168,15 @@ export function setCollateralDecision(
 }
 
 export function clearCollateralDecision(chainId: number, collateralAddress: string) {
+  clearCollateralDecisionWithTimestamp(chainId, collateralAddress)
+}
+
+export function clearCollateralDecisionWithTimestamp(chainId: number, collateralAddress: string, ts?: number) {
   const key = makeKey(chainId, collateralAddress)
-  safeWrite(key, undefined)
+  safeWrite(key, {
+    ts: normalizeTimestamp(ts),
+    deleted: true,
+  })
   emitChange()
 }
 
@@ -163,6 +225,40 @@ export function listCollateralDecisions(): CollateralDecisionRecord[] {
         ts: entry.ts,
         symbol: entry.symbol,
         name: entry.name,
+      })
+    }
+  }
+  catch {
+    return []
+  }
+
+  return out.sort((a, b) => b.ts - a.ts)
+}
+
+export function listCollateralDecisionSyncRecords(): CollateralDecisionSyncRecord[] {
+  if (typeof window === 'undefined')
+    return []
+
+  const out: CollateralDecisionSyncRecord[] = []
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i)
+      if (!key)
+        continue
+      const parsedKey = parseKey(key)
+      if (!parsedKey)
+        continue
+      const entry = readStoredEntry(key)
+      if (!entry)
+        continue
+      out.push({
+        chainId: parsedKey.chainId,
+        collateralAddress: parsedKey.collateralAddress,
+        ts: entry.ts,
+        decision: entry.decision,
+        symbol: entry.symbol,
+        name: entry.name,
+        deleted: entry.deleted,
       })
     }
   }

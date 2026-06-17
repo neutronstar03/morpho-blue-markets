@@ -1,3 +1,4 @@
+import type { CollateralDecision } from './market-risk/collateral-decisions'
 // Orchestrates wallet-authenticated sync between local blacklist preferences and the backend blob.
 import { useEffect, useSyncExternalStore } from 'react'
 import {
@@ -12,6 +13,11 @@ import {
   setOracleLocallyExcludedWithTimestamp,
   subscribeLocalMarketExclusions,
 } from './local-market-exclusions'
+import {
+  clearCollateralDecisionWithTimestamp,
+  listCollateralDecisionSyncRecords,
+  setCollateralDecisionWithTimestamp,
+} from './market-risk/collateral-decisions'
 
 interface SyncCollateralEntry {
   t: number
@@ -36,13 +42,24 @@ interface SyncOracleEntry {
   d?: true
 }
 
+type SyncDecisionValue = 0 | 1 | 'approve' | 'ban'
+
+interface SyncDecisionEntry {
+  t: number
+  x?: SyncDecisionValue
+  s?: string
+  n?: string
+  d?: true
+}
+
 export interface UserBlacklistBlob {
-  // Compact KV shape: c=collaterals, o=oracles, w=lost-value writeoffs; u=blob timestamp; t=entry timestamp; d=deleted tombstone.
+  // Compact KV shape: c=collateral exclusions, o=oracles, w=lost-value writeoffs, r=collateral risk decisions; u=blob timestamp; t=entry timestamp; d=deleted tombstone; r.x: 1=approve, 0=ban.
   v: 1
   u: number
   c: Record<string, Record<string, SyncCollateralEntry>>
   o: Record<string, Record<string, SyncOracleEntry>>
   w: Record<string, Record<string, SyncMarketEntry>>
+  r: Record<string, Record<string, SyncDecisionEntry>>
 }
 
 export interface UserBlacklistSyncState {
@@ -207,7 +224,23 @@ export function subscribeUserBlacklistSync(listener: () => void) {
 }
 
 function emptyBlob(updatedAt = Date.now()): UserBlacklistBlob {
-  return { v: 1, u: updatedAt, c: {}, o: {}, w: {} }
+  return { v: 1, u: updatedAt, c: {}, o: {}, w: {}, r: {} }
+}
+
+function encodeDecision(decision?: CollateralDecision) {
+  if (decision === 'approve')
+    return 1
+  if (decision === 'ban')
+    return 0
+  return undefined
+}
+
+function decodeDecision(value: SyncDecisionValue | undefined): CollateralDecision | undefined {
+  if (value === 1 || value === 'approve')
+    return 'approve'
+  if (value === 0 || value === 'ban')
+    return 'ban'
+  return undefined
 }
 
 function localBlob(updatedAt = Date.now()): UserBlacklistBlob {
@@ -244,6 +277,17 @@ function localBlob(updatedAt = Date.now()): UserBlacklistBlob {
       d: entry.deleted ? true : undefined,
     }
   }
+  for (const entry of listCollateralDecisionSyncRecords()) {
+    const chainId = String(entry.chainId)
+    blob.r[chainId] ??= {}
+    blob.r[chainId][entry.collateralAddress.toLowerCase()] = {
+      t: entry.ts,
+      x: encodeDecision(entry.decision),
+      s: entry.symbol,
+      n: entry.name,
+      d: entry.deleted ? true : undefined,
+    }
+  }
   return blob
 }
 
@@ -275,6 +319,14 @@ export function mergeUserBlacklistBlobs(a: UserBlacklistBlob, b: UserBlacklistBl
         const existing = merged.w[chainId][marketId]
         if (!existing || entry.t >= existing.t)
           merged.w[chainId][marketId] = entry
+      }
+    }
+    for (const [chainId, entries] of Object.entries(blob.r ?? {})) {
+      merged.r[chainId] ??= {}
+      for (const [address, entry] of Object.entries(entries)) {
+        const existing = merged.r[chainId][address]
+        if (!existing || entry.t >= existing.t)
+          merged.r[chainId][address] = entry
       }
     }
   }
@@ -332,6 +384,25 @@ function applyBlobToLocal(blob: UserBlacklistBlob) {
           collateralAssetSymbol: entry.cs,
           loanAssetAddress: entry.la,
           collateralAssetAddress: entry.ca,
+        })
+      }
+    }
+    for (const [chainId, entries] of Object.entries(blob.r ?? {})) {
+      const parsedChainId = Number(chainId)
+      if (!Number.isFinite(parsedChainId))
+        continue
+      for (const [address, entry] of Object.entries(entries)) {
+        if (entry.d) {
+          clearCollateralDecisionWithTimestamp(parsedChainId, address, entry.t)
+          continue
+        }
+        const decision = decodeDecision(entry.x)
+        if (!decision)
+          continue
+        setCollateralDecisionWithTimestamp(parsedChainId, address, decision, {
+          ts: entry.t,
+          symbol: entry.s,
+          name: entry.n,
         })
       }
     }
