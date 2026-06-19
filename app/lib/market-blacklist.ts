@@ -361,16 +361,17 @@ function formatTodayPendleSortable() {
 function parsePendleExpiryFromSymbol(symbol?: string | null) {
   if (!symbol)
     return undefined
-  const match = /(?:^|-)\d{2}[A-Z]{3}\d{4}(?:$|\s)/.exec(symbol.toUpperCase())
+  const match = /(?:^|-)(\d{1,2})([A-Z]{3})(\d{4})(?=$|\s|-)/.exec(symbol.toUpperCase())
   if (!match)
     return undefined
-  const dateToken = match[0].replace(/(^-|\s$)/g, '')
-  const day = dateToken.slice(0, 2)
-  const monthToken = dateToken.slice(2, 5)
-  const year = dateToken.slice(5)
+  const [, rawDay, monthToken, year] = match
   const month = PENDLE_MONTHS[monthToken]
   if (!month)
     return undefined
+  const dayNumber = Number(rawDay)
+  if (!Number.isInteger(dayNumber) || dayNumber <= 0 || dayNumber > 31)
+    return undefined
+  const day = String(dayNumber).padStart(2, '0')
   return Number(`${year}${month}${day}`)
 }
 

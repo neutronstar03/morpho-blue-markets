@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.8 - 2026-06-19
+
+### Fixed
+- blacklist: expired Pendle PT assets with one-digit expiry days, such as `PT-srUSDe-2APR2026`, now match the automatic expiry blacklist.
+
+### Tests
+- test: added focused Pendle expiry blacklist coverage for one-digit day symbols.
+
 ## v1.6.7 - 2026-06-18
 
 ### Fixed
