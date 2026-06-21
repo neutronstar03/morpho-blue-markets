@@ -9,6 +9,7 @@ import { supportedChainMap } from '~/lib/addresses'
 import { useViewingWallet } from '~/lib/contexts/viewing-wallet'
 import { formatTimeAgo, formatUsd } from '~/lib/formatters'
 import { useUserPositionsAcrossChains } from '~/lib/hooks/graphql/use-user-positions'
+import { useUserVaultV2PositionChains } from '~/lib/hooks/graphql/use-vault-v2-adapter-positions'
 import { useIsClient } from '~/lib/hooks/use-is-client'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
@@ -37,15 +38,30 @@ function PositionClient() {
     { prefix: 'use-ss:', storage, sync: false },
   )
   const {
-    data: crossChainPositions,
-    isLoading,
-    refetch,
-    dataUpdatedAt,
+    data: directCrossChainPositions,
+    isLoading: isLoadingDirectPositions,
+    refetch: refetchDirectPositions,
+    dataUpdatedAt: directPositionsUpdatedAt,
   } = useUserPositionsAcrossChains(effectiveAddress)
+  const {
+    data: vaultV2CrossChainPositions,
+    isLoading: isLoadingVaultV2Positions,
+    refetch: refetchVaultV2Positions,
+    dataUpdatedAt: vaultV2PositionsUpdatedAt,
+  } = useUserVaultV2PositionChains(effectiveAddress)
+  const crossChainPositions = useMemo(() => [
+    ...(directCrossChainPositions ?? []),
+    ...(vaultV2CrossChainPositions ?? []),
+  ], [directCrossChainPositions, vaultV2CrossChainPositions])
+  const isLoading = isLoadingDirectPositions || isLoadingVaultV2Positions
+  const dataUpdatedAt = Math.max(directPositionsUpdatedAt, vaultV2PositionsUpdatedAt)
   const handlePositionsRefresh = useCallback(async () => {
-    await refetch()
+    await Promise.all([
+      refetchDirectPositions(),
+      refetchVaultV2Positions(),
+    ])
     setLiveRefreshKey(key => key + 1)
-  }, [refetch])
+  }, [refetchDirectPositions, refetchVaultV2Positions])
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(handlePositionsRefresh)
 
   const timeAgo = dataUpdatedAt > 0 ? formatTimeAgo(dataUpdatedAt) : ''

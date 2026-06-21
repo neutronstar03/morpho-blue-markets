@@ -39,6 +39,14 @@ export function hasVisibleSupplyPosition(position: LiveMarketPosition) {
   })
 }
 
+export function isVisiblePositionRow(position: LiveMarketPosition, options: { minSupplyUsd?: number } = {}) {
+  const hasNonSupplyPosition = position.userState.borrowShares > 0n || position.userState.collateral > 0n
+  const principalUsd = getPositionPrincipalUsd(position)
+  if (!hasNonSupplyPosition && principalUsd != null && options.minSupplyUsd != null && principalUsd < options.minSupplyUsd)
+    return false
+  return hasNonSupplyPosition || hasVisibleSupplyPosition(position)
+}
+
 export function getPositionYearlyUsd(position: LiveMarketPosition, liveApr?: number) {
   if (liveApr == null)
     return undefined

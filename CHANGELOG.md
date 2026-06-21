@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.11 - 2026-06-22
+
+### Fixed
+- positions: combined direct wallet markets and Vault V2 adapter-derived markets in the Positions card, restoring vault rows while keeping direct msY/USDC visible.
+- positions: added regression coverage for the supplied wallet that holds the direct msY/USDC market and Vault V2 adapter positions.
+- positions: supply-only dust below $1 is filtered from the visible Positions list.
+
 ## v1.6.10 - 2026-06-22
 
 ### Fixed

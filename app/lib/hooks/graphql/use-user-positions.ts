@@ -54,6 +54,15 @@ export interface UserPosition {
     borrowShares: string
     collateral: string
   }
+  source?: {
+    kind: 'direct' | 'vaultV2Adapter'
+    ownerAddress?: string
+    vaultAddress?: string
+    vaultName?: string
+    vaultSymbol?: string
+    multiplierNumerator?: string
+    multiplierDenominator?: string
+  }
 }
 
 interface QueryUserPositionsResult {
@@ -192,6 +201,20 @@ function isVisibleUserPosition(position: UserPosition) {
   }) && !isOracleMisconfiguredWarning(position.market.warnings)
 }
 
+export async function fetchUserPositions(userAddress: string, chainId: number) {
+  const result = await graphqlClient.request<QueryUserPositionsResult>(
+    QUERY_USER_POSITIONS,
+    {
+      user: userAddress,
+      chainId,
+    },
+  )
+
+  return (result.marketPositions.items || [])
+    .map(position => ({ ...position, source: { kind: 'direct' as const } }))
+    .filter(isVisibleUserPosition)
+}
+
 export function useUserPositions(userAddress?: string, chainId?: number) {
   return useQuery<UserPosition[]>({
     queryKey: ['user-positions-graph', userAddress, chainId],
@@ -199,15 +222,7 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
       if (!userAddress || !chainId)
         return []
 
-      const result = await graphqlClient.request<QueryUserPositionsResult>(
-        QUERY_USER_POSITIONS,
-        {
-          user: userAddress,
-          chainId,
-        },
-      )
-
-      return (result.marketPositions.items || []).filter(isVisibleUserPosition)
+      return fetchUserPositions(userAddress, chainId)
     },
     enabled: !!userAddress && !!chainId,
     staleTime: 30 * 1000, // 30 seconds - positions don't change that often
