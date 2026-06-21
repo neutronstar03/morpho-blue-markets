@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.12 - 2026-06-22
+
+### Fixed
+- positions: holdings are no longer hidden by market blacklist or lost-value filters, so risky wallet positions such as direct msY/USDC remain visible for inspection.
+- positions: Vault V2 wallet holdings now render as full vault share positions using Morpho `vaultV2Positions.assets`, avoiding partial adapter-only totals.
+- positions: anonymous `#w=<address>` viewing now shows direct wallet markets and Vault V2 rows together.
+
 ## v1.6.11 - 2026-06-22
 
 ### Fixed

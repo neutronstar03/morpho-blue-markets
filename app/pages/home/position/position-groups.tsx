@@ -107,7 +107,7 @@ export function PositionGroups({
               {group.positions.map((position) => {
                 const key = `${chainId}:${position.market.uniqueKey.toLowerCase()}`
                 const riskStatus = riskStatusByKey[key]
-                const positionKey = position.source?.kind === 'vaultV2Adapter'
+                const positionKey = position.source?.kind === 'vaultV2'
                   ? `${position.market.uniqueKey}:${position.source.vaultAddress ?? position.source.ownerAddress ?? 'vault-v2'}`
                   : position.market.uniqueKey
                 return (

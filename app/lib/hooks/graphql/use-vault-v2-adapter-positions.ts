@@ -1,28 +1,28 @@
-import type { CrossChainUserPosition, UserPosition } from './use-user-positions'
+import type { CrossChainUserPosition } from './use-user-positions'
+import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
 import { supportedChainMap } from '~/lib/addresses'
-import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
-import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { graphqlClient } from '../../graphql/client'
 
-interface QueryUserVaultV2AdapterPositionsResult {
+interface QueryUserVaultV2PositionsResult {
   userByAddress: {
     vaultV2Positions: Array<{
       shares: string
+      assets: string
+      assetsUsd: number | null
       vault: {
         address: string
         name: string
         symbol: string
-        totalSupply: string
-        adapters: {
-          items: Array<{
-            __typename: string
-            address: string
-            positions?: {
-              items: UserPosition[]
-            }
-          }>
+        netApy: number | null
+        asset: {
+          address: string
+          symbol: string
+          decimals: number
+          price?: {
+            usd?: number | null
+          } | null
         }
       }
     }>
@@ -33,6 +33,7 @@ interface QueryCrossChainVaultV2PositionsResult {
   userByAddress: {
     vaultV2Positions: Array<{
       shares: string
+      assets: string
       vault: {
         address: string
       }
@@ -40,61 +41,24 @@ interface QueryCrossChainVaultV2PositionsResult {
   } | null
 }
 
-const QUERY_USER_VAULT_V2_ADAPTER_POSITIONS = gql`
-  query GetUserVaultV2AdapterPositions($user: String!, $chainId: Int!) {
+const QUERY_USER_VAULT_V2_POSITIONS = gql`
+  query GetUserVaultV2Positions($user: String!, $chainId: Int!) {
     userByAddress(address: $user, chainId: $chainId) {
       vaultV2Positions {
         shares
+        assets
+        assetsUsd
         vault {
           address
           name
           symbol
-          totalSupply
-          adapters(first: 20) {
-            items {
-              __typename
-              address
-              ... on MorphoMarketV1Adapter {
-                positions(first: 20) {
-                  items {
-                    market {
-                      marketId
-                      uniqueKey: marketId
-                      loanAsset {
-                        symbol
-                        decimals
-                        address
-                        price {
-                          usd
-                        }
-                      }
-                      collateralAsset {
-                        symbol
-                        decimals
-                        address
-                      }
-                      oracle {
-                        address
-                      }
-                      irmAddress
-                      lltv
-                      warnings { type level }
-                      state {
-                        netSupplyApy
-                        utilization
-                        supplyAssets
-                        supplyShares
-                        supplyAssetsUsd
-                      }
-                    }
-                    state {
-                      supplyShares
-                      borrowShares
-                      collateral
-                    }
-                  }
-                }
-              }
+          netApy
+          asset {
+            address
+            symbol
+            decimals
+            price {
+              usd
             }
           }
         }
@@ -108,6 +72,7 @@ const QUERY_USER_VAULT_V2_CHAINS = gql`
     userByAddress(address: $user, chainId: $chainId) {
       vaultV2Positions {
         shares
+        assets
         vault {
           address
         }
@@ -116,83 +81,84 @@ const QUERY_USER_VAULT_V2_CHAINS = gql`
   }
 `
 
-function toBigint(value: string | undefined): bigint {
+function toBigint(value: string | number | bigint | undefined | null): bigint {
   return BigInt(value || '0')
 }
 
-function mulDivDown(value: bigint, numerator: bigint, denominator: bigint): bigint {
-  if (value <= 0n || numerator <= 0n || denominator <= 0n)
-    return 0n
-  return (value * numerator) / denominator
-}
+function vaultPositionToLivePosition(position: NonNullable<QueryUserVaultV2PositionsResult['userByAddress']>['vaultV2Positions'][number]): LiveMarketPosition | null {
+  const shares = toBigint(position.shares)
+  const assets = toBigint(position.assets)
+  if (shares <= 0n || assets <= 0n)
+    return null
 
-function scalePositionState(state: UserPosition['state'], numerator: bigint, denominator: bigint): UserPosition['state'] {
+  const vaultKey = `vault-v2:${position.vault.address.toLowerCase()}`
   return {
-    supplyShares: mulDivDown(toBigint(state.supplyShares), numerator, denominator).toString(),
-    borrowShares: mulDivDown(toBigint(state.borrowShares), numerator, denominator).toString(),
-    collateral: mulDivDown(toBigint(state.collateral), numerator, denominator).toString(),
+    market: {
+      uniqueKey: vaultKey,
+      irmAddress: '',
+      oracleAddress: undefined,
+      lltv: undefined,
+      warnings: undefined,
+      loanAsset: {
+        symbol: position.vault.asset.symbol,
+        decimals: position.vault.asset.decimals,
+        address: position.vault.asset.address,
+        price: position.vault.asset.price,
+      },
+      collateralAsset: {
+        symbol: position.vault.symbol,
+        decimals: 18,
+        address: position.vault.address,
+      },
+      state: {
+        netSupplyApy: position.vault.netApy ?? 0,
+        utilization: 0,
+        supplyAssets: position.assets,
+        supplyShares: position.shares,
+        supplyAssetsUsd: position.assetsUsd,
+        rewards: null,
+      },
+    },
+    userState: {
+      supplyShares: shares,
+      borrowShares: 0n,
+      collateral: 0n,
+    },
+    liveState: {
+      suppliedAssets: assets,
+      projectedSuppliedAssets: assets,
+    },
+    source: {
+      kind: 'vaultV2',
+      vaultAddress: position.vault.address,
+      vaultName: position.vault.name,
+      vaultSymbol: position.vault.symbol,
+    },
   }
 }
 
-function isVisibleUserPosition(position: UserPosition) {
-  return hasVisibleSuppliedAssets({
-    userSupplyShares: position.state.supplyShares,
-    totalSupplyAssets: position.market.state.supplyAssets,
-    totalSupplyShares: position.market.state.supplyShares,
-  }) && !isOracleMisconfiguredWarning(position.market.warnings)
-}
-
-export async function fetchUserVaultV2AdapterPositions(userAddress: string, chainId: number) {
-  const result = await graphqlClient.request<QueryUserVaultV2AdapterPositionsResult>(
-    QUERY_USER_VAULT_V2_ADAPTER_POSITIONS,
+export async function fetchUserVaultV2Positions(userAddress: string, chainId: number) {
+  const result = await graphqlClient.request<QueryUserVaultV2PositionsResult>(
+    QUERY_USER_VAULT_V2_POSITIONS,
     {
       user: userAddress,
       chainId,
     },
   )
 
-  const out: UserPosition[] = []
-  for (const vaultPosition of result.userByAddress?.vaultV2Positions ?? []) {
-    const userVaultShares = toBigint(vaultPosition.shares)
-    const vaultTotalSupply = toBigint(vaultPosition.vault.totalSupply)
-    if (userVaultShares <= 0n || vaultTotalSupply <= 0n)
-      continue
-
-    for (const adapter of vaultPosition.vault.adapters.items ?? []) {
-      if (adapter.__typename !== 'MorphoMarketV1Adapter' || !adapter.positions)
-        continue
-
-      for (const position of adapter.positions.items ?? []) {
-        const scaledPosition: UserPosition = {
-          ...position,
-          state: scalePositionState(position.state, userVaultShares, vaultTotalSupply),
-          source: {
-            kind: 'vaultV2Adapter',
-            ownerAddress: adapter.address,
-            vaultAddress: vaultPosition.vault.address,
-            vaultName: vaultPosition.vault.name,
-            vaultSymbol: vaultPosition.vault.symbol,
-            multiplierNumerator: userVaultShares.toString(),
-            multiplierDenominator: vaultTotalSupply.toString(),
-          },
-        }
-        if (isVisibleUserPosition(scaledPosition))
-          out.push(scaledPosition)
-      }
-    }
-  }
-
-  return out
+  return (result.userByAddress?.vaultV2Positions ?? [])
+    .map(vaultPositionToLivePosition)
+    .filter((position): position is LiveMarketPosition => position !== null)
 }
 
-export function useUserVaultV2AdapterPositions(userAddress?: string, chainId?: number) {
-  return useQuery<UserPosition[]>({
-    queryKey: ['user-vault-v2-adapter-positions-graph', userAddress, chainId],
+export function useLiveVaultV2Positions(userAddress?: string, chainId?: number, refreshKey?: number) {
+  return useQuery<LiveMarketPosition[]>({
+    queryKey: ['user-vault-v2-positions-graph', userAddress, chainId, refreshKey ?? 0],
     queryFn: async () => {
       if (!userAddress || !chainId)
         return []
 
-      return fetchUserVaultV2AdapterPositions(userAddress, chainId)
+      return fetchUserVaultV2Positions(userAddress, chainId)
     },
     enabled: !!userAddress && !!chainId,
     staleTime: 30 * 1000,
@@ -216,13 +182,13 @@ export function useUserVaultV2PositionChains(userAddress?: string) {
         )
 
         return (result.userByAddress?.vaultV2Positions ?? [])
-          .filter(position => toBigint(position.shares) > 0n)
+          .filter(position => toBigint(position.shares) > 0n && toBigint(position.assets) > 0n)
           .map(position => ({
             chainId,
-            uniqueKey: `vault-v2:${position.vault.address}`,
+            uniqueKey: `vault-v2:${position.vault.address.toLowerCase()}`,
             supplyShares: position.shares,
-            marketSupplyAssets: '1',
-            marketSupplyShares: '1',
+            marketSupplyAssets: position.assets,
+            marketSupplyShares: position.shares,
           }))
       }))
 

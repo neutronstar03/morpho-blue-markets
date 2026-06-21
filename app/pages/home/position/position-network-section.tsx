@@ -9,9 +9,9 @@ import { trackEvent } from '~/lib/analytics'
 import { CHAIN_ICON_BY_ID } from '~/lib/chain-icons'
 import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatBigintShort, formatUsd } from '~/lib/formatters'
+import { useLiveVaultV2Positions } from '~/lib/hooks/graphql/use-vault-v2-adapter-positions'
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
-import { useLiveMarketPositions, useLiveVaultV2AdapterMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
-import { useMarketIdBlacklistPredicate } from '~/lib/market-blacklist'
+import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { useMarketRiskStatusMap } from '~/lib/market-risk/hooks'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { cn } from '~/lib/utils'
@@ -115,29 +115,24 @@ export function PositionNetworkSection({
     isFetching: isFetchingDirectPositions,
   } = useLiveMarketPositions({ address, chainId, refreshKey })
   const {
-    data: vaultV2AdapterPositions,
+    data: vaultV2Positions,
     isLoading: isLoadingVaultV2Positions,
     isFetching: isFetchingVaultV2Positions,
-  } = useLiveVaultV2AdapterMarketPositions({ address, chainId, refreshKey })
+  } = useLiveVaultV2Positions(address, chainId, refreshKey)
   const positions = useMemo(() => [
     ...(directPositions ?? []),
-    ...(vaultV2AdapterPositions ?? []),
-  ], [directPositions, vaultV2AdapterPositions])
+    ...(vaultV2Positions ?? []),
+  ], [directPositions, vaultV2Positions])
   const isLoading = isLoadingDirectPositions || isLoadingVaultV2Positions
   const isFetching = isFetchingDirectPositions || isFetchingVaultV2Positions
   const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
   const { aprByMarketKey } = useLiveMarketApr(markets, { chainId })
-  const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()
 
   const visiblePositions = useMemo(() => {
     if (!positions)
       return []
-    return positions.filter((position) => {
-      if (isMarketIdBlacklisted(position.market.uniqueKey, chainId))
-        return false
-      return isVisiblePositionRow(position, { minSupplyUsd: MIN_VISIBLE_POSITION_USD })
-    })
-  }, [chainId, isMarketIdBlacklisted, positions])
+    return positions.filter(position => isVisiblePositionRow(position, { minSupplyUsd: MIN_VISIBLE_POSITION_USD }))
+  }, [positions])
 
   const riskMarkets = useMemo<MarketRiskInput[]>(() => {
     return visiblePositions.map(p => ({

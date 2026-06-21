@@ -9,7 +9,6 @@ import { useAccount, useReadContract, useReadContracts } from 'wagmi'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName, morphoAddressOnChain } from '~/lib/addresses'
 import { useUserPositions } from '~/lib/hooks/graphql/use-user-positions'
-import { useUserVaultV2AdapterPositions } from '~/lib/hooks/graphql/use-vault-v2-adapter-positions'
 import { buildLiveMarketPosition, liveMarketMetadataFromGraphPosition, liveMarketMetadataFromMarket } from '~/lib/morpho/live-position'
 
 interface PositionCall {
@@ -273,21 +272,6 @@ export function useLiveMarketPositions(options: { address?: Address, chainId?: n
     address: userAddress,
     chainId,
     scopeSource: 'direct',
-    graphPositionsQuery,
-  })
-}
-
-export function useLiveVaultV2AdapterMarketPositions(options: { address?: Address, chainId?: number, refreshKey?: number } = {}) {
-  const { address: connectedAddress, chain } = useAccount()
-  const userAddress = options.address ?? connectedAddress
-  const chainId = options.chainId ?? chain?.id
-  const graphPositionsQuery = useUserVaultV2AdapterPositions(userAddress, chainId)
-
-  return useLiveMarketPositionsFromGraphPositions({
-    ...options,
-    address: userAddress,
-    chainId,
-    scopeSource: 'vault-v2-adapter',
     graphPositionsQuery,
   })
 }

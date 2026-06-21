@@ -1,6 +1,6 @@
 import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
-import { getSuppliedAssetsFromShares, hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
+import { getSuppliedAssetsFromShares } from '~/lib/morpho/position-visibility'
 
 export function getMarketSupplyUsd(position: LiveMarketPosition) {
   return getMarketSupplyUsdWithFallback(position.market)
@@ -24,6 +24,10 @@ export function getPositionPrincipalUsd(position: LiveMarketPosition) {
 }
 
 export function getPositionSuppliedAssets(position: LiveMarketPosition) {
+  const liveSuppliedAssets = position.liveState?.projectedSuppliedAssets ?? position.liveState?.suppliedAssets
+  if (liveSuppliedAssets != null)
+    return liveSuppliedAssets
+
   return getSuppliedAssetsFromShares({
     userSupplyShares: position.userState.supplyShares,
     totalSupplyAssets: position.market.state.supplyAssets,
@@ -32,11 +36,7 @@ export function getPositionSuppliedAssets(position: LiveMarketPosition) {
 }
 
 export function hasVisibleSupplyPosition(position: LiveMarketPosition) {
-  return hasVisibleSuppliedAssets({
-    userSupplyShares: position.userState.supplyShares,
-    totalSupplyAssets: position.market.state.supplyAssets,
-    totalSupplyShares: position.market.state.supplyShares,
-  })
+  return getPositionSuppliedAssets(position) > 0n
 }
 
 export function isVisiblePositionRow(position: LiveMarketPosition, options: { minSupplyUsd?: number } = {}) {

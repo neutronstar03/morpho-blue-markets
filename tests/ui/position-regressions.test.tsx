@@ -1,7 +1,7 @@
 import type { LiveMarketPosition } from '../../app/lib/morpho/live-position'
 import { describe, expect, it } from 'vitest'
 import { fetchUserPositions } from '../../app/lib/hooks/graphql/use-user-positions'
-import { fetchUserVaultV2AdapterPositions } from '../../app/lib/hooks/graphql/use-vault-v2-adapter-positions'
+import { fetchUserVaultV2Positions } from '../../app/lib/hooks/graphql/use-vault-v2-adapter-positions'
 import { isVisiblePositionRow } from '../../app/pages/home/position/position-utils'
 
 const PRIVATE_POSITION_WALLET = process.env.MBM_PRIVATE_POSITION_TEST_WALLET
@@ -54,10 +54,10 @@ describe('position regressions', () => {
     expect(BigInt(msYPosition?.state.supplyShares ?? '0')).toBeGreaterThan(0n)
   }, 30_000)
 
-  it.runIf(PRIVATE_POSITION_WALLET)('keeps Vault V2 adapter rows additive for the same private wallet', async () => {
-    const positions = await fetchUserVaultV2AdapterPositions(PRIVATE_POSITION_WALLET!, MAINNET_CHAIN_ID)
+  it.runIf(PRIVATE_POSITION_WALLET)('keeps full Vault V2 rows additive for the same private wallet', async () => {
+    const positions = await fetchUserVaultV2Positions(PRIVATE_POSITION_WALLET!, MAINNET_CHAIN_ID)
 
-    expect(positions.some(position => position.source?.kind === 'vaultV2Adapter')).toBe(true)
+    expect(positions.some(position => position.source?.kind === 'vaultV2')).toBe(true)
     expect(positions.some(position => position.source?.vaultSymbol === 'sdFRXUSDv2')).toBe(true)
   }, 30_000)
 

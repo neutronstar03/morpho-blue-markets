@@ -24,6 +24,7 @@ export interface LiveAprMarketInput {
   loanAsset: { address: string, symbol?: string | null }
   collateralAsset: { address: string, symbol?: string | null }
   state?: {
+    netSupplyApy?: number | null
     rewards?: Array<{ supplyApr?: number | null }> | null
   }
 }
@@ -40,6 +41,8 @@ function sumSupplyRewardApr(rewards?: Array<{ supplyApr?: number | null }> | nul
 }
 
 function computeMarketId(p: LiveAprMarketInput): `0x${string}` | undefined {
+  if (!isMorphoMarketUniqueKey(p.uniqueKey))
+    return undefined
   const oracle = (p.oracleAddress ?? ZERO_ADDRESS) as `0x${string}`
   if (!p.lltv)
     return undefined
@@ -56,6 +59,10 @@ function computeMarketId(p: LiveAprMarketInput): `0x${string}` | undefined {
   catch {
     return undefined
   }
+}
+
+function isMorphoMarketUniqueKey(uniqueKey: string): uniqueKey is `0x${string}` {
+  return /^0x[a-f0-9]{64}$/i.test(uniqueKey)
 }
 
 /**
@@ -113,13 +120,15 @@ export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined, opti
   function buildMarketStateContracts(chunk: LiveAprMarketInput[]) {
     if (!chunk.length || isWrongNetwork)
       return []
-    return chunk.map(m => ({
-      chainId,
-      address: morphoAddress,
-      abi: SIMPLIFIED_MORPHO_BLUE_ABI,
-      functionName: 'market',
-      args: [m.uniqueKey as any] as const,
-    }))
+    return chunk
+      .filter(m => isMorphoMarketUniqueKey(m.uniqueKey))
+      .map(m => ({
+        chainId,
+        address: morphoAddress,
+        abi: SIMPLIFIED_MORPHO_BLUE_ABI,
+        functionName: 'market',
+        args: [m.uniqueKey] as const,
+      }))
   }
 
   function buildRateAtTargetContracts(chunk: LiveAprMarketInput[]) {
@@ -210,7 +219,10 @@ export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined, opti
   const aprByMarketKey = useMemo<Record<string, LiveAprResultByMarketKey>>(() => {
     const out: Record<string, LiveAprResultByMarketKey> = {}
     for (const m of marketsSafe) {
-      out[m.uniqueKey] = { apr: undefined, isLive: false }
+      const fallbackApr = typeof m.state?.netSupplyApy === 'number' && Number.isFinite(m.state.netSupplyApy)
+        ? m.state.netSupplyApy + sumSupplyRewardApr(m.state.rewards)
+        : undefined
+      out[m.uniqueKey] = { apr: fallbackApr, isLive: false }
     }
 
     const nowTimestamp = BigInt(Math.floor(Date.now() / 1000))
@@ -236,19 +248,20 @@ export function useLiveMarketApr(markets: LiveAprMarketInput[] | undefined, opti
         continue
 
       const marketResults = marketResultsAll[chunkIndex]
-      if (!marketResults || marketResults.length < chunk.length)
+      if (!marketResults)
         continue
 
       // Market states (chunk)
       const marketStateByKey = new Map<string, ReturnType<typeof normalizeMorphoMarketState>>()
-      for (let i = 0; i < chunk.length; i++) {
+      const morphoMarkets = chunk.filter(m => isMorphoMarketUniqueKey(m.uniqueKey))
+      for (let i = 0; i < morphoMarkets.length; i++) {
         const res = marketResults[i]
         if (res?.status !== 'success')
           continue
         const st = normalizeMorphoMarketState(res.result)
         if (!st)
           continue
-        marketStateByKey.set(chunk[i].uniqueKey, st)
+        marketStateByKey.set(morphoMarkets[i].uniqueKey, st)
       }
 
       // rateAtTarget (chunk, only for markets where we computed marketId)

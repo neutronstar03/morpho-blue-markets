@@ -55,7 +55,7 @@ export interface UserPosition {
     collateral: string
   }
   source?: {
-    kind: 'direct' | 'vaultV2Adapter'
+    kind: 'direct' | 'vaultV2'
     ownerAddress?: string
     vaultAddress?: string
     vaultName?: string
