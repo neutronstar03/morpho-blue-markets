@@ -1,7 +1,6 @@
 import type { Address } from 'viem'
 import type { SupportedChain } from '~/lib/addresses'
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
-import type { UserPosition } from '~/lib/hooks/graphql/use-user-positions'
 import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -9,7 +8,6 @@ import { useAccount, useReadContract, useReadContracts } from 'wagmi'
 import { IRM_RATE_AT_TARGET_ABI, SIMPLIFIED_MORPHO_BLUE_ABI } from '~/lib/abis/simplified'
 import { getSupportedChainName, morphoAddressOnChain } from '~/lib/addresses'
 import { useUserPositions } from '~/lib/hooks/graphql/use-user-positions'
-import { useUserVaultV2AdapterPositions } from '~/lib/hooks/graphql/use-vault-v2-adapter-positions'
 import { buildLiveMarketPosition, liveMarketMetadataFromGraphPosition, liveMarketMetadataFromMarket } from '~/lib/morpho/live-position'
 
 interface PositionCall {
@@ -45,21 +43,7 @@ interface RateAtTargetCall {
  *
  * This avoids iterating over all ~1000 markets on a chain.
  */
-interface GraphPositionsQueryState {
-  data?: UserPosition[]
-  isLoading: boolean
-  isFetching: boolean
-  refetch: () => Promise<unknown>
-  dataUpdatedAt: number
-}
-
-function useLiveMarketPositionsFromGraphPositions(options: {
-  address?: Address
-  chainId?: number
-  refreshKey?: number
-  scopeSource: string
-  graphPositionsQuery: GraphPositionsQueryState
-}) {
+export function useLiveMarketPositions(options: { address?: Address, chainId?: number, refreshKey?: number } = {}) {
   const { address: connectedAddress, chain } = useAccount()
   const userAddress = options.address ?? connectedAddress
   const chainId = options.chainId ?? chain?.id
@@ -80,7 +64,7 @@ function useLiveMarketPositionsFromGraphPositions(options: {
     isFetching: isFetchingGraph,
     refetch: refetchGraph,
     dataUpdatedAt: graphUpdatedAt,
-  } = options.graphPositionsQuery
+  } = useUserPositions(userAddress, chainId)
 
   const morphoAddress = useMemo(() => {
     if (!chainId)
@@ -101,7 +85,7 @@ function useLiveMarketPositionsFromGraphPositions(options: {
       chainId,
       abi: SIMPLIFIED_MORPHO_BLUE_ABI,
       functionName: 'position',
-      args: [position.market.uniqueKey as `0x${string}`, (position.source?.ownerAddress ?? userAddress) as `0x${string}`] as const,
+      args: [position.market.uniqueKey as `0x${string}`, userAddress as `0x${string}`] as const,
     }))
   }, [chainId, graphPositions, userAddress, morphoAddress])
 
@@ -134,8 +118,8 @@ function useLiveMarketPositionsFromGraphPositions(options: {
   }, [chainId, graphPositions])
 
   const liveReadScopeKey = useMemo(() => {
-    return `live-market-positions:${chainId ?? 'none'}:${userAddress ?? 'none'}:${options.refreshKey ?? 0}:${options.scopeSource}:${readInstanceKey}`
-  }, [chainId, options.refreshKey, options.scopeSource, readInstanceKey, userAddress])
+    return `live-market-positions:${chainId ?? 'none'}:${userAddress ?? 'none'}:${options.refreshKey ?? 0}:${readInstanceKey}`
+  }, [chainId, options.refreshKey, readInstanceKey, userAddress])
 
   // Step 3: Fetch live position data from RPC
   const {
@@ -221,14 +205,7 @@ function useLiveMarketPositionsFromGraphPositions(options: {
         return buildLiveMarketPosition({
           metadata: liveMarketMetadataFromGraphPosition(gp),
           graphUserState: gp.state,
-          source: gp.source,
           positionResult: result.result,
-          positionResultScale: gp.source?.multiplierNumerator && gp.source.multiplierDenominator
-            ? {
-                numerator: BigInt(gp.source.multiplierNumerator),
-                denominator: BigInt(gp.source.multiplierDenominator),
-              }
-            : undefined,
           marketResult: marketResult.result,
           rateAtTarget: rateAtTargetByMarketKey.get(gp.market.uniqueKey),
           projectionTimestamp,
@@ -260,45 +237,6 @@ function useLiveMarketPositionsFromGraphPositions(options: {
     refetch,
     dataUpdatedAt: Math.max(graphUpdatedAt, rpcUpdatedAt, marketsUpdatedAt, rateAtTargetUpdatedAt),
   }
-}
-
-/**
- * Efficient Live Market Positions Hook
- *
- * Strategy:
- * 1. Discovery: Use GraphQL to find only markets where user has a position (efficient!)
- * 2. Live Data: Use RPC to fetch real-time position data for those markets
- *
- * This avoids iterating over all ~1000 markets on a chain.
- */
-export function useLiveMarketPositions(options: { address?: Address, chainId?: number, refreshKey?: number } = {}) {
-  const { address: connectedAddress, chain } = useAccount()
-  const userAddress = options.address ?? connectedAddress
-  const chainId = options.chainId ?? chain?.id
-  const graphPositionsQuery = useUserPositions(userAddress, chainId)
-
-  return useLiveMarketPositionsFromGraphPositions({
-    ...options,
-    address: userAddress,
-    chainId,
-    scopeSource: 'direct',
-    graphPositionsQuery,
-  })
-}
-
-export function useLiveVaultV2AdapterMarketPositions(options: { address?: Address, chainId?: number, refreshKey?: number } = {}) {
-  const { address: connectedAddress, chain } = useAccount()
-  const userAddress = options.address ?? connectedAddress
-  const chainId = options.chainId ?? chain?.id
-  const graphPositionsQuery = useUserVaultV2AdapterPositions(userAddress, chainId)
-
-  return useLiveMarketPositionsFromGraphPositions({
-    ...options,
-    address: userAddress,
-    chainId,
-    scopeSource: 'vault-v2-adapter',
-    graphPositionsQuery,
-  })
 }
 
 export function useLiveMarketPosition(options: { market: SingleMorphoMarket, address?: Address }) {

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.10 - 2026-06-22
+
+### Fixed
+- positions: restored the home Positions card to direct Morpho Blue wallet positions only, so direct msY/USDC supply positions remain visible without expanding unrelated Vault V2 allocations.
+- positions: direct position discovery now asks Morpho GraphQL for nonzero supply-share rows, avoiding stale zero-share history rows crowding out active positions.
+- positions: tiny supply dust below $1 is hidden from the visible Positions list.
+
 ## v1.6.9 - 2026-06-22
 
 ### Fixed

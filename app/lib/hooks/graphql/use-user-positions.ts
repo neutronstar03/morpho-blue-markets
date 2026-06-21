@@ -54,15 +54,6 @@ export interface UserPosition {
     borrowShares: string
     collateral: string
   }
-  source?: {
-    kind: 'direct' | 'vaultV2Adapter'
-    ownerAddress?: string
-    vaultAddress?: string
-    vaultName?: string
-    vaultSymbol?: string
-    multiplierNumerator?: string
-    multiplierDenominator?: string
-  }
 }
 
 interface QueryUserPositionsResult {
@@ -115,7 +106,7 @@ interface QueryCrossChainUserPositionsResult {
 export const QUERY_USER_POSITIONS = gql`
   query GetUserPositions($user: String!, $chainId: Int!) {
     marketPositions(
-      where: { userAddress_in: [$user], chainId_in: [$chainId] }
+      where: { userAddress_in: [$user], chainId_in: [$chainId], supplyShares_gte: "1" }
       first: 100
     ) {
       items {
@@ -167,7 +158,7 @@ export const QUERY_USER_POSITIONS = gql`
 const QUERY_USER_POSITIONS_ALL_CHAINS = gql`
   query GetUserPositionsAllChains($user: String!, $chainIds: [Int!]) {
     marketPositions(
-      where: { userAddress_in: [$user], chainId_in: $chainIds }
+      where: { userAddress_in: [$user], chainId_in: $chainIds, supplyShares_gte: "1" }
       first: 500
     ) {
       items {
@@ -216,9 +207,7 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
         },
       )
 
-      return (result.marketPositions.items || [])
-        .map(position => ({ ...position, source: { kind: 'direct' as const } }))
-        .filter(isVisibleUserPosition)
+      return (result.marketPositions.items || []).filter(isVisibleUserPosition)
     },
     enabled: !!userAddress && !!chainId,
     staleTime: 30 * 1000, // 30 seconds - positions don't change that often

@@ -55,7 +55,6 @@ export interface LiveMarketPosition {
     projectedSuppliedAssets?: bigint
     secondsSinceLastMarketUpdate?: bigint
   }
-  source?: UserPosition['source']
 }
 
 type LiveMarketMetadata = Pick<UserPosition['market'], 'uniqueKey' | 'irmAddress' | 'lltv' | 'warnings' | 'loanAsset' | 'collateralAsset'> & {
@@ -99,17 +98,12 @@ export function liveMarketMetadataFromMarket(market: SingleMorphoMarket): LiveMa
 export function buildLiveMarketPosition(args: {
   metadata: LiveMarketMetadata
   graphUserState?: UserPosition['state']
-  source?: UserPosition['source']
   positionResult?: unknown
-  positionResultScale?: {
-    numerator: bigint
-    denominator: bigint
-  }
   marketResult?: unknown
   rateAtTarget?: bigint
   projectionTimestamp: number
 }): LiveMarketPosition | null {
-  const { metadata, graphUserState, source, positionResult, positionResultScale, marketResult, rateAtTarget, projectionTimestamp } = args
+  const { metadata, graphUserState, positionResult, marketResult, rateAtTarget, projectionTimestamp } = args
 
   let supplyShares = BigInt(graphUserState?.supplyShares || '0')
   let borrowShares = BigInt(graphUserState?.borrowShares || '0')
@@ -125,16 +119,9 @@ export function buildLiveMarketPosition(args: {
 
   if (Array.isArray(positionResult)) {
     const [ss, bs, col] = positionResult as unknown as readonly [bigint, bigint, bigint]
-    if (positionResultScale && positionResultScale.denominator > 0n) {
-      supplyShares = (ss * positionResultScale.numerator) / positionResultScale.denominator
-      borrowShares = (bs * positionResultScale.numerator) / positionResultScale.denominator
-      collateral = (col * positionResultScale.numerator) / positionResultScale.denominator
-    }
-    else {
-      supplyShares = ss
-      borrowShares = bs
-      collateral = col
-    }
+    supplyShares = ss
+    borrowShares = bs
+    collateral = col
   }
 
   const marketState = normalizeMorphoMarketState(marketResult)
@@ -216,6 +203,5 @@ export function buildLiveMarketPosition(args: {
       projectedSuppliedAssets,
       secondsSinceLastMarketUpdate,
     },
-    source,
   }
 }
