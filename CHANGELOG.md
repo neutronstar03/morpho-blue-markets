@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.13 - 2026-06-22
+
+### Fixed
+- positions: Vault V2 holdings now render in a separate Vault holdings section with vault-specific value and APR fields instead of market-only safety and usage badges.
+- positions: locally marked lost-value direct markets are hidden from Positions lists and totals while other risky held markets, including msY/USDC, remain visible.
+
 ## v1.6.12 - 2026-06-22
 
 ### Fixed

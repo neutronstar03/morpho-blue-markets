@@ -12,12 +12,14 @@ import { formatBigintShort, formatUsd } from '~/lib/formatters'
 import { useLiveVaultV2Positions } from '~/lib/hooks/graphql/use-vault-v2-adapter-positions'
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
+import { useLocalMarketExclusionsVersion } from '~/lib/local-market-exclusions'
 import { useMarketRiskStatusMap } from '~/lib/market-risk/hooks'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
 import { cn } from '~/lib/utils'
 import { PositionGroups } from './position-groups'
-import { getMarketSupplyUsd, getPositionSuppliedAssets, isVisiblePositionRow } from './position-utils'
+import { getMarketSupplyUsd, getPositionSuppliedAssets, isVisibleDirectMarketPosition, isVisibleVaultV2Position } from './position-utils'
 import { usePositionGroups } from './use-position-groups'
+import { VaultV2PositionList } from './vault-v2-position-list'
 
 const OPEN_SUPPLY_APR_OPTIMIZER_EVENT = 'open-supply-apr-optimizer'
 const MIN_VISIBLE_POSITION_USD = 1
@@ -108,6 +110,7 @@ export function PositionNetworkSection({
   const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
   const chainName = getSupportedChainName(chainId)
   const Icon = CHAIN_ICON_BY_ID[chainId]
+  const localMarketExclusionsVersion = useLocalMarketExclusionsVersion()
 
   const {
     data: directPositions,
@@ -128,14 +131,26 @@ export function PositionNetworkSection({
   const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
   const { aprByMarketKey } = useLiveMarketApr(markets, { chainId })
 
-  const visiblePositions = useMemo(() => {
-    if (!positions)
+  const visibleDirectMarketPositions = useMemo(() => {
+    void localMarketExclusionsVersion
+    if (!directPositions)
       return []
-    return positions.filter(position => isVisiblePositionRow(position, { minSupplyUsd: MIN_VISIBLE_POSITION_USD }))
-  }, [positions])
+    return directPositions.filter(position => isVisibleDirectMarketPosition(position, { chainId, minSupplyUsd: MIN_VISIBLE_POSITION_USD }))
+  }, [chainId, directPositions, localMarketExclusionsVersion])
+
+  const visibleVaultV2Positions = useMemo(() => {
+    if (!vaultV2Positions)
+      return []
+    return vaultV2Positions.filter(position => isVisibleVaultV2Position(position, { minSupplyUsd: MIN_VISIBLE_POSITION_USD }))
+  }, [vaultV2Positions])
+
+  const visiblePositions = useMemo(() => [
+    ...visibleDirectMarketPositions,
+    ...visibleVaultV2Positions,
+  ], [visibleDirectMarketPositions, visibleVaultV2Positions])
 
   const riskMarkets = useMemo<MarketRiskInput[]>(() => {
-    return visiblePositions.map(p => ({
+    return visibleDirectMarketPositions.map(p => ({
       chainId,
       uniqueKey: p.market.uniqueKey,
       loanAssetAddress: p.market.loanAsset?.address,
@@ -145,10 +160,10 @@ export function PositionNetworkSection({
       warnings: p.market.warnings,
       oracleAddress: p.market.oracleAddress,
     }))
-  }, [chainId, visiblePositions])
+  }, [chainId, visibleDirectMarketPositions])
   const riskStatusByKey = useMarketRiskStatusMap(riskMarkets)
   const portfolio = useMemo(() => computePortfolio(visiblePositions, aprByMarketKey), [visiblePositions, aprByMarketKey])
-  const groupedPositions = usePositionGroups(visiblePositions, chainId, aprByMarketKey)
+  const groupedPositions = usePositionGroups(visibleDirectMarketPositions, chainId, aprByMarketKey)
   const visibleAssetCount = useMemo(() => {
     const assets = new Set<string>()
     for (const position of visiblePositions)
@@ -259,22 +274,25 @@ export function PositionNetworkSection({
                 </p>
               )
             : (
-                <PositionGroups
-                  groups={groupedPositions}
-                  chainId={chainId}
-                  portfolioTotalAssetsUsd={portfolio.totalAssetsUsd}
-                  aprByMarketKey={aprByMarketKey}
-                  riskStatusByKey={riskStatusByKey}
-                  summaryMode={assetSummaryMode}
-                  onToggleSummaryMode={() => setAssetSummaryMode((mode) => {
-                    if (mode === 'total')
-                      return 'native'
-                    if (mode === 'native')
-                      return 'yearly'
-                    return 'total'
-                  })}
-                  onSelectLoanAsset={handleOpenOptimizerForGroup}
-                />
+                <div className="space-y-5">
+                  <PositionGroups
+                    groups={groupedPositions}
+                    chainId={chainId}
+                    portfolioTotalAssetsUsd={portfolio.totalAssetsUsd}
+                    aprByMarketKey={aprByMarketKey}
+                    riskStatusByKey={riskStatusByKey}
+                    summaryMode={assetSummaryMode}
+                    onToggleSummaryMode={() => setAssetSummaryMode((mode) => {
+                      if (mode === 'total')
+                        return 'native'
+                      if (mode === 'native')
+                        return 'yearly'
+                      return 'total'
+                    })}
+                    onSelectLoanAsset={handleOpenOptimizerForGroup}
+                  />
+                  <VaultV2PositionList positions={visibleVaultV2Positions} aprByMarketKey={aprByMarketKey} />
+                </div>
               )}
         </div>
       )}

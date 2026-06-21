@@ -1,6 +1,11 @@
 import type { LiveMarketPosition } from '~/lib/morpho/live-position'
+import { isMarketLocallyMarkedLostValue } from '~/lib/local-market-exclusions'
 import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
 import { getSuppliedAssetsFromShares } from '~/lib/morpho/position-visibility'
+
+export function isVaultV2Position(position: LiveMarketPosition) {
+  return position.source?.kind === 'vaultV2'
+}
 
 export function getMarketSupplyUsd(position: LiveMarketPosition) {
   return getMarketSupplyUsdWithFallback(position.market)
@@ -45,6 +50,18 @@ export function isVisiblePositionRow(position: LiveMarketPosition, options: { mi
   if (!hasNonSupplyPosition && principalUsd != null && options.minSupplyUsd != null && principalUsd < options.minSupplyUsd)
     return false
   return hasNonSupplyPosition || hasVisibleSupplyPosition(position)
+}
+
+export function isVisibleDirectMarketPosition(position: LiveMarketPosition, options: { chainId: number, minSupplyUsd?: number }) {
+  if (isVaultV2Position(position))
+    return false
+  if (isMarketLocallyMarkedLostValue(options.chainId, position.market.uniqueKey))
+    return false
+  return isVisiblePositionRow(position, { minSupplyUsd: options.minSupplyUsd })
+}
+
+export function isVisibleVaultV2Position(position: LiveMarketPosition, options: { minSupplyUsd?: number } = {}) {
+  return isVaultV2Position(position) && isVisiblePositionRow(position, { minSupplyUsd: options.minSupplyUsd })
 }
 
 export function getPositionYearlyUsd(position: LiveMarketPosition, liveApr?: number) {
