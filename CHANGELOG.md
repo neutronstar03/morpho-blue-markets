@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.9 - 2026-06-22
+
+### Fixed
+- positions: Vault V2 adapter-backed Morpho market exposure now appears in the home Positions card, so zero-cap markets such as msY remain visible when held through Delta-style vault adapters.
+
+### Changed
+- positions: vault-derived rows are labeled with their source vault and are kept separate from direct Morpho Blue wallet positions in the data hooks.
+
 ## v1.6.8 - 2026-06-19
 
 ### Fixed

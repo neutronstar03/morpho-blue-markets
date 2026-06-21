@@ -10,7 +10,7 @@ import { CHAIN_ICON_BY_ID } from '~/lib/chain-icons'
 import { resolveMarketAprByAssetSymbol } from '~/lib/default-market-apr'
 import { formatBigintShort, formatUsd } from '~/lib/formatters'
 import { useLiveMarketApr } from '~/lib/hooks/rpc/use-live-market-apr'
-import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
+import { useLiveMarketPositions, useLiveVaultV2AdapterMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { useMarketIdBlacklistPredicate } from '~/lib/market-blacklist'
 import { useMarketRiskStatusMap } from '~/lib/market-risk/hooks'
 import { useHomeMagicOptimizerStore } from '~/lib/stores/home-magic-optimizer.store'
@@ -108,7 +108,22 @@ export function PositionNetworkSection({
   const chainName = getSupportedChainName(chainId)
   const Icon = CHAIN_ICON_BY_ID[chainId]
 
-  const { data: positions, isLoading, isFetching } = useLiveMarketPositions({ address, chainId, refreshKey })
+  const {
+    data: directPositions,
+    isLoading: isLoadingDirectPositions,
+    isFetching: isFetchingDirectPositions,
+  } = useLiveMarketPositions({ address, chainId, refreshKey })
+  const {
+    data: vaultV2AdapterPositions,
+    isLoading: isLoadingVaultV2Positions,
+    isFetching: isFetchingVaultV2Positions,
+  } = useLiveVaultV2AdapterMarketPositions({ address, chainId, refreshKey })
+  const positions = useMemo(() => [
+    ...(directPositions ?? []),
+    ...(vaultV2AdapterPositions ?? []),
+  ], [directPositions, vaultV2AdapterPositions])
+  const isLoading = isLoadingDirectPositions || isLoadingVaultV2Positions
+  const isFetching = isFetchingDirectPositions || isFetchingVaultV2Positions
   const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
   const { aprByMarketKey } = useLiveMarketApr(markets, { chainId })
   const isMarketIdBlacklisted = useMarketIdBlacklistPredicate()

@@ -66,6 +66,13 @@ export function PositionListItem({
               {' '}
               {position.market.loanAsset.symbol}
             </p>
+            {position.source?.kind === 'vaultV2Adapter' && position.source.vaultSymbol && (
+              <p className="text-xs font-medium text-cyan-300">
+                via
+                {' '}
+                {position.source.vaultSymbol}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col items-end gap-1">

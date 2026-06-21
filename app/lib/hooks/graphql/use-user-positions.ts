@@ -54,6 +54,15 @@ export interface UserPosition {
     borrowShares: string
     collateral: string
   }
+  source?: {
+    kind: 'direct' | 'vaultV2Adapter'
+    ownerAddress?: string
+    vaultAddress?: string
+    vaultName?: string
+    vaultSymbol?: string
+    multiplierNumerator?: string
+    multiplierDenominator?: string
+  }
 }
 
 interface QueryUserPositionsResult {
@@ -184,6 +193,14 @@ const QUERY_USER_POSITIONS_ALL_CHAINS = gql`
   }
 `
 
+function isVisibleUserPosition(position: UserPosition) {
+  return hasVisibleSuppliedAssets({
+    userSupplyShares: position.state.supplyShares,
+    totalSupplyAssets: position.market.state.supplyAssets,
+    totalSupplyShares: position.market.state.supplyShares,
+  }) && !isOracleMisconfiguredWarning(position.market.warnings)
+}
+
 export function useUserPositions(userAddress?: string, chainId?: number) {
   return useQuery<UserPosition[]>({
     queryKey: ['user-positions-graph', userAddress, chainId],
@@ -199,12 +216,9 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
         },
       )
 
-      const positions = (result.marketPositions.items || []).filter(p => hasVisibleSuppliedAssets({
-        userSupplyShares: p.state.supplyShares,
-        totalSupplyAssets: p.market.state.supplyAssets,
-        totalSupplyShares: p.market.state.supplyShares,
-      }))
-      return positions.filter(position => !isOracleMisconfiguredWarning(position.market.warnings))
+      return (result.marketPositions.items || [])
+        .map(position => ({ ...position, source: { kind: 'direct' as const } }))
+        .filter(isVisibleUserPosition)
     },
     enabled: !!userAddress && !!chainId,
     staleTime: 30 * 1000, // 30 seconds - positions don't change that often

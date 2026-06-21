@@ -14,9 +14,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.6.9: Vault V2 adapter-backed Morpho market exposure now appears in the Positions card, including zero-cap markets held through Delta-style vault adapters.
 - v1.6.8: Expired Pendle PT assets with one-digit expiry days, such as `PT-srUSDe-2APR2026`, are now auto-blacklisted.
 - v1.6.7: Manual unknown-collateral approve/ban decisions now sync across devices using compact numeric decision values and tombstones.
-- v1.6.6: Footer now shows a tiny blacklist sync freshness marker, and local blacklist changes push immediately instead of waiting on the old debounce.
 
 ## Development
 
@@ -80,9 +80,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.6.9` (2026-06-22): Vault V2 adapter-backed Morpho market exposure now appears in the Positions card, including zero-cap markets held through Delta-style vault adapters.
 - `v1.6.8` (2026-06-19): Expired Pendle PT assets with one-digit expiry days, such as `PT-srUSDe-2APR2026`, are now auto-blacklisted.
 - `v1.6.7` (2026-06-18): Manual unknown-collateral approve/ban decisions now sync across devices using compact numeric decision values and tombstones.
-- `v1.6.6` (2026-06-16): Footer now shows a tiny blacklist sync freshness marker, and local blacklist changes push immediately instead of waiting on the old debounce.
 
 ## Live Version
 
