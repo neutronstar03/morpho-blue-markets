@@ -81,7 +81,9 @@ export function useLocalStorage<T>(
     const raw = readRawValue()
     if (raw != null)
       setValue(parseStoredValue(raw))
-  }, [isClient, readRawValue, parseStoredValue])
+    else
+      setValue(stableInitialValue)
+  }, [isClient, readRawValue, parseStoredValue, stableInitialValue])
 
   // Keep value in sync across tabs.
   useEffect(() => {

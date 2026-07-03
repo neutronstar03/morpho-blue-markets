@@ -31,11 +31,10 @@ function PositionClient() {
   const [marketAprBySymbol] = useLocalStorage<MarketAprBySymbolMap>('supply-apr-optimizer:market-apr-by-symbol', {})
   const [chainPortfolioById, setChainPortfolioById] = useState<Record<number, ChainPortfolioState>>({})
   const [liveRefreshKey, setLiveRefreshKey] = useState(0)
-  const storage = typeof window === 'undefined' ? undefined : window.sessionStorage
-  const [openChainIdsById, setOpenChainIdsById] = useLocalStorage<Record<string, boolean> | null>(
+  const [openChainIdsById, setOpenChainIdsById] = useLocalStorage<Record<string, boolean>>(
     `positions:open-networks:${effectiveAddress?.toLowerCase() ?? 'none'}`,
-    null,
-    { prefix: 'use-ss:', storage, sync: false },
+    {},
+    { sync: false },
   )
   const {
     data: directCrossChainPositions,
@@ -215,12 +214,12 @@ function PositionClient() {
               )
             : (
                 <div className="space-y-3">
-                  {networkChainIds.map((networkChainId, index) => (
+                  {networkChainIds.map(networkChainId => (
                     <PositionNetworkSection
                       key={networkChainId}
                       chainId={networkChainId}
                       address={effectiveAddress as `0x${string}`}
-                      isOpen={openChainIdsById == null ? index === 0 : !!openChainIdsById[networkChainId]}
+                      isOpen={openChainIdsById[networkChainId] ?? true}
                       onOpenChange={isOpen => handleChainOpenChange(networkChainId, isOpen)}
                       marketAprBySymbol={marketAprBySymbol}
                       refreshKey={liveRefreshKey}

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.14 - 2026-07-04
+
+### Fixed
+- positions: network sections now default open and persist each chain's expanded state independently in local storage.
+- positions: opening one network no longer collapses the other network sections.
+- storage: local-storage-backed state now resets to the current key's initial value when switching to a key without saved data.
+
 ## v1.6.13 - 2026-06-22
 
 ### Fixed

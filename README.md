@@ -14,9 +14,9 @@ This project focuses on practical Morpho market exploration and action tooling, 
 
 ## Recent updates
 
+- v1.6.14: Positions now opens every network by default and persists each chain section independently.
 - v1.6.13: Positions now separates Vault V2 holdings into a vault-specific section and hides locally marked lost-value markets from totals.
 - v1.6.12: Positions now keeps risky wallet holdings visible and shows Vault V2 rows as full vault share positions.
-- v1.6.11: Positions now combines direct wallet markets with Vault V2 adapter rows again, with private live-regression support for the msY wallet case.
 
 ## Development
 
@@ -80,9 +80,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.6.14` (2026-07-04): Positions now opens every network by default and persists each chain section independently.
 - `v1.6.13` (2026-06-22): Positions now separates Vault V2 holdings into a vault-specific section and hides locally marked lost-value markets from totals.
 - `v1.6.12` (2026-06-22): Positions now keeps risky wallet holdings visible and shows Vault V2 rows as full vault share positions.
-- `v1.6.11` (2026-06-22): Positions now combines direct wallet markets with Vault V2 adapter rows again, with private live-regression support for the msY wallet case.
 
 ## Live Version
 
