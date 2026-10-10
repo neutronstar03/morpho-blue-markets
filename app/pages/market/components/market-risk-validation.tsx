@@ -22,6 +22,7 @@ const GECKOTERMINAL_NETWORK_BY_CHAIN: Record<number, string> = {
   747474: 'katana',
   143: 'monad',
   480: 'world-chain',
+  4663: 'robinhood',
 }
 
 const DEFINED_CHAIN_BY_ID: Record<number, string> = {
@@ -49,6 +50,7 @@ const COINGECKO_PLATFORM_BY_CHAIN: Record<number, string> = {
   747474: 'katana',
   143: 'monad',
   480: 'world-chain',
+  4663: 'robinhood',
 }
 
 function getGeckoTerminalTokenUrl(chainId: number, address: string) {

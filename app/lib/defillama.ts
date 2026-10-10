@@ -12,6 +12,7 @@ export const DEFILLAMA_CHAIN_SLUGS: Record<SupportedChain, string> = {
   'Monad': 'monad',
   'Stable': 'stable',
   'World Chain': '480',
+  'Robinhood Chain': 'robinhood',
 }
 
 export interface LlamaPriceEntry {

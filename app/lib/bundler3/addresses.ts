@@ -44,6 +44,10 @@ export const BUNDLER3_CONFIG_BY_CHAIN_ID = {
     bundler3: '0x6BFd8137e702540E7A42B74178A4a49Ba43920C4',
     generalAdapter1: '0xb98c948CFA24072e58935BC004a8A7b376AE746A',
   },
+  4663: { // Robinhood Chain; morpho-org/sdks registry at d98eca5 (before Bundler3 removal).
+    bundler3: '0x6478e9393d4C5bB4d53ee881d1DE78786A0344a6',
+    generalAdapter1: '0xc5E188541D107e8B79e43478bDE365F1406665D6',
+  },
   42161: { // Arbitrum
     bundler3: '0x1FA4431bC113D308beE1d46B0e98Cb805FB48C13',
     generalAdapter1: '0x9954aFB60BB5A222714c478ac86990F221788B88',

@@ -20,6 +20,7 @@ const CHAIN_ID_TO_GECKO_NETWORK: Record<number, string> = {
   747474: 'katana',
   10: 'optimism',
   480: 'world-chain',
+  4663: 'robinhood',
 }
 
 interface Env {}

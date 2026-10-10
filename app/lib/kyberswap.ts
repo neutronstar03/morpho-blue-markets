@@ -10,6 +10,7 @@ const KYBERSWAP_CHAIN_SLUGS = new Map<number, string>([
   [130, 'unichain'],
   [999, 'hyperevm'],
   [143, 'monad'],
+  [4663, 'robinhood'],
 ])
 
 export interface KyberSwapEstimateParams {

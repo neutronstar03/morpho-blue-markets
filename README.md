@@ -12,6 +12,8 @@ This project focuses on practical Morpho market exploration and action tooling, 
 - Opportunity recap for coarse chain-level deployable yield evaluation
 - Blacklist recap for reviewing user-hidden and unsafe collaterals, with optional wallet-authenticated sync across devices
 
+Robinhood Chain mainnet (chain ID `4663`) is supported for market discovery, positions, supply optimization, and batch withdrawals. Market pages also use its explorer, GeckoTerminal liquidity data, and KyberSwap price estimates.
+
 ## Recent updates
 
 - v1.6.14: Positions now opens every network by default and persists each chain section independently.

@@ -3,6 +3,7 @@ export function morphoAppChainSlug(chainName: string) {
     'hyperliquid': 'hyperevm',
     'optimism': 'opmainnet',
     'world chain': 'world-chain',
+    'robinhood chain': 'robinhood-chain',
   }
 
   return exceptions[chainName.toLowerCase()] ?? chainName.toLowerCase()

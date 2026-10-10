@@ -2,6 +2,13 @@ import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { defineChain, fallback, http } from 'viem'
 import { monad } from 'viem/chains'
 import { arbitrum, base, katana, mainnet, optimism, polygon, unichain, worldchain } from 'wagmi/chains'
+import { robinhood } from './chains/robinhood'
+
+const robinhoodWithIcon = {
+  ...robinhood,
+  iconUrl: '/logos/robinhood.png',
+  iconBackground: '#000000',
+}
 
 const worldchainWithIcon = {
   ...worldchain,
@@ -37,7 +44,7 @@ const hyperEvm = defineChain({
 export const config = getDefaultConfig({
   appName: 'mbm',
   projectId: '0d13744a3dd855198cde1538ca87976d',
-  chains: [arbitrum, base, katana, mainnet, monad, optimism, polygon, unichain, hyperEvm, worldchainWithIcon],
+  chains: [arbitrum, base, katana, mainnet, monad, optimism, polygon, unichain, hyperEvm, worldchainWithIcon, robinhoodWithIcon],
   transports: {
     [mainnet.id]: fallback([
       http('https://ethereum-rpc.publicnode.com'),
@@ -65,6 +72,7 @@ export const config = getDefaultConfig({
       http('https://public-arb-mainnet.fastnode.io'),
     ], { rank: false, retryCount: 2 }),
     [katana.id]: http('https://rpc.katana.network'),
+    [robinhood.id]: http(robinhood.rpcUrls.default.http[0]),
     [unichain.id]: fallback([
       http('https://unichain.drpc.org'),
       http('https://0xrpc.io/uni'),

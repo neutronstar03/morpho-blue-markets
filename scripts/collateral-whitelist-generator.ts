@@ -29,6 +29,7 @@ const CHAINS = [
   { chainId: 143, name: 'Monad', llamaSlug: 'monad' },
   { chainId: 988, name: 'Stable', llamaSlug: 'stable' },
   { chainId: 480, name: 'World Chain', llamaSlug: '480' },
+  { chainId: 4663, name: 'Robinhood Chain', llamaSlug: 'robinhood' },
 ] as const
 
 interface GoodEntry {
