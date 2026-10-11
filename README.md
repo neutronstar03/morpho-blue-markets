@@ -36,7 +36,19 @@ To run this project locally, follow these steps:
     ```
     The application will usually be available at `http://localhost:5173`.
     If that port is already in use, Vite will automatically choose the next free port.
-    Local `/api/*` calls are proxied through Wrangler Pages dev so Cloudflare Pages Functions and KV bindings match production more closely.
+    Local `/api/*` calls run through Vite middleware using the Pages Function handlers. User-blacklist KV storage is an in-memory development shim and resets when the server restarts. Use `bun run preview:cf` for a built Cloudflare Pages preview.
+
+### Verification
+
+```bash
+bun run typecheck
+bun run lint:check
+bun run test:unit
+bun run test:ui:run
+bun run build
+```
+
+Release-tag deployments run these checks before publishing. Bun discovers offline `tests/**/*.test.ts` automatically; RPC/GraphQL integration cases use `.live.test.ts` and run separately with `bun run test:live`. The optional private-wallet UI checks require `MBM_PRIVATE_POSITION_TEST_WALLET`. Normal branch pushes do not run the release deployment workflow; manual deployment also requires a release-tag ref.
 
 ### Collateral Whitelist (Optional)
 
@@ -60,7 +72,7 @@ To download the current whitelist from the artifacts repo into your local `publi
 bun run artifacts:pull
 ```
 
-This is a one-time local-only step; after that, `bun dev` can run fully offline. These downloaded files are ignored by git and should not be committed.
+This is a one-time local-only step that makes the downloaded risk datasets available without fetching their published copies. Market discovery, RPC reads, and price estimates still need network access. These downloaded files are ignored by git and should not be committed.
 
 To also pull the latest market blacklist dataset (optional):
 

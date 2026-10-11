@@ -7,6 +7,7 @@ import type {
 } from '~/lib/contexts/transaction-feedback.types'
 import { waitForTransactionReceipt } from '@wagmi/core'
 import { useCallback } from 'react'
+import { BaseError } from 'viem'
 import { useAccount, useConfig, useSwitchChain } from 'wagmi'
 import { useTransactionFeedback } from '~/lib/contexts/transaction-feedback.context'
 
@@ -23,9 +24,15 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+function isTimeoutError(error: unknown) {
+  return typeof error === 'object' && !!error && 'name' in error
+    && (error.name === 'WaitForTransactionReceiptTimeoutError' || error.name === 'TimeoutError')
+}
+
 function isConfirmationTimeout(error: unknown) {
-  const message = getErrorMessage(error, '').toLowerCase()
-  return message.includes('timed out') || message.includes('timeout')
+  // A revert reason can itself contain "timeout"; only typed timeout errors
+  // (including a viem cause) mean confirmation could still be pending.
+  return isTimeoutError(error instanceof BaseError ? error.walk(isTimeoutError) : error)
 }
 
 export function isConfirmationDelayedError(error: unknown) {
@@ -160,14 +167,28 @@ export function useChainedTransactionFlow() {
   }) => {
     activateStep(scope, walletStepKey, walletSummary, 'awaiting_wallet')
 
+    // Submission stage: the wallet write. A failure here means no transaction
+    // hash exists yet, so it is always a hard failure and can never be reported
+    // as a delayed confirmation.
+    let txHash: `0x${string}`
     try {
-      const txHash = await run()
-      setTxHash(scope, txHash, chainId)
-      markStepCompleted(scope, walletStepKey)
-      activateStep(scope, confirmStepKey, confirmSummary, 'confirming')
-      await waitForTransactionReceipt(config, { hash: txHash, chainId, confirmations: 1 })
-      markStepCompleted(scope, confirmStepKey)
-      return txHash
+      txHash = await run()
+    }
+    catch (error) {
+      const message = getErrorMessage(error, fallbackError)
+      failFlow(scope, message)
+      throw new Error(message)
+    }
+
+    setTxHash(scope, txHash, chainId)
+    markStepCompleted(scope, walletStepKey)
+
+    // Confirmation stage: we hold a known hash, so a receipt-wait timeout can be
+    // surfaced as a delayed confirmation instead of a hard failure. Reverted or
+    // otherwise failed receipts still fail the flow.
+    activateStep(scope, confirmStepKey, confirmSummary, 'confirming')
+    try {
+      await waitForTransactionReceipt(config, { hash: txHash, chainId, confirmations: 1, timeout: 180_000 })
     }
     catch (error) {
       if (isConfirmationTimeout(error)) {
@@ -184,6 +205,9 @@ export function useChainedTransactionFlow() {
       failFlow(scope, message)
       throw new Error(message)
     }
+
+    markStepCompleted(scope, confirmStepKey)
+    return txHash
   }, [activateStep, config, failFlow, markStepCompleted, setTxHash, warnFlow])
 
   const finishFlow = useCallback((scope: ScopedTransactionUpdate, payload: TransactionSuccessPayload) => {

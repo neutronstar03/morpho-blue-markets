@@ -1,1 +1,2 @@
-ZEROEX_API_KEY=0000000-xxxx-yyyy-zzzz-123456789012
+# Optional analytics proxy backend for local development.
+UMAMI_BACKEND_URL=

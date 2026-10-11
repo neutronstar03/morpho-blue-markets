@@ -11,7 +11,6 @@ import svgr from 'vite-plugin-svgr'
 import { onRequestGet as collateralReview } from './functions/api/collateral-review'
 import { onRequestGet as popularLoanAssets } from './functions/api/popular-loan-assets'
 import { onRequestGet as reviewedCollaterals } from './functions/api/reviewed-collaterals'
-import { onRequestGet as swapEstimate } from './functions/api/swap-estimate'
 import { onRequestGet as tokenLiquidity } from './functions/api/token-liquidity'
 import {
   onRequestGet as userBlacklistGet,
@@ -61,7 +60,6 @@ const DEV_API_HANDLERS: Record<string, DevApiRoute> = {
   '/api/collateral-review': { GET: collateralReview as unknown as PagesFunctionHandler },
   '/api/popular-loan-assets': { GET: popularLoanAssets as unknown as PagesFunctionHandler },
   '/api/reviewed-collaterals': { GET: reviewedCollaterals as unknown as PagesFunctionHandler },
-  '/api/swap-estimate': { GET: swapEstimate as unknown as PagesFunctionHandler },
   '/api/token-liquidity': { GET: tokenLiquidity as unknown as PagesFunctionHandler },
   '/api/user-blacklist': {
     GET: userBlacklistGet as unknown as PagesFunctionHandler,
@@ -110,7 +108,6 @@ const devPagesEnv: Record<string, unknown> = {
       devUserBlacklistKv.set(key, value)
     },
   },
-  ZEROEX_API_KEY: devVars.ZEROEX_API_KEY ?? process.env.ZEROEX_API_KEY ?? '',
 }
 
 async function requestFromIncoming(req: IncomingMessage) {

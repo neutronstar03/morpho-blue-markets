@@ -184,7 +184,10 @@ export function AdvancedList() {
   }, [chainFilter])
 
   const liveChainId = selectedChainId ?? walletChainId ?? undefined
-  const canComputeLiveApr = liveChainId != null && (selectedChainId == null || walletChainId === selectedChainId)
+  // Live APR is a read-only on-chain call: an explicitly selected chain must load it
+  // regardless of wallet connection or the wallet's current chain. Wallet switching is
+  // only required for writes, which are gated elsewhere.
+  const canComputeLiveApr = liveChainId != null
 
   const liveAprMarkets = useMemo<LiveAprMarketInput[]>(() => {
     if (!canComputeLiveApr || liveChainId == null)
@@ -201,7 +204,7 @@ export function AdvancedList() {
       }))
   }, [markets, canComputeLiveApr, liveChainId])
 
-  const { aprByMarketKey } = useLiveMarketApr(liveAprMarkets)
+  const { aprByMarketKey } = useLiveMarketApr(liveAprMarkets, { chainId: liveChainId })
 
   const [timeAgo, setTimeAgo] = useState('')
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)

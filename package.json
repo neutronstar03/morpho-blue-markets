@@ -21,6 +21,7 @@
     "dev:wrangler": "wrangler pages dev --proxy 5173 --compatibility-date=2025-04-13 --kv USER_BLACKLIST --show-interactive-dev-session=false",
     "start": "react-router-serve ./build/server/index.js",
     "lint": "eslint . --fix",
+    "lint:check": "eslint .",
     "typecheck": "react-router typegen && tsc",
     "preview:cf": "bun run build && cp -R functions ./build/client/functions && wrangler pages dev ./build/client",
     "deploy:cf": "bun run build && cp -R functions ./build/client/functions && wrangler pages deploy ./build/client --project-name=morpho-blue-markets --branch=main",
@@ -33,6 +34,9 @@
     "artifacts:pull": "bun scripts/pull-artifacts.ts --whitelist",
     "artifacts:pull:all": "bun scripts/pull-artifacts.ts --whitelist --blacklist --unhealthy-markets --oracle-providers",
     "test:ui": "vitest --config vitest.config.ts",
+    "test:ui:run": "vitest run --config vitest.config.ts",
+    "test:unit": "bun scripts/run-tests.ts",
+    "test:live": "bun scripts/run-tests.ts --live",
     "snapshot:usds:24164776": "bun tests/scripts/rpc-snapshot01.ts"
   },
   "dependencies": {

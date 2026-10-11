@@ -1,11 +1,19 @@
 import type { LiveMarketPosition } from '../../app/lib/morpho/live-position'
 import { render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fetchUserPositions } from '../../app/lib/hooks/graphql/use-user-positions'
 import { fetchUserVaultV2Positions } from '../../app/lib/hooks/graphql/use-vault-v2-adapter-positions'
 import { setMarketLocallyMarkedLostValue } from '../../app/lib/local-market-exclusions'
+import { PositionListItem } from '../../app/pages/home/position/position-list-item'
 import { isVisibleDirectMarketPosition, isVisiblePositionRow, isVisibleVaultV2Position } from '../../app/pages/home/position/position-utils'
 import { VaultV2PositionList } from '../../app/pages/home/position/vault-v2-position-list'
+
+// Keep the render test deterministic: safuness reads liquidity/collateral supply over the network.
+vi.mock('~/lib/hooks/use-safuness', () => ({
+  safunessColorClass: () => '',
+  useSafuness: () => ({ safuness: undefined }),
+}))
 
 const PRIVATE_POSITION_WALLET = process.env.MBM_PRIVATE_POSITION_TEST_WALLET
 const MAINNET_CHAIN_ID = 1
@@ -124,5 +132,37 @@ describe('position regressions', () => {
     expect(screen.getByText('Stake DAO frxUSD v2')).toBeInTheDocument()
     expect(screen.queryByText('Market usage')).not.toBeInTheDocument()
     expect(screen.queryByText('Safety')).not.toBeInTheDocument()
+  })
+
+  it('keeps hook order stable across a zero -> positive supply transition on the same position key', () => {
+    const uniqueKey = `0x${'a'.repeat(64)}`
+    const zeroSupply = positionWithPrincipalUsd(0, {
+      market: { uniqueKey } as LiveMarketPosition['market'],
+    })
+    zeroSupply.liveState = { suppliedAssets: 0n }
+
+    const positiveSupply = positionWithPrincipalUsd(25, {
+      market: { uniqueKey } as LiveMarketPosition['market'],
+    })
+    positiveSupply.liveState = { suppliedAssets: 25_000_000n }
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <PositionListItem position={zeroSupply} chainId={MAINNET_CHAIN_ID} />
+      </MemoryRouter>,
+    )
+
+    // A position with zero supplied assets renders nothing.
+    expect(screen.queryByText('dust')).not.toBeInTheDocument()
+
+    // Same key/component instance now has supply: rendering must not throw or lose hook state.
+    rerender(
+      <MemoryRouter>
+        <PositionListItem position={positiveSupply} chainId={MAINNET_CHAIN_ID} />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('dust')).toBeInTheDocument()
+    expect(screen.getByText('25 USDC')).toBeInTheDocument()
   })
 })

@@ -27,11 +27,6 @@ export function PositionListItem({
     return getPositionSuppliedAssets(position)
   }, [position])
 
-  if (suppliedAssets <= 0n)
-    return null
-
-  const apr = liveApr != null ? liveApr * 100 : undefined
-
   const principalUsd = useMemo(() => {
     return getPositionPrincipalUsd(position)
   }, [position])
@@ -42,13 +37,19 @@ export function PositionListItem({
     return (principalUsd / totalValueUsd) * 100
   }, [principalUsd, totalValueUsd])
 
-  const contributionLabel = contributionPct != null ? formatPercent(contributionPct / 100, 1) : '—'
-  const marketUsageLabel = formatPercent(position.market.state.utilization, 1)
-
   const { safuness } = useSafuness({
     chainId,
     collateralAddress: position.market.collateralAsset.address,
   })
+
+  // All hooks must run before this guard so a zero -> positive supply
+  // transition on the same position key does not change the hook count.
+  if (suppliedAssets <= 0n)
+    return null
+
+  const apr = liveApr != null ? liveApr * 100 : undefined
+  const contributionLabel = contributionPct != null ? formatPercent(contributionPct / 100, 1) : '—'
+  const marketUsageLabel = formatPercent(position.market.state.utilization, 1)
 
   const content = (
     <li className="py-3 px-2.5 sm:p-4 bg-gray-900/50 border border-gray-800 rounded-lg hover:bg-gray-900 hover:border-gray-700 transition-all duration-200 cursor-pointer group">
