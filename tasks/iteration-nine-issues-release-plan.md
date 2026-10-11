@@ -15,7 +15,7 @@ Resolve all nine findings in `tasks/robinhood-chain-and-reconnaissance.md`, incl
 - [x] #7 Accessibility: opportunity action works with keyboard; dialog moves/traps/restores focus and handles Escape; identified input labels are associated with controls.
 - [x] #8 GraphQL: one shared endpoint and one shared popular-assets query are used across browser, Pages Function, and generators; payload semantics and local API behavior remain compatible.
 - [x] #9 Cleanup: remove the unused 0x endpoint and its Vite/env wiring; correct development/offline documentation; keep KyberSwap price estimation intact.
-- [ ] Done/release: all nine checks above are complete, required verification and targeted browser/live-read checks pass, README/CHANGELOG/package version are updated together, the release commit and matching tag are pushed, tag CI/deployment succeeds, and the production version is checked.
+- [x] Done/release: all nine checks above are complete, required verification and targeted browser/live-read checks pass, README/CHANGELOG/package version are updated together, the release commit and matching tag are pushed, tag CI/deployment succeeds, and the production version is checked.
 
 ## Execution model
 
@@ -88,3 +88,5 @@ After all nine items are complete, prepare the next patch release and include Ro
 - `27b0113` / `v1.6.15` pushed; tag CI and Cloudflare deployment succeeded. Production version.json matches the release SHA, and the Robinhood popular-assets endpoint and market detail work.
 - Production smoke testing found a recoverable React hydration mismatch in the new dataset metadata hook when cached data arrives before hydration. A failing server-render/hydration regression reproduced it. Fixed the hook to use a stable server metadata snapshot and the actual metadata as the external-store client snapshot.
 - Follow-up patch `v1.6.16` prepared without changing the published `v1.6.15` tag. Final checks: 82 offline and 29 UI tests passed (2 private-wallet opt-in cases skipped), plus typecheck, lint, and production build. The local Cloudflare Pages preview compiled its Worker successfully.
+- `aa32c07` / `v1.6.16` pushed; [tag CI and deployment succeeded](https://github.com/neutronstar03/morpho-blue-markets/actions/runs/38102088248). Production version.json matches `aa32c07bcda458c52172d339d7557be76b4d945a`; the footer shows v1.6.16, and the cached homepage reload has no new console errors. Robinhood detail and disconnected home APR load successfully. Temporary development/preview servers were stopped.
+- A separate direct-market-URL hydration warning remains: Cloudflare returns the homepage prerender for deep links. The routing configuration is unchanged from v1.6.14. This additional finding is tracked in `tasks/deep-link-hydration-followup.md`; it does not alter the completed nine-item scope.
