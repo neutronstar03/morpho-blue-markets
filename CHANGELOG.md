@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.16 - 2026-10-11
+
+### Fixed
+- risk data: hydration uses the stable prerendered metadata snapshot before displaying browser-cached data, avoiding a React hydration mismatch on page load.
+
+### Tests
+- risk data: regression renders server HTML, hydrates with an already loaded browser cache, and checks that React reports no recoverable hydration error.
+
 ## v1.6.15 - 2026-10-11
 
 ### Added

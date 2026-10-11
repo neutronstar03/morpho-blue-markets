@@ -16,9 +16,9 @@ Robinhood Chain mainnet (chain ID `4663`) is supported for market discovery, pos
 
 ## Recent updates
 
+- v1.6.16: Cached risk-data status now hydrates consistently with the prerendered page.
 - v1.6.15: Robinhood Chain support, reliable transaction feedback and live APR reads, chain capability alignment, and visible risk-data freshness.
 - v1.6.14: Positions now opens every network by default and persists each chain section independently.
-- v1.6.13: Positions now separates Vault V2 holdings into a vault-specific section and hides locally marked lost-value markets from totals.
 
 ## Development
 
@@ -96,9 +96,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.6.16` (2026-10-11): Fixed hydration of the risk-data indicator when browser cache is already present.
 - `v1.6.15` (2026-10-11): Robinhood Chain support and nine maintenance fixes covering transactions, chains, datasets, accessibility, shared GraphQL, and release verification.
 - `v1.6.14` (2026-07-04): Positions now opens every network by default and persists each chain section independently.
-- `v1.6.13` (2026-06-22): Positions now separates Vault V2 holdings into a vault-specific section and hides locally marked lost-value markets from totals.
 
 ## Live Version
 

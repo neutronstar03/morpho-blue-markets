@@ -489,9 +489,32 @@ export function createDatasetCache<TPayload>(definition: DatasetDefinition<TPayl
   }
 }
 
+const serverMetaSnapshots = new WeakMap<DatasetMetaSource, DatasetMeta>()
+
+function getServerMeta(source: DatasetMetaSource): DatasetMeta {
+  let snapshot = serverMetaSnapshots.get(source)
+  if (!snapshot) {
+    snapshot = {
+      status: 'uninitialized',
+      source: 'none',
+      refreshing: false,
+      observedAtMs: null,
+      cachedAtMs: null,
+      publishedAtMs: null,
+      lastCheckedAtMs: null,
+      freshnessMs: source.getMeta().freshnessMs,
+      nextRetryAtMs: null,
+      error: null,
+    }
+    serverMetaSnapshots.set(source, snapshot)
+  }
+  return snapshot
+}
+
 export function useDatasetMeta(source: DatasetMetaSource): DatasetMeta {
-  useSyncExternalStore(source.subscribe, source.getVersion, () => 0)
-  return source.getMeta()
+  // Hydration must start with the prerendered empty state even if a loader
+  // has already acquired browser-cached data before React mounts.
+  return useSyncExternalStore(source.subscribe, source.getMeta, () => getServerMeta(source))
 }
 
 export type DatasetFreshnessLevel = 'pending' | 'fresh' | 'stale' | 'unavailable'
