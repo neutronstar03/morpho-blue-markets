@@ -1,5 +1,6 @@
 import type { LoanAssetOption, OptimizerChainOption } from './shared'
 import type { OptimizerStrategy } from '~/lib/optimizer/supply-optimizer-runner'
+import { useId } from 'react'
 import { Button } from '~/components/ui/button'
 import { InfoTooltip } from '~/components/ui/info-tooltip'
 import { Input } from '~/components/ui/input'
@@ -80,6 +81,9 @@ export function SupplyAprOptimizerForm({
   optimizeLoading,
   optimizeLabel,
 }: SupplyAprOptimizerFormProps) {
+  const marketAprInputId = useId()
+  const depositAmountInputId = useId()
+  const maxMarketsInputId = useId()
   const unownedPopularOptions = popularLoanAssetOptions
     .filter(o => !ownedLoanAssetOptions.some(x => x.address.toLowerCase() === o.address.toLowerCase()))
   const OptimizerChainIcon = optimizerChainId ? CHAIN_ICON_BY_ID[optimizerChainId] : undefined
@@ -173,7 +177,7 @@ export function SupplyAprOptimizerForm({
 
       <div className="flex flex-col gap-1.5 md:gap-2">
         <div className="h-5 flex items-center gap-2">
-          <Label>Market APR</Label>
+          <Label htmlFor={marketAprInputId}>Market APR</Label>
           <InfoTooltip
             ariaLabel="Market APR info"
             content={(
@@ -186,6 +190,7 @@ export function SupplyAprOptimizerForm({
           />
         </div>
         <StepperInput
+          id={marketAprInputId}
           value={marketApr ?? ''}
           onChange={onChangeMarketApr}
           onDecrement={() => {
@@ -250,10 +255,11 @@ export function SupplyAprOptimizerForm({
 
       <div className="flex flex-col gap-1.5 md:gap-2">
         <div className="h-5 flex items-center">
-          <Label>Additional amount to supply</Label>
+          <Label htmlFor={depositAmountInputId}>Additional amount to supply</Label>
         </div>
         <div className="relative">
           <Input
+            id={depositAmountInputId}
             type="text"
             inputMode="decimal"
             value={newDepositAmount ?? ''}
@@ -288,7 +294,7 @@ export function SupplyAprOptimizerForm({
 
       <div className="flex flex-col gap-1.5 md:gap-2">
         <div className="h-5 flex items-center gap-2">
-          <Label>Max markets</Label>
+          <Label htmlFor={maxMarketsInputId}>Max markets</Label>
           <InfoTooltip
             ariaLabel="Max markets info"
             content={(
@@ -299,6 +305,7 @@ export function SupplyAprOptimizerForm({
           />
         </div>
         <StepperInput
+          id={maxMarketsInputId}
           value={maxMarketsInput ?? ''}
           onChange={(value) => {
             const digitsOnly = value.replace(/\D+/g, '')

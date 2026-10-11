@@ -1,66 +1,48 @@
+import type { DatasetMeta, DatasetMetaSource } from './dataset-cache'
 import { useEffect, useSyncExternalStore } from 'react'
+import { createDatasetCache, ORACLE_PROVIDERS_FRESHNESS_MS, useDatasetMeta } from './dataset-cache'
 
-interface OracleProvidersArtifact {
-  version: number
-  generatedAt?: string
-  providersByChain?: Record<string, Record<string, string>>
-}
-
-type OracleProvidersStatus = 'uninitialized' | 'loading' | 'loaded' | 'failed'
-
-interface OracleProvidersState {
-  status: OracleProvidersStatus
-  providersByChain: Record<number, Record<string, string>>
-}
+type ProvidersByChain = Record<number, Record<string, string>>
 
 const CHANGE_EVENT = 'oracle-providers:changed'
 
 const LOCAL_URL_PATH = 'oracle-providers.json'
 const ARTIFACTS_URL = 'https://neutronstar03.github.io/mbm-artifacts/v1/oracle-providers.json'
 
+// Keep the current v1 cache key so previously fetched provider labels survive.
 const LS_CACHE_KEY = 'oracle-providers-cache:v1'
-
-let oracleProvidersVersion = 0
-let oracleProvidersState: OracleProvidersState = {
-  status: 'uninitialized',
-  providersByChain: {},
-}
 
 function normalizeAddress(address?: string | null) {
   const s = (address ?? '').trim().toLowerCase()
   return /^0x[a-f0-9]{40}$/.test(s) ? s : ''
 }
 
-function emitChange() {
-  if (typeof window === 'undefined')
-    return
-  oracleProvidersVersion++
-  window.dispatchEvent(new Event(CHANGE_EVENT))
-}
+// The published artifact is the only valid shape; anything without a
+// providersByChain map is treated as invalid so we keep the cached/previous
+// labels instead of blanking them out. An empty map is preserved as valid.
+function buildProvidersByChain(input: unknown): ProvidersByChain | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    return null
+  const artifact = input as Record<string, unknown>
+  const source = artifact.providersByChain
+  if (!Number.isSafeInteger(artifact.version) || Number(artifact.version) <= 0
+    || !source || typeof source !== 'object' || Array.isArray(source)) {
+    return null
+  }
 
-function setState(next: OracleProvidersState) {
-  oracleProvidersState = next
-  emitChange()
-}
-
-function buildProvidersByChain(input: unknown) {
-  const artifact = input as OracleProvidersArtifact | undefined
-  const source = artifact?.providersByChain
-  const out: Record<number, Record<string, string>> = {}
-  if (!source || typeof source !== 'object')
-    return out
-
+  const out: ProvidersByChain = {}
   for (const [chainIdRaw, providers] of Object.entries(source)) {
     const chainId = Number(chainIdRaw)
-    if (!Number.isFinite(chainId) || chainId <= 0 || !providers || typeof providers !== 'object')
-      continue
+    if (!Number.isSafeInteger(chainId) || chainId <= 0 || !providers || typeof providers !== 'object' || Array.isArray(providers))
+      return null
 
     const normalizedProviders: Record<string, string> = {}
     for (const [addressRaw, labelRaw] of Object.entries(providers)) {
       const address = normalizeAddress(addressRaw)
       const label = typeof labelRaw === 'string' ? labelRaw.trim() : ''
-      if (address && label)
-        normalizedProviders[address] = label
+      if (!address || !label)
+        return null
+      normalizedProviders[address] = label
     }
 
     if (Object.keys(normalizedProviders).length > 0)
@@ -70,120 +52,51 @@ function buildProvidersByChain(input: unknown) {
   return out
 }
 
-let loadPromise: Promise<void> | null = null
-
-function safeReadCache(): unknown | undefined {
-  if (typeof window === 'undefined')
-    return undefined
-  try {
-    const raw = window.localStorage.getItem(LS_CACHE_KEY)
-    if (!raw)
-      return undefined
-    const parsed = JSON.parse(raw) as any
-    return parsed?.artifact
-  }
-  catch {
-    return undefined
-  }
+// generatedAt reflects the last content change, not the last publisher run, so
+// it is surfaced as informational publication time only.
+function publishedAtFromArtifact(input: unknown): number | null {
+  const generatedAt = input && typeof input === 'object' && 'generatedAt' in input ? input.generatedAt : undefined
+  if (typeof generatedAt !== 'string')
+    return null
+  const parsed = Date.parse(generatedAt)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
-function safeWriteCache(artifact: unknown) {
+let oracleProvidersVersion = 0
+
+function emitChange() {
   if (typeof window === 'undefined')
     return
-  try {
-    window.localStorage.setItem(LS_CACHE_KEY, JSON.stringify({
-      cachedAtMs: Date.now(),
-      artifact,
-    }))
-  }
-  catch {
-    // ignore
-  }
+  oracleProvidersVersion++
+  window.dispatchEvent(new Event(CHANGE_EVENT))
 }
 
-function baseUrlPrefix() {
-  const base = (import.meta as any).env?.BASE_URL as string | undefined
-  return base && typeof base === 'string' ? base : '/'
-}
+const cache = createDatasetCache<ProvidersByChain>({
+  name: 'oracle-providers',
+  cacheKey: LS_CACHE_KEY,
+  localPath: LOCAL_URL_PATH,
+  remoteUrl: ARTIFACTS_URL,
+  freshnessMs: ORACLE_PROVIDERS_FRESHNESS_MS,
+  payloadField: 'artifact',
+  parse: buildProvidersByChain,
+  getPublishedAtMs: publishedAtFromArtifact,
+  onChange: emitChange,
+})
 
-function shouldTryLocalStaticFile() {
-  return Boolean((import.meta as any).env?.DEV)
-}
+import.meta.hot?.dispose(() => cache.dispose())
 
-async function fetchJson(url: string) {
-  return await fetch(url, { headers: { accept: 'application/json' } })
-}
-
-async function readJsonResponse(res: Response) {
-  if (!res.ok)
-    return undefined
-  const contentType = res.headers.get('content-type') ?? ''
-  if (contentType.includes('text/html'))
-    return undefined
-  try {
-    return await res.json()
-  }
-  catch {
-    return undefined
-  }
+const metaSource: DatasetMetaSource = {
+  subscribe: subscribeOracleProviders,
+  getVersion: () => oracleProvidersVersion,
+  getMeta: () => cache.getMeta(),
 }
 
 export function ensureOracleProvidersLoaded() {
-  if (typeof window === 'undefined')
-    return
-  if (oracleProvidersState.status === 'loaded' || oracleProvidersState.status === 'failed')
-    return
-  if (loadPromise)
-    return
+  cache.ensureLoaded()
+}
 
-  setState({ ...oracleProvidersState, status: 'loading' })
-  loadPromise = (async () => {
-    try {
-      const localRes = shouldTryLocalStaticFile()
-        ? await fetchJson(`${baseUrlPrefix()}${LOCAL_URL_PATH}`)
-        : undefined
-      const localJson = localRes ? await readJsonResponse(localRes) : undefined
-
-      if (localJson !== undefined) {
-        safeWriteCache(localJson)
-        setState({ status: 'loaded', providersByChain: buildProvidersByChain(localJson) })
-        return
-      }
-
-      if (!localRes || localRes.status === 404 || localRes.ok) {
-        const artifactsRes = await fetchJson(ARTIFACTS_URL)
-        const artifactsJson = await readJsonResponse(artifactsRes)
-        if (artifactsJson !== undefined) {
-          safeWriteCache(artifactsJson)
-          setState({ status: 'loaded', providersByChain: buildProvidersByChain(artifactsJson) })
-          return
-        }
-
-        if (artifactsRes.status === 404) {
-          setState({ status: 'loaded', providersByChain: {} })
-          return
-        }
-      }
-
-      const cached = safeReadCache()
-      if (cached) {
-        setState({ status: 'loaded', providersByChain: buildProvidersByChain(cached) })
-        return
-      }
-
-      setState({ status: 'failed', providersByChain: {} })
-    }
-    catch {
-      const cached = safeReadCache()
-      if (cached) {
-        setState({ status: 'loaded', providersByChain: buildProvidersByChain(cached) })
-        return
-      }
-      setState({ status: 'failed', providersByChain: {} })
-    }
-  })().finally(() => {
-    loadPromise = null
-  })
+export function refreshOracleProvidersDataset() {
+  cache.refresh()
 }
 
 export function getOracleProvidersVersion() {
@@ -206,9 +119,17 @@ export function useOracleProvidersVersion() {
   )
 }
 
+export function useOracleProvidersDatasetMeta(): DatasetMeta {
+  return useDatasetMeta(metaSource)
+}
+
+export function getOracleProvidersDatasetMeta(): DatasetMeta {
+  return cache.getMeta()
+}
+
 export function useOracleProvidersPreload() {
   useEffect(() => {
-    ensureOracleProvidersLoaded()
+    cache.ensureLoaded()
   }, [])
 }
 
@@ -218,5 +139,5 @@ export function getOracleProvider(chainId?: number, oracleAddress?: string | nul
   const address = normalizeAddress(oracleAddress)
   if (!address)
     return undefined
-  return oracleProvidersState.providersByChain[chainId]?.[address]
+  return cache.getPayload()?.[chainId]?.[address]
 }

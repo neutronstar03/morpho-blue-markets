@@ -1,17 +1,11 @@
+import { chainProviderSlugMap } from './chain-capabilities'
+
 const KYBERSWAP_API_BASE = 'https://aggregator-api.kyberswap.com'
 const KYBERSWAP_CLIENT_ID = 'mbm'
 
-const KYBERSWAP_CHAIN_SLUGS = new Map<number, string>([
-  [1, 'ethereum'],
-  [10, 'optimism'],
-  [137, 'polygon'],
-  [8453, 'base'],
-  [42161, 'arbitrum'],
-  [130, 'unichain'],
-  [999, 'hyperevm'],
-  [143, 'monad'],
-  [4663, 'robinhood'],
-])
+// Derived from the chain capability registry: chains with a null KyberSwap
+// capability (Katana, Stable, World Chain) are omitted on purpose.
+const KYBERSWAP_CHAIN_SLUGS = chainProviderSlugMap('kyberswap')
 
 export interface KyberSwapEstimateParams {
   chainId: number

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
-import { getSupportedChainName, supportedChainIdMap } from '~/lib/addresses'
+import { getSupportedChainName, supportedChainIdMap, supportedChainMap } from '~/lib/addresses'
 import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
 import {
   MarketOrderBy,
@@ -187,7 +187,7 @@ export function AdvancedList() {
   // Live APR is a read-only on-chain call: an explicitly selected chain must load it
   // regardless of wallet connection or the wallet's current chain. Wallet switching is
   // only required for writes, which are gated elsewhere.
-  const canComputeLiveApr = liveChainId != null
+  const canComputeLiveApr = liveChainId != null && supportedChainMap.has(liveChainId)
 
   const liveAprMarkets = useMemo<LiveAprMarketInput[]>(() => {
     if (!canComputeLiveApr || liveChainId == null)

@@ -240,32 +240,34 @@ export default function HomePage() {
                     key={opportunity.id}
                     className={`border border-green-700/40 bg-green-950/20 ${isOddLastCard ? 'md:col-span-2' : ''}`}
                   >
-                    <div
-                      className="flex w-full items-start gap-2 p-2.5 text-left cursor-pointer sm:gap-3 sm:p-4"
-                      onClick={() => handleOpenOptimizer(opportunity)}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <h2 className="text-sm font-semibold text-green-100 sm:text-base">
+                    <div className="flex w-full items-start gap-2 p-2.5 sm:gap-3 sm:p-4">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenOptimizer(opportunity)}
+                        aria-label={`Optimize ${opportunity.loanAssetSymbol} opportunity`}
+                        className="min-w-0 flex-1 cursor-pointer rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+                      >
+                        <span className="block text-sm font-semibold text-green-100 sm:text-base">
                           Optimizable:
                           {' '}
                           {opportunity.loanAssetSymbol}
-                        </h2>
-                        <div className="mt-1 space-y-0.5 text-xs text-green-200/90 sm:text-sm">
-                          <p>
+                        </span>
+                        <span className="mt-1 block space-y-0.5 text-xs text-green-200/90 sm:text-sm">
+                          <span className="block">
                             Estimated APR improvement
                             {' '}
                             +
                             {opportunity.aprGainPct.toFixed(2)}
                             %
-                          </p>
-                          <p>
+                          </span>
+                          <span className="block">
                             Improvement over previous
                             {' '}
                             {opportunity.relativeImprovementPct != null
                               ? `+${opportunity.relativeImprovementPct.toFixed(2)}%`
                               : '--'}
-                          </p>
-                          <p>
+                          </span>
+                          <span className="block">
                             Daily Return
                             {' '}
                             +
@@ -277,28 +279,26 @@ export default function HomePage() {
                             {' '}
                             +
                             {formatUsd(opportunity.yearlyReturnGainUsd)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="ml-auto flex items-start gap-2 self-stretch">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            trackEvent('opportunity_card_dismissed', {
-                              loanAsset: opportunity.loanAssetSymbol,
-                              chainId: opportunity.chainId,
-                            })
-                            dismissOpportunity(opportunity.id)
-                          }}
-                          className="h-8 w-8 px-0"
-                          aria-label={`Dismiss ${opportunity.loanAssetSymbol} opportunity`}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
+                          </span>
+                        </span>
+                      </button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          trackEvent('opportunity_card_dismissed', {
+                            loanAsset: opportunity.loanAssetSymbol,
+                            chainId: opportunity.chainId,
+                          })
+                          dismissOpportunity(opportunity.id)
+                        }}
+                        className="ml-auto h-8 w-8 shrink-0 self-start px-0"
+                        aria-label={`Dismiss ${opportunity.loanAssetSymbol} opportunity`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
                   </Card>
                 )

@@ -1,3 +1,5 @@
+import type { SupportedChainId } from '../chain-capabilities'
+
 export interface Bundler3Config {
   bundler3: `0x${string}`
   generalAdapter1: `0x${string}`
@@ -56,7 +58,7 @@ export const BUNDLER3_CONFIG_BY_CHAIN_ID = {
     bundler3: '0xA8C5e23C9C0DF2b6fF716486c6bBEBB6661548C8',
     generalAdapter1: '0x916Aa175C36E845db45fF6DDB886AE437d403B61',
   },
-} as const satisfies Record<number, Bundler3Config>
+} as const satisfies Record<SupportedChainId, Bundler3Config>
 
 export function getBundler3Config(chainId?: number): Bundler3Config | undefined {
   if (!chainId)

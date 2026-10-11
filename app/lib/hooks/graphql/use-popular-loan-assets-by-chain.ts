@@ -1,5 +1,6 @@
+import type { PopularLoanAssetsEnvelope, PopularLoanAssetsMarketItem, PopularLoanAssetsQueryResult } from '~/lib/graphql/queries/popular-loan-assets'
 import { useQuery } from '@tanstack/react-query'
-import { gql } from 'graphql-request'
+import { QUERY_POPULAR_LOAN_ASSETS } from '~/lib/graphql/queries/popular-loan-assets'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
 import { isAssetBlacklisted } from '~/lib/market-blacklist'
 import { graphqlClient } from '../../graphql/client'
@@ -20,34 +21,8 @@ export interface PopularLoanAsset {
   averageApy: number
 }
 
-interface InterestingMarketItem {
-  marketId: string
-  uniqueKey: string
-  loanAsset: {
-    address: string
-    symbol: string
-    name?: string | null
-    decimals?: number | null
-    price?: {
-      usd?: number | null
-    } | null
-    chain: { id: number, network?: string | null }
-  }
-  state: {
-    borrowAssetsUsd?: number | null
-    netSupplyApy?: number | null
-    utilization: number
-  }
-}
-
-interface QueryInterestingMarketsResult {
-  markets: {
-    items: InterestingMarketItem[]
-  }
-}
-
 /** Process raw GraphQL market items into sorted, aggregated PopularLoanAsset[]. */
-export function aggregatePopularLoanAssets(items: InterestingMarketItem[], topN: number): PopularLoanAsset[] {
+export function aggregatePopularLoanAssets(items: PopularLoanAssetsMarketItem[], topN: number): PopularLoanAsset[] {
   const byAddr = new Map<string, PopularLoanAsset>()
   const apyWeightedSumByAddr = new Map<string, number>()
   const apyWeightByAddr = new Map<string, number>()
@@ -113,50 +88,6 @@ export function aggregatePopularLoanAssets(items: InterestingMarketItem[], topN:
     .slice(0, topN)
 }
 
-export const QUERY_INTERESTING_MARKETS = gql`
-  query InterestingMarkets(
-    $first: Int = 100
-    $skip: Int = 0
-    $chainId: Int = 1
-    $minNetSupplyApy: Float = 0.05
-    $maxNetSupplyApy: Float = 10
-    $minBorrowUsd: Float = 10000
-    $minUtilization: Float = 0.1
-  ) {
-    markets(
-      first: $first
-      skip: $skip
-      orderBy: NetSupplyApy
-      orderDirection: Desc
-      where: {
-        chainId_in: [$chainId]
-        netSupplyApy_gte: $minNetSupplyApy
-        netSupplyApy_lte: $maxNetSupplyApy
-        borrowAssetsUsd_gte: $minBorrowUsd
-        utilization_gte: $minUtilization
-      }
-    ) {
-      items {
-        marketId
-        uniqueKey: marketId
-        loanAsset {
-          address
-          symbol
-          name
-          decimals
-          chain { id network }
-          price { usd }
-        }
-        state {
-          utilization
-          borrowAssetsUsd
-          netSupplyApy
-        }
-      }
-    }
-  }
-`
-
 export interface UsePopularLoanAssetsByChainOptions {
   first?: number
   skip?: number
@@ -201,9 +132,8 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
       const res = await fetch(`/api/popular-loan-assets?${params}`)
       if (!res.ok)
         throw new Error(`Edge cache error: ${res.status}`)
-      const raw = await res.json() as { data: QueryInterestingMarketsResult }
-      const items = raw?.data?.markets?.items ?? []
-      return aggregatePopularLoanAssets(items, topN)
+      const raw = await res.json() as PopularLoanAssetsEnvelope
+      return aggregatePopularLoanAssets(raw.data.markets.items, topN)
     },
     enabled: !!chainId && enabled,
     staleTime: STALE_TIME_LONG_MS,
@@ -227,8 +157,8 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
       if (!chainId)
         return []
 
-      const result = await graphqlClient.request<QueryInterestingMarketsResult>(
-        QUERY_INTERESTING_MARKETS,
+      const result = await graphqlClient.request<PopularLoanAssetsQueryResult>(
+        QUERY_POPULAR_LOAN_ASSETS,
         {
           first,
           skip,
@@ -240,7 +170,7 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
         },
       )
 
-      return aggregatePopularLoanAssets(result.markets.items ?? [], topN)
+      return aggregatePopularLoanAssets(result.markets.items, topN)
     },
     enabled: !!chainId && enabled,
     placeholderData: edgeQuery.data,

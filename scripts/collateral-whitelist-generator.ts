@@ -1,6 +1,7 @@
 import type { SupplyMarketData } from '../app/lib/graphql/queries/markets-by-chain'
 import { mkdir } from 'node:fs/promises'
 import process from 'node:process'
+import { CHAIN_CAPABILITIES } from '../app/lib/chain-capabilities'
 import { graphqlClient } from '../app/lib/graphql/client'
 import { MarketOrderBy, OrderDirection, QUERY_MARKETS_BY_CHAIN } from '../app/lib/graphql/queries/markets-by-chain'
 import { filterBlacklistedMarkets } from '../app/lib/market-blacklist'
@@ -17,20 +18,14 @@ const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
 const MAX_CANDIDATE_NET_SUPPLY_APY = 6
 const MIN_CANDIDATE_BORROW_USD = 5
 
-const CHAINS = [
-  { chainId: 1, name: 'Ethereum', llamaSlug: 'ethereum' },
-  { chainId: 8453, name: 'Base', llamaSlug: 'base' },
-  { chainId: 42161, name: 'Arbitrum', llamaSlug: 'arbitrum' },
-  { chainId: 137, name: 'Polygon', llamaSlug: 'polygon' },
-  { chainId: 130, name: 'Unichain', llamaSlug: 'unichain' },
-  { chainId: 999, name: 'Hyperliquid', llamaSlug: 'hyperliquid' },
-  { chainId: 747474, name: 'Katana', llamaSlug: 'katana' },
-  { chainId: 10, name: 'Optimism', llamaSlug: 'optimism' },
-  { chainId: 143, name: 'Monad', llamaSlug: 'monad' },
-  { chainId: 988, name: 'Stable', llamaSlug: 'stable' },
-  { chainId: 480, name: 'World Chain', llamaSlug: '480' },
-  { chainId: 4663, name: 'Robinhood Chain', llamaSlug: 'robinhood' },
-] as const
+// Derived from the shared chain registry; the DefiLlama slug drives the
+// collateral validation keys.
+const CHAINS = CHAIN_CAPABILITIES.flatMap((chain) => {
+  const llamaSlug = chain.providers.defillama
+  if (!llamaSlug)
+    return []
+  return [{ chainId: chain.id, name: chain.name, llamaSlug }]
+})
 
 interface GoodEntry {
   chainId: number

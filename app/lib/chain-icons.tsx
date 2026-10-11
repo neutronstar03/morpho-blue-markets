@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { SupportedChainId } from './chain-capabilities'
 import NetworkArbitrumOne from '@web3icons/react/icons/networks/NetworkArbitrumOne'
 import NetworkBase from '@web3icons/react/icons/networks/NetworkBase'
 import NetworkEthereum from '@web3icons/react/icons/networks/NetworkEthereum'
@@ -59,4 +60,4 @@ export const CHAIN_ICON_BY_ID: Record<number, ChainIconComponent | undefined> = 
   747474: NetworkKatana,
   480: NetworkWorldChain,
   4663: NetworkRobinhood,
-}
+} satisfies Record<SupportedChainId, ChainIconComponent>

@@ -1,7 +1,10 @@
+import type { Chain } from 'viem'
+import type { SupportedChainId } from './chain-capabilities'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { defineChain, fallback, http } from 'viem'
-import { monad } from 'viem/chains'
+import { monad, stable } from 'viem/chains'
 import { arbitrum, base, katana, mainnet, optimism, polygon, unichain, worldchain } from 'wagmi/chains'
+import { CHAIN_CAPABILITIES } from './chain-capabilities'
 import { robinhood } from './chains/robinhood'
 
 const robinhoodWithIcon = {
@@ -41,10 +44,31 @@ const hyperEvm = defineChain({
   },
 })
 
+const WALLET_CHAIN_BY_ID = {
+  [mainnet.id]: mainnet,
+  [base.id]: base,
+  [arbitrum.id]: arbitrum,
+  [polygon.id]: polygon,
+  [unichain.id]: unichain,
+  [hyperEvm.id]: hyperEvm,
+  [katana.id]: katana,
+  [optimism.id]: optimism,
+  [monad.id]: monad,
+  [stable.id]: stable,
+  [worldchainWithIcon.id]: worldchainWithIcon,
+  [robinhoodWithIcon.id]: robinhoodWithIcon,
+} satisfies Record<SupportedChainId, Chain>
+
+const [firstChain, ...remainingChains] = CHAIN_CAPABILITIES
+const walletChains = [
+  WALLET_CHAIN_BY_ID[firstChain.id],
+  ...remainingChains.map(chain => WALLET_CHAIN_BY_ID[chain.id]),
+] as const
+
 export const config = getDefaultConfig({
   appName: 'mbm',
   projectId: '0d13744a3dd855198cde1538ca87976d',
-  chains: [arbitrum, base, katana, mainnet, monad, optimism, polygon, unichain, hyperEvm, worldchainWithIcon, robinhoodWithIcon],
+  chains: walletChains,
   transports: {
     [mainnet.id]: fallback([
       http('https://ethereum-rpc.publicnode.com'),
@@ -73,6 +97,7 @@ export const config = getDefaultConfig({
     ], { rank: false, retryCount: 2 }),
     [katana.id]: http('https://rpc.katana.network'),
     [robinhood.id]: http(robinhood.rpcUrls.default.http[0]),
+    [stable.id]: http(stable.rpcUrls.default.http[0]),
     [unichain.id]: fallback([
       http('https://unichain.drpc.org'),
       http('https://0xrpc.io/uni'),

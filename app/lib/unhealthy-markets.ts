@@ -1,4 +1,6 @@
+import type { DatasetMeta, DatasetMetaSource } from './dataset-cache'
 import { useEffect, useSyncExternalStore } from 'react'
+import { createDatasetCache, UNHEALTHY_MARKETS_FRESHNESS_MS, useDatasetMeta } from './dataset-cache'
 
 export interface UnhealthyMarketEntry {
   chainId: number
@@ -15,10 +17,7 @@ export interface UnhealthyMarketEntry {
   loanSymbol?: string
 }
 
-type UnhealthyMarketsStatus = 'uninitialized' | 'loading' | 'loaded' | 'failed'
-
-interface UnhealthyMarketsState {
-  status: UnhealthyMarketsStatus
+interface UnhealthyMarketsPayload {
   marketIdsByChain: Record<number, Set<string>>
   entriesByKey: Record<string, UnhealthyMarketEntry>
 }
@@ -26,44 +25,43 @@ interface UnhealthyMarketsState {
 const CHANGE_EVENT = 'unhealthy-markets:changed'
 const LOCAL_URL_PATH = 'unhealthy.markets.json'
 const ARTIFACTS_URL = 'https://neutronstar03.github.io/mbm-artifacts/v1/unhealthy.markets.json'
+// Keep the current v1 cache key so previously flagged markets survive.
 const LS_CACHE_KEY = 'unhealthy-markets-cache:v1'
-
-let unhealthyMarketsVersion = 0
-let unhealthyMarketsState: UnhealthyMarketsState = {
-  status: 'uninitialized',
-  marketIdsByChain: {},
-  entriesByKey: {},
-}
-
-function emitChange() {
-  if (typeof window === 'undefined')
-    return
-  unhealthyMarketsVersion++
-  window.dispatchEvent(new Event(CHANGE_EVENT))
-}
-
-function setState(next: UnhealthyMarketsState) {
-  unhealthyMarketsState = next
-  emitChange()
-}
 
 function normalizeMarketId(value?: string | null) {
   return value?.toLowerCase() ?? undefined
 }
 
-function buildState(entries: unknown): Omit<UnhealthyMarketsState, 'status'> {
+// Returns null for a non-array payload so the lifecycle falls back to cache
+// instead of clearing previously flagged unhealthy markets.
+function buildPayload(entries: unknown): UnhealthyMarketsPayload | null {
+  if (!Array.isArray(entries))
+    return null
+
   const marketIdsByChain: Record<number, Set<string>> = {}
   const entriesByKey: Record<string, UnhealthyMarketEntry> = {}
-  const arr = Array.isArray(entries) ? entries : []
 
-  for (const item of arr) {
-    if (!item || typeof item !== 'object')
-      continue
-    const e = item as Partial<UnhealthyMarketEntry>
+  for (const item of entries) {
+    if (!item || typeof item !== 'object' || Array.isArray(item))
+      return null
+    const e = item as Record<string, unknown>
     const chainId = Number(e.chainId)
-    const uniqueKey = normalizeMarketId(e.uniqueKey)
-    if (!Number.isFinite(chainId) || chainId <= 0 || !uniqueKey)
-      continue
+    const uniqueKey = typeof e.uniqueKey === 'string' ? normalizeMarketId(e.uniqueKey) : undefined
+    if (!Number.isSafeInteger(chainId) || chainId <= 0 || !uniqueKey || !/^0x[a-f0-9]{64}$/.test(uniqueKey)
+      || e.severity !== 'black' || e.reason !== 'unhealthy_borrowers'
+      || typeof e.generatedAt !== 'string' || !Number.isFinite(Date.parse(e.generatedAt))) {
+      return null
+    }
+    const numericKeys = ['unhealthyBorrowUsd', 'unhealthyCollateralUsd', 'unhealthyBorrowerCount', 'minHealthFactor', 'thresholdUsd'] as const
+    const metrics = {} as Record<(typeof numericKeys)[number], number>
+    for (const key of numericKeys) {
+      const value = e[key]
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
+        return null
+      metrics[key] = value
+    }
+    if (!Number.isSafeInteger(metrics.unhealthyBorrowerCount))
+      return null
     if (!marketIdsByChain[chainId])
       marketIdsByChain[chainId] = new Set<string>()
     marketIdsByChain[chainId].add(uniqueKey)
@@ -72,12 +70,8 @@ function buildState(entries: unknown): Omit<UnhealthyMarketsState, 'status'> {
       uniqueKey,
       severity: 'black',
       reason: 'unhealthy_borrowers',
-      unhealthyBorrowUsd: Number(e.unhealthyBorrowUsd) || 0,
-      unhealthyCollateralUsd: Number(e.unhealthyCollateralUsd) || 0,
-      unhealthyBorrowerCount: Number(e.unhealthyBorrowerCount) || 0,
-      minHealthFactor: Number(e.minHealthFactor) || 0,
-      thresholdUsd: Number(e.thresholdUsd) || 0,
-      generatedAt: typeof e.generatedAt === 'string' ? e.generatedAt : '',
+      ...metrics,
+      generatedAt: e.generatedAt,
       collateralSymbol: typeof e.collateralSymbol === 'string' ? e.collateralSymbol : undefined,
       loanSymbol: typeof e.loanSymbol === 'string' ? e.loanSymbol : undefined,
     }
@@ -86,119 +80,41 @@ function buildState(entries: unknown): Omit<UnhealthyMarketsState, 'status'> {
   return { marketIdsByChain, entriesByKey }
 }
 
-function safeReadCache(): unknown | undefined {
-  if (typeof window === 'undefined')
-    return undefined
-  try {
-    const raw = window.localStorage.getItem(LS_CACHE_KEY)
-    if (!raw)
-      return undefined
-    const parsed = JSON.parse(raw) as any
-    return parsed?.entries
-  }
-  catch {
-    return undefined
-  }
-}
+const EMPTY_PAYLOAD: UnhealthyMarketsPayload = { marketIdsByChain: {}, entriesByKey: {} }
 
-function safeWriteCache(entries: unknown) {
+let unhealthyMarketsVersion = 0
+
+function emitChange() {
   if (typeof window === 'undefined')
     return
-  try {
-    window.localStorage.setItem(LS_CACHE_KEY, JSON.stringify({
-      cachedAtMs: Date.now(),
-      entries,
-    }))
-  }
-  catch {
-    // ignore
-  }
+  unhealthyMarketsVersion++
+  window.dispatchEvent(new Event(CHANGE_EVENT))
 }
 
-function baseUrlPrefix() {
-  const base = (import.meta as any).env?.BASE_URL as string | undefined
-  return base && typeof base === 'string' ? base : '/'
-}
+const cache = createDatasetCache<UnhealthyMarketsPayload>({
+  name: 'unhealthy-markets',
+  cacheKey: LS_CACHE_KEY,
+  localPath: LOCAL_URL_PATH,
+  remoteUrl: ARTIFACTS_URL,
+  freshnessMs: UNHEALTHY_MARKETS_FRESHNESS_MS,
+  parse: buildPayload,
+  onChange: emitChange,
+})
 
-function shouldTryLocalStaticFile() {
-  return Boolean((import.meta as any).env?.DEV)
-}
+import.meta.hot?.dispose(() => cache.dispose())
 
-async function fetchJson(url: string) {
-  return fetch(url, { headers: { accept: 'application/json' } })
+const metaSource: DatasetMetaSource = {
+  subscribe: subscribeUnhealthyMarkets,
+  getVersion: () => unhealthyMarketsVersion,
+  getMeta: () => cache.getMeta(),
 }
-
-async function readJsonResponse(res: Response) {
-  if (!res.ok)
-    return undefined
-  const contentType = res.headers.get('content-type') ?? ''
-  if (contentType.includes('text/html'))
-    return undefined
-  try {
-    return await res.json()
-  }
-  catch {
-    return undefined
-  }
-}
-
-let loadPromise: Promise<void> | null = null
 
 export function ensureUnhealthyMarketsLoaded() {
-  if (typeof window === 'undefined')
-    return
-  if (unhealthyMarketsState.status === 'loaded' || unhealthyMarketsState.status === 'failed')
-    return
-  if (loadPromise)
-    return
+  cache.ensureLoaded()
+}
 
-  setState({ ...unhealthyMarketsState, status: 'loading' })
-  loadPromise = (async () => {
-    try {
-      const localRes = shouldTryLocalStaticFile()
-        ? await fetchJson(`${baseUrlPrefix()}${LOCAL_URL_PATH}`)
-        : undefined
-      const localJson = localRes ? await readJsonResponse(localRes) : undefined
-      if (localJson !== undefined) {
-        safeWriteCache(localJson)
-        setState({ status: 'loaded', ...buildState(localJson) })
-        return
-      }
-
-      if (!localRes || localRes.status === 404 || localRes.ok) {
-        const artifactsRes = await fetchJson(ARTIFACTS_URL)
-        const artifactsJson = await readJsonResponse(artifactsRes)
-        if (artifactsJson !== undefined) {
-          safeWriteCache(artifactsJson)
-          setState({ status: 'loaded', ...buildState(artifactsJson) })
-          return
-        }
-
-        if (artifactsRes.status === 404) {
-          setState({ status: 'loaded', marketIdsByChain: {}, entriesByKey: {} })
-          return
-        }
-      }
-
-      const cached = safeReadCache()
-      if (cached) {
-        setState({ status: 'loaded', ...buildState(cached) })
-        return
-      }
-
-      setState({ status: 'failed', marketIdsByChain: {}, entriesByKey: {} })
-    }
-    catch {
-      const cached = safeReadCache()
-      if (cached) {
-        setState({ status: 'loaded', ...buildState(cached) })
-        return
-      }
-      setState({ status: 'failed', marketIdsByChain: {}, entriesByKey: {} })
-    }
-  })().finally(() => {
-    loadPromise = null
-  })
+export function refreshUnhealthyMarketsDataset() {
+  cache.refresh()
 }
 
 export function getUnhealthyMarketsVersion() {
@@ -221,9 +137,17 @@ export function useUnhealthyMarketsVersion() {
   )
 }
 
+export function useUnhealthyMarketsDatasetMeta(): DatasetMeta {
+  return useDatasetMeta(metaSource)
+}
+
+export function getUnhealthyMarketsDatasetMeta(): DatasetMeta {
+  return cache.getMeta()
+}
+
 export function useUnhealthyMarketsPreload() {
   useEffect(() => {
-    ensureUnhealthyMarketsLoaded()
+    cache.ensureLoaded()
   }, [])
 }
 
@@ -243,14 +167,15 @@ function hasValueInChainMap(
 }
 
 export function isMarketSystemUnhealthy(uniqueKey?: string | null, chainId?: number) {
-  return hasValueInChainMap(unhealthyMarketsState.marketIdsByChain, uniqueKey, chainId)
+  const payload = cache.getPayload() ?? EMPTY_PAYLOAD
+  return hasValueInChainMap(payload.marketIdsByChain, uniqueKey, chainId)
 }
 
 export function getMarketSystemUnhealthyEntry(uniqueKey?: string | null, chainId?: number) {
   const normalized = normalizeMarketId(uniqueKey)
   if (!normalized || chainId == null)
     return undefined
-  return unhealthyMarketsState.entriesByKey[`${chainId}:${normalized}`]
+  return cache.getPayload()?.entriesByKey[`${chainId}:${normalized}`]
 }
 
 if (typeof window !== 'undefined')

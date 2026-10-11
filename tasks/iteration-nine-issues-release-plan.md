@@ -6,22 +6,22 @@ Resolve all nine findings in `tasks/robinhood-chain-and-reconnaissance.md`, incl
 
 ## Checklist and done criteria
 
-- [ ] #1 Positions: zero/positive supplied-asset transitions keep hook order stable and pass a render regression check.
-- [ ] #2 Transactions: submission errors fail the flow; receipt timeouts retain a known hash and show delayed confirmation; successful/reverted receipts keep their correct outcomes.
-- [ ] #3 Release CI: release-tag deployments run frozen dependency install, non-mutating lint, typecheck, offline Bun tests, UI tests, and build before deployment. Branch pushes/PRs do not trigger this workflow; manual deployment is restricted to release-tag refs.
-- [ ] #4 Chains: one typed capability registry feeds chain consumers/generators; Stable wallet/RPC support and Monad liquidity mappings are verified; Robinhood remains covered.
-- [ ] #5 Datasets: cache freshness/source is visible, failed loads can recover, and stale restrictive datasets remain distinguishable from missing data; local/manual exclusions preserve precedence.
-- [ ] #6 Live APR: the selected chain loads immediate APR without wallet connection or wallet-chain switching; unknown/unconfigured chains stay explicitly unavailable.
-- [ ] #7 Accessibility: opportunity action works with keyboard; dialog moves/traps/restores focus and handles Escape; identified input labels are associated with controls.
-- [ ] #8 GraphQL: one shared endpoint and one shared popular-assets query are used across browser, Pages Function, and generators; payload semantics and local API behavior remain compatible.
-- [ ] #9 Cleanup: remove the unused 0x endpoint and its Vite/env wiring; correct development/offline documentation; keep KyberSwap price estimation intact.
+- [x] #1 Positions: zero/positive supplied-asset transitions keep hook order stable and pass a render regression check.
+- [x] #2 Transactions: submission errors fail the flow; receipt timeouts retain a known hash and show delayed confirmation; successful/reverted receipts keep their correct outcomes.
+- [x] #3 Release CI: release-tag deployments run frozen dependency install, non-mutating lint, typecheck, offline Bun tests, UI tests, and build before deployment. Branch pushes/PRs do not trigger this workflow; manual deployment is restricted to release-tag refs.
+- [x] #4 Chains: one typed capability registry feeds chain consumers/generators; Stable wallet/RPC support and Monad liquidity mappings are verified; Robinhood remains covered.
+- [x] #5 Datasets: cache freshness/source is visible, failed loads can recover, and stale restrictive datasets remain distinguishable from missing data; local/manual exclusions preserve precedence.
+- [x] #6 Live APR: the selected chain loads immediate APR without wallet connection or wallet-chain switching; unknown/unconfigured chains stay explicitly unavailable.
+- [x] #7 Accessibility: opportunity action works with keyboard; dialog moves/traps/restores focus and handles Escape; identified input labels are associated with controls.
+- [x] #8 GraphQL: one shared endpoint and one shared popular-assets query are used across browser, Pages Function, and generators; payload semantics and local API behavior remain compatible.
+- [x] #9 Cleanup: remove the unused 0x endpoint and its Vite/env wiring; correct development/offline documentation; keep KyberSwap price estimation intact.
 - [ ] Done/release: all nine checks above are complete, required verification and targeted browser/live-read checks pass, README/CHANGELOG/package version are updated together, the release commit and matching tag are pushed, tag CI/deployment succeeds, and the production version is checked.
 
 ## Execution model
 
 Use the current checkout, with at most three active implementation subagents and explicit disjoint file ownership. No worktrees. The coordinator owns cross-task decisions, repository-wide lint autofix, final checks, commits, release files, pushing, and deployment verification. Subagents run their targeted checks and return changed paths and evidence; they do not commit, push, tag, deploy, run global autofix, or revert another agent's changes.
 
-Implement in two waves, followed by integration and release. All work is tracked by the issue numbers above; overlapping files are handed off at a wave boundary.
+Implement in two waves, followed by integration and release. Start an independent wave-2 assignment as its agent slot becomes free; wait for the relevant handoff where files overlap. All work is tracked by the issue numbers above.
 
 | Stage | Owner | Issues | Responsibility |
 | --- | --- | --- | --- |
@@ -74,4 +74,14 @@ Track last successful fetch and cache acquisition time accurately; do not relabe
 
 After all nine items are complete, prepare the next patch release and include Robinhood support in its notes. Update `package.json`, add the newest entry at the top of CHANGELOG, and keep README's recent-update sections to the latest three releases. Re-run release verification. Create the release commit `v1.6.15: add Robinhood support and fix maintenance issues` and matching tag (adjust together if the version changed), then push the branch and tag using the repository's anonymous GitHub persona. Follow the deployment workflow to completion and verify production's version metadata and a Robinhood market page.
 
-This file is the execution plan; the implementation checklist remains pending until each change and its acceptance checks are complete.
+## Execution evidence
+
+- `7bd73ca`: implemented #1/#2/#3/#6/#9. Offline suite: 37 passed; UI suite: 15 passed, 2 optional private-wallet cases skipped; typecheck and production build passed. Global lint will run after all agent-owned edits and temporary probes finish.
+- Browser: Robinhood selected while disconnected displayed live Immediate APR for all five visible market rows.
+- Dataset publisher verified through its repository workflow: daily at 03:17 UTC, deployment only on content changes. Default fetch-age windows: blacklist/unhealthy 48h, whitelist 72h, oracle providers 7d. Publication age remains separate from last check time.
+- Anonymous GitHub CLI and SSH alias identities verified; origin now uses `github.com-neutronstar03` for the eventual release push.
+- Integrated release checks: 82 offline tests passed; 28 UI tests passed with 2 optional private-wallet cases skipped; typecheck, non-mutating lint, production build, and Wrangler Pages Functions compilation passed. `bun.lock` is unchanged.
+- Browser after integration: Stable and Robinhood show live Immediate APR with no connected wallet. All four datasets load from the remote source and show fetch age separately from oracle publication date. Fixed and regression-tested the between-clock-ticks freshness label discovered during this smoke check.
+- GraphQL: both Morpho hosts returned equivalent detail/popular-asset/generator selections in read-only probes; the local popular-assets Pages Function returns a validated response for Robinhood. Query aggregation semantics and malformed-response rejection have offline coverage.
+- Position transitions, transaction outcomes, opportunity semantics, form labels, dialog focus/Escape/restoration, and dataset failure/recovery cases are covered through render/flow fixtures; no funded transaction was submitted.
+- Prepared `v1.6.15` in package.json, README, and CHANGELOG; release publication/deployment verification remains the final unchecked criterion above.

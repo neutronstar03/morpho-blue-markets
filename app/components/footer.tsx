@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 import pkg from '../../package.json'
 import { formatUserBlacklistSyncAge, useUserBlacklistSyncStatus } from '../lib/user-blacklist-sync'
+import { DatasetRiskStatus } from './dataset-freshness-status'
 import { Container } from './ui/container'
 
 function getRepoUrl(repository: unknown): string | null {
@@ -202,6 +203,7 @@ export function Footer() {
               : <span />}
 
             <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+              <DatasetRiskStatus />
               <BlacklistSyncMiniStatus />
               <a
                 href="#advanced-settings"

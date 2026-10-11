@@ -1,12 +1,9 @@
+import type { DatasetMeta, DatasetMetaSource } from './dataset-cache'
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import blacklistAssets from './blacklist.assets.json'
+import { baseUrlPrefix, createDatasetCache, localArtifactsEnabled, MARKET_BLACKLIST_FRESHNESS_MS, useDatasetMeta } from './dataset-cache'
 import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue, isOracleLocallyExcluded, subscribeLocalMarketExclusions } from './local-market-exclusions'
 import { isMarketSystemUnhealthy, subscribeUnhealthyMarkets } from './unhealthy-markets'
-
-interface BlacklistMarketEntry {
-  chainId: number
-  uniqueKey: string
-}
 
 interface MarketBlacklistArgs {
   uniqueKey?: string | null
@@ -18,17 +15,7 @@ interface MarketBlacklistArgs {
   chainId?: number
 }
 
-interface ManualBlacklistMarketEntry extends BlacklistMarketEntry {
-  comment?: string
-}
-
-type BlacklistStatus = 'uninitialized' | 'loading' | 'loaded' | 'failed'
-
-interface BlacklistState {
-  status: BlacklistStatus
-  marketIdsByChain: Record<number, Set<string>>
-  manualMarketIdsByChain: Record<number, Set<string>>
-}
+type MarketIdsByChain = Record<number, Set<string>>
 
 const CHANGE_EVENT = 'market-blacklist:changed'
 
@@ -36,42 +23,27 @@ const LOCAL_URL_PATH = 'blacklist.markets.json'
 const LOCAL_MANUAL_URL_PATH = 'blacklist.markets.manual.json'
 const ARTIFACTS_URL = 'https://neutronstar03.github.io/mbm-artifacts/v1/blacklist.markets.json'
 
+// Keep the current v1 cache key so previously fetched generated entries survive.
 const LS_CACHE_KEY = 'market-blacklist-cache:v1'
-
-let blacklistVersion = 0
-let blacklistState: BlacklistState = {
-  status: 'uninitialized',
-  marketIdsByChain: {},
-  manualMarketIdsByChain: {},
-}
-
-function emitChange() {
-  if (typeof window === 'undefined')
-    return
-  blacklistVersion++
-  window.dispatchEvent(new Event(CHANGE_EVENT))
-}
-
-function setState(next: BlacklistState) {
-  blacklistState = next
-  emitChange()
-}
 
 function normalizeMarketId(value?: string | null) {
   return value?.toLowerCase() ?? undefined
 }
 
-function buildMarketIdsByChain(entries: unknown) {
-  const out: Record<number, Set<string>> = {}
-  const arr = Array.isArray(entries) ? entries : []
-  for (const item of arr) {
-    if (!item || typeof item !== 'object')
-      continue
-    const e = item as Partial<BlacklistMarketEntry>
+// Returns null for a non-array payload so the lifecycle falls back to cache or
+// the previously loaded data instead of clearing known blacklisted markets.
+function buildMarketIdsByChain(entries: unknown): MarketIdsByChain | null {
+  if (!Array.isArray(entries))
+    return null
+  const out: MarketIdsByChain = {}
+  for (const item of entries) {
+    if (!item || typeof item !== 'object' || Array.isArray(item))
+      return null
+    const e = item as Record<string, unknown>
     const chainId = Number(e.chainId)
-    const uniqueKey = normalizeMarketId(e.uniqueKey)
-    if (!Number.isFinite(chainId) || chainId <= 0 || !uniqueKey)
-      continue
+    const uniqueKey = typeof e.uniqueKey === 'string' ? normalizeMarketId(e.uniqueKey) : undefined
+    if (!Number.isSafeInteger(chainId) || chainId <= 0 || !uniqueKey || !/^0x[a-f0-9]{64}$/.test(uniqueKey))
+      return null
     if (!out[chainId])
       out[chainId] = new Set<string>()
     out[chainId].add(uniqueKey)
@@ -79,10 +51,12 @@ function buildMarketIdsByChain(entries: unknown) {
   return out
 }
 
-function mergeMarketIdsByChain(
-  ...maps: Array<Record<number, Set<string>>>
-) {
-  const out: Record<number, Set<string>> = {}
+// Manual entries always win over generated ones: they are merged on top so a
+// generated refresh can never drop a local exclusion.
+export function mergeMarketIdsByChain(
+  ...maps: MarketIdsByChain[]
+): MarketIdsByChain {
+  const out: MarketIdsByChain = {}
   for (const map of maps) {
     for (const [chainIdRaw, values] of Object.entries(map)) {
       const chainId = Number(chainIdRaw)
@@ -95,170 +69,83 @@ function mergeMarketIdsByChain(
   return out
 }
 
-function safeReadCache(): unknown | undefined {
-  if (typeof window === 'undefined')
-    return undefined
-  try {
-    const raw = window.localStorage.getItem(LS_CACHE_KEY)
-    if (!raw)
-      return undefined
-    const parsed = JSON.parse(raw) as any
-    return parsed?.entries
-  }
-  catch {
-    return undefined
-  }
+let manualMarketIdsByChain: MarketIdsByChain = {}
+let manualLoadPromise: Promise<void> | null = null
+let mergedMarketIdsByChain: MarketIdsByChain = {}
+
+let blacklistVersion = 0
+
+const cache = createDatasetCache<MarketIdsByChain>({
+  name: 'market-blacklist',
+  cacheKey: LS_CACHE_KEY,
+  localPath: LOCAL_URL_PATH,
+  remoteUrl: ARTIFACTS_URL,
+  freshnessMs: MARKET_BLACKLIST_FRESHNESS_MS,
+  parse: buildMarketIdsByChain,
+  onChange: emitChange,
+})
+
+import.meta.hot?.dispose(() => cache.dispose())
+
+function recomputeMerged() {
+  mergedMarketIdsByChain = mergeMarketIdsByChain(cache.getPayload() ?? {}, manualMarketIdsByChain)
 }
 
-function safeWriteCache(entries: unknown) {
-  if (typeof window === 'undefined')
-    return
-  try {
-    window.localStorage.setItem(LS_CACHE_KEY, JSON.stringify({
-      cachedAtMs: Date.now(),
-      entries,
-    }))
-  }
-  catch {
-    // ignore
-  }
-}
-
-function baseUrlPrefix() {
-  const base = (import.meta as any).env?.BASE_URL as string | undefined
-  return base && typeof base === 'string' ? base : '/'
-}
-
-function shouldTryLocalStaticFile() {
-  return Boolean((import.meta as any).env?.DEV)
-}
-
-async function fetchJson(url: string) {
-  const res = await fetch(url, { headers: { accept: 'application/json' } })
-  return res
-}
-
-async function readJsonResponse(res: Response) {
-  if (!res.ok)
-    return undefined
-  const contentType = res.headers.get('content-type') ?? ''
-  if (contentType.includes('text/html'))
-    return undefined
-  try {
-    return await res.json()
-  }
-  catch {
-    return undefined
-  }
-}
-
-async function fetchOptionalJson(url: string) {
-  try {
-    const res = await fetchJson(url)
-    return await readJsonResponse(res)
-  }
-  catch {
-    return undefined
-  }
-}
-
-let loadPromise: Promise<void> | null = null
-
-export function ensureMarketBlacklistLoaded() {
+function emitChange() {
+  recomputeMerged()
+  blacklistVersion++
   if (typeof window === 'undefined')
     return
-  if (blacklistState.status === 'loaded' || blacklistState.status === 'failed')
-    return
-  if (loadPromise)
-    return
+  window.dispatchEvent(new Event(CHANGE_EVENT))
+}
 
-  setState({ ...blacklistState, status: 'loading' })
-  loadPromise = (async () => {
+const metaSource: DatasetMetaSource = {
+  subscribe: subscribeMarketBlacklist,
+  getVersion: () => blacklistVersion,
+  getMeta: () => cache.getMeta(),
+}
+
+// The manual file is a dev/static-only overlay. A failed read keeps the
+// previous manual entries; it never clears them.
+function ensureManualBlacklistLoaded() {
+  if (typeof window === 'undefined')
+    return
+  if (!localArtifactsEnabled())
+    return
+  if (manualLoadPromise)
+    return
+  manualLoadPromise = (async () => {
     try {
-      const manualEntries = shouldTryLocalStaticFile()
-        ? await fetchOptionalJson(`${baseUrlPrefix()}${LOCAL_MANUAL_URL_PATH}`)
-        : undefined
-      const manualMarketIdsByChain = buildMarketIdsByChain(manualEntries as ManualBlacklistMarketEntry[] | undefined)
-      const localRes = shouldTryLocalStaticFile()
-        ? await fetchJson(`${baseUrlPrefix()}${LOCAL_URL_PATH}`)
-        : undefined
-      const localJson = localRes ? await readJsonResponse(localRes) : undefined
-      if (localJson !== undefined) {
-        safeWriteCache(localJson)
-        const generatedMarketIdsByChain = buildMarketIdsByChain(localJson)
-        setState({
-          status: 'loaded',
-          marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
-          manualMarketIdsByChain,
-        })
-        return
-      }
-
-      if (!localRes || localRes.status === 404 || localRes.ok) {
-        const artifactsRes = await fetchJson(ARTIFACTS_URL)
-        const artifactsJson = await readJsonResponse(artifactsRes)
-        if (artifactsJson !== undefined) {
-          safeWriteCache(artifactsJson)
-          const generatedMarketIdsByChain = buildMarketIdsByChain(artifactsJson)
-          setState({
-            status: 'loaded',
-            marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
-            manualMarketIdsByChain,
-          })
-          return
-        }
-
-        if (artifactsRes.status === 404) {
-          setState({
-            status: 'loaded',
-            marketIdsByChain: manualMarketIdsByChain,
-            manualMarketIdsByChain,
-          })
-          return
-        }
-      }
-
-      const cached = safeReadCache()
-      if (cached) {
-        const generatedMarketIdsByChain = buildMarketIdsByChain(cached)
-        setState({
-          status: 'loaded',
-          marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
-          manualMarketIdsByChain,
-        })
-        return
-      }
-
-      setState({
-        status: 'failed',
-        marketIdsByChain: manualMarketIdsByChain,
-        manualMarketIdsByChain,
+      const res = await fetch(`${baseUrlPrefix()}${LOCAL_MANUAL_URL_PATH}`, {
+        headers: { accept: 'application/json' },
       })
+      if (!res.ok)
+        return
+      const contentType = res.headers?.get?.('content-type') ?? ''
+      if (contentType.includes('text/html'))
+        return
+      const parsed = buildMarketIdsByChain(await res.json())
+      if (parsed === null)
+        return
+      manualMarketIdsByChain = parsed
+      emitChange()
     }
     catch {
-      const manualEntries = shouldTryLocalStaticFile()
-        ? await fetchOptionalJson(`${baseUrlPrefix()}${LOCAL_MANUAL_URL_PATH}`)
-        : undefined
-      const manualMarketIdsByChain = buildMarketIdsByChain(manualEntries as ManualBlacklistMarketEntry[] | undefined)
-      const cached = safeReadCache()
-      if (cached) {
-        const generatedMarketIdsByChain = buildMarketIdsByChain(cached)
-        setState({
-          status: 'loaded',
-          marketIdsByChain: mergeMarketIdsByChain(generatedMarketIdsByChain, manualMarketIdsByChain),
-          manualMarketIdsByChain,
-        })
-        return
-      }
-      setState({
-        status: 'failed',
-        marketIdsByChain: manualMarketIdsByChain,
-        manualMarketIdsByChain,
-      })
+      // keep previously loaded manual entries
     }
   })().finally(() => {
-    loadPromise = null
+    manualLoadPromise = null
   })
+}
+
+export function ensureMarketBlacklistLoaded() {
+  cache.ensureLoaded()
+  ensureManualBlacklistLoaded()
+}
+
+export function refreshMarketBlacklistDataset() {
+  cache.refresh()
+  ensureManualBlacklistLoaded()
 }
 
 export function getMarketBlacklistVersion() {
@@ -269,13 +156,13 @@ export function subscribeMarketBlacklist(listener: () => void) {
   if (typeof window === 'undefined')
     return () => {}
   const onEvent = () => listener()
-  const onLocalExclusionChange = () => {
+  const onDependentChange = () => {
     blacklistVersion++
     listener()
   }
   window.addEventListener(CHANGE_EVENT, onEvent)
-  const unsubscribeLocalMarketExclusions = subscribeLocalMarketExclusions(onLocalExclusionChange)
-  const unsubscribeUnhealthyMarkets = subscribeUnhealthyMarkets(onLocalExclusionChange)
+  const unsubscribeLocalMarketExclusions = subscribeLocalMarketExclusions(onDependentChange)
+  const unsubscribeUnhealthyMarkets = subscribeUnhealthyMarkets(onDependentChange)
   return () => {
     window.removeEventListener(CHANGE_EVENT, onEvent)
     unsubscribeLocalMarketExclusions()
@@ -291,6 +178,14 @@ export function useMarketBlacklistVersion() {
     () => getMarketBlacklistVersion(),
     () => 0,
   )
+}
+
+export function useMarketBlacklistDatasetMeta(): DatasetMeta {
+  return useDatasetMeta(metaSource)
+}
+
+export function getMarketBlacklistDatasetMeta(): DatasetMeta {
+  return cache.getMeta()
 }
 
 export function useMarketIdBlacklistPredicate() {
@@ -345,10 +240,6 @@ const PENDLE_MONTHS: Record<string, string> = {
 function normalizeId(value?: string | null) {
   return value?.toLowerCase() ?? undefined
 }
-
-// Kick off best-effort load early in the client.
-if (typeof window !== 'undefined')
-  ensureMarketBlacklistLoaded()
 
 function formatTodayPendleSortable() {
   const now = new Date()
@@ -434,11 +325,11 @@ export function isAssetBlacklisted(address?: string | null, chainId?: number) {
 }
 
 export function isMarketIdBlacklisted(uniqueKey?: string | null, chainId?: number) {
-  return hasValueInChainMap(blacklistState.marketIdsByChain, uniqueKey, chainId) || isMarketSystemUnhealthy(uniqueKey, chainId) || isMarketLocallyMarkedLostValue(chainId, uniqueKey)
+  return hasValueInChainMap(mergedMarketIdsByChain, uniqueKey, chainId) || isMarketSystemUnhealthy(uniqueKey, chainId) || isMarketLocallyMarkedLostValue(chainId, uniqueKey)
 }
 
 export function isMarketIdManuallyBlacklisted(uniqueKey?: string | null, chainId?: number) {
-  return hasValueInChainMap(blacklistState.manualMarketIdsByChain, uniqueKey, chainId)
+  return hasValueInChainMap(manualMarketIdsByChain, uniqueKey, chainId)
 }
 
 export function isMarketBlacklisted(args: MarketBlacklistArgs) {
@@ -461,3 +352,7 @@ export function filterBlacklistedMarkets<T>(
 ) {
   return markets.filter(market => !isMarketBlacklisted(getArgs(market)))
 }
+
+// Kick off best-effort load early in the client.
+if (typeof window !== 'undefined')
+  ensureMarketBlacklistLoaded()

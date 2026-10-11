@@ -1,6 +1,7 @@
 import type { SingleMorphoMarket } from '~/lib/hooks/graphql/use-market'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { chainProviderSlugMap } from '~/lib/chain-capabilities'
 import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
 import { getExplorerUrl } from '~/lib/explorer'
 import { useCollateralReview } from '~/lib/hooks/use-collateral-review'
@@ -11,64 +12,28 @@ interface MarketRiskValidationProps {
   market: SingleMorphoMarket
 }
 
-const GECKOTERMINAL_NETWORK_BY_CHAIN: Record<number, string> = {
-  1: 'eth',
-  42161: 'arbitrum',
-  8453: 'base',
-  10: 'optimism',
-  137: 'polygon',
-  130: 'unichain',
-  999: 'hyperevm',
-  747474: 'katana',
-  143: 'monad',
-  480: 'world-chain',
-  4663: 'robinhood',
-}
-
-const DEFINED_CHAIN_BY_ID: Record<number, string> = {
-  1: 'eth',
-  42161: 'arbitrum',
-  8453: 'base',
-  10: 'op',
-  137: 'polygon',
-  130: 'unichain',
-  999: 'hyperevm',
-  747474: 'katana',
-  143: 'monad',
-  988: 'stable',
-  480: 'worldchain',
-}
-
-const COINGECKO_PLATFORM_BY_CHAIN: Record<number, string> = {
-  1: 'ethereum',
-  42161: 'arbitrum-one',
-  8453: 'base',
-  10: 'optimistic-ethereum',
-  137: 'polygon-pos',
-  130: 'unichain',
-  999: 'hyperevm',
-  747474: 'katana',
-  143: 'monad',
-  480: 'world-chain',
-  4663: 'robinhood',
-}
+// All three provider maps come from the shared chain registry, so a chain with
+// a null capability intentionally yields no link rather than a guessed URL.
+const GECKOTERMINAL_NETWORK_BY_CHAIN = chainProviderSlugMap('geckoterminal')
+const DEFINED_CHAIN_BY_ID = chainProviderSlugMap('defined')
+const COINGECKO_PLATFORM_BY_CHAIN = chainProviderSlugMap('coingecko')
 
 function getGeckoTerminalTokenUrl(chainId: number, address: string) {
-  const network = GECKOTERMINAL_NETWORK_BY_CHAIN[chainId]
+  const network = GECKOTERMINAL_NETWORK_BY_CHAIN.get(chainId)
   if (!network)
     return ''
   return `https://www.geckoterminal.com/${network}/tokens/${address.toLowerCase()}`
 }
 
 function getDefinedTokenUrl(chainId: number, address: string) {
-  const chain = DEFINED_CHAIN_BY_ID[chainId]
+  const chain = DEFINED_CHAIN_BY_ID.get(chainId)
   if (!chain)
     return ''
   return `https://www.defined.fi/${chain}/${address.toLowerCase()}`
 }
 
 function getCoingeckoContractUrl(chainId: number, address: string) {
-  const platform = COINGECKO_PLATFORM_BY_CHAIN[chainId]
+  const platform = COINGECKO_PLATFORM_BY_CHAIN.get(chainId)
   if (!platform)
     return ''
   return `https://www.coingecko.com/en/coins/${platform}/contract/${address.toLowerCase()}`

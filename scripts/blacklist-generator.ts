@@ -1,6 +1,5 @@
 import process from 'node:process'
-
-const MORPHO_GRAPHQL_URL = 'https://blue-api.morpho.org/graphql'
+import { MORPHO_GRAPHQL_URL } from '../app/lib/graphql/endpoint'
 
 const OUTPUT_PATH = 'public/blacklist.markets.json'
 const UNHEALTHY_OUTPUT_PATH = 'public/unhealthy.markets.json'

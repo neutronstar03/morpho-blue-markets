@@ -16,9 +16,9 @@ Robinhood Chain mainnet (chain ID `4663`) is supported for market discovery, pos
 
 ## Recent updates
 
+- v1.6.15: Robinhood Chain support, reliable transaction feedback and live APR reads, chain capability alignment, and visible risk-data freshness.
 - v1.6.14: Positions now opens every network by default and persists each chain section independently.
 - v1.6.13: Positions now separates Vault V2 holdings into a vault-specific section and hides locally marked lost-value markets from totals.
-- v1.6.12: Positions now keeps risky wallet holdings visible and shows Vault V2 rows as full vault share positions.
 
 ## Development
 
@@ -64,6 +64,8 @@ The app will try to load a precomputed whitelist from (in order):
 
 If none are available, the whitelist is treated as empty.
 
+The footer shows source and fetch/cache age for the whitelist, market blacklist, unhealthy markets, and oracle providers, with a manual refresh control. Failed refreshes keep previously loaded data and retry with bounded backoff or when the browser reconnects. Fetch-age windows are 72 hours for the whitelist, 48 hours for blacklist/unhealthy markets, and 7 days for oracle providers; content publication dates are shown separately when available.
+
 #### Pull Once (Recommended)
 
 To download the current whitelist from the artifacts repo into your local `public/` folder:
@@ -94,9 +96,9 @@ bun run gen:whitelist:collaterals:reset
 
 See `CHANGELOG.md` for the full release history. Recent updates:
 
+- `v1.6.15` (2026-10-11): Robinhood Chain support and nine maintenance fixes covering transactions, chains, datasets, accessibility, shared GraphQL, and release verification.
 - `v1.6.14` (2026-07-04): Positions now opens every network by default and persists each chain section independently.
 - `v1.6.13` (2026-06-22): Positions now separates Vault V2 holdings into a vault-specific section and hides locally marked lost-value markets from totals.
-- `v1.6.12` (2026-06-22): Positions now keeps risky wallet holdings visible and shows Vault V2 rows as full vault share positions.
 
 ## Live Version
 

@@ -1,19 +1,11 @@
 import type { SupportedChain } from './addresses'
+import { CHAIN_CAPABILITIES } from './chain-capabilities'
 
-export const DEFILLAMA_CHAIN_SLUGS: Record<SupportedChain, string> = {
-  'Ethereum': 'ethereum',
-  'Base': 'base',
-  'Arbitrum': 'arbitrum',
-  'Polygon': 'polygon',
-  'Hyperliquid': 'hyperliquid',
-  'Unichain': 'unichain',
-  'Katana': 'katana',
-  'Optimism': 'optimism',
-  'Monad': 'monad',
-  'Stable': 'stable',
-  'World Chain': '480',
-  'Robinhood Chain': 'robinhood',
-}
+// Derived from the chain capability registry; every supported chain has a
+// DefiLlama slug today, so the record stays total.
+export const DEFILLAMA_CHAIN_SLUGS: Record<SupportedChain, string> = Object.fromEntries(
+  CHAIN_CAPABILITIES.map(chain => [chain.name, chain.providers.defillama]),
+) as Record<SupportedChain, string>
 
 export interface LlamaPriceEntry {
   decimals?: number

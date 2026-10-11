@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.15 - 2026-10-11
+
+### Added
+- chains: Robinhood Chain mainnet support for discovery, positions, optimizer and batch withdrawal flows, explorer links, liquidity data, and price estimates.
+- risk data: footer source/freshness details and manual refresh for all four generated datasets, with bounded retries and recovery on reconnect.
+
+### Fixed
+- positions: zero-to-positive supplied-asset transitions preserve React hook order.
+- transactions: submission errors fail immediately; only receipt timeouts with a known transaction hash show delayed confirmation, with a bounded receipt wait.
+- APR: selected-chain live reads work while disconnected or connected to a different wallet chain.
+- chains: Stable is registered for wallet/RPC use; Monad and Stable liquidity provider mappings are aligned through a typed capability registry.
+- risk data: failed or malformed refreshes retain known data and cached restrictions apply immediately during network revalidation.
+- accessibility: opportunity actions use native buttons, the success dialog handles focus and Escape, and optimizer input labels target their controls.
+
+### Changed
+- GraphQL: browser, Pages Functions, and generators share the Morpho endpoint and query contracts; malformed popular-asset responses are rejected before caching.
+- release: deployment-tag CI checks frozen dependencies, lint, types, offline unit tests, UI tests, and build before publishing; branch pushes do not trigger it.
+- cleanup: removed the unused 0x Pages Function and corrected local development/network documentation.
+
 ## v1.6.14 - 2026-07-04
 
 ### Fixed

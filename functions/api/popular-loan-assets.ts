@@ -1,57 +1,15 @@
 // Edge-cached API endpoint: GET /api/popular-loan-assets
-// Caches Morpho GraphQL "interesting markets" data at the Cloudflare edge (120s TTL).
-// Returns the raw GraphQL response JSON so the frontend can use it as placeholderData.
+// Caches normalized Morpho GraphQL "interesting markets" data at the Cloudflare
+// edge (120s TTL) and returns the normalized { data: { markets: { items } } }
+// envelope the frontend consumes as placeholderData.
+//
+// The upstream payload is validated before caching: a malformed body or a
+// GraphQL error responds 502 and is never cached.
 
+import { MORPHO_GRAPHQL_URL } from '../../app/lib/graphql/endpoint'
+import { parsePopularLoanAssetsEnvelope, QUERY_POPULAR_LOAN_ASSETS } from '../../app/lib/graphql/queries/popular-loan-assets'
 import { edgeCacheProxy, errorResponse } from '../api/_cache-utils'
 
-// GraphQL query string matching the frontend's QUERY_INTERESTING_MARKETS
-// (from use-popular-loan-assets-by-chain.ts).
-// Keep in sync with the frontend query — it changes rarely but must match exactly.
-const QUERY_INTERESTING_MARKETS = `
-  query InterestingMarkets(
-    $first: Int = 100
-    $skip: Int = 0
-    $chainId: Int = 1
-    $minNetSupplyApy: Float = 0.05
-    $maxNetSupplyApy: Float = 10
-    $minBorrowUsd: Float = 10000
-    $minUtilization: Float = 0.1
-  ) {
-    markets(
-      first: $first
-      skip: $skip
-      orderBy: NetSupplyApy
-      orderDirection: Desc
-      where: {
-        chainId_in: [$chainId]
-        netSupplyApy_gte: $minNetSupplyApy
-        netSupplyApy_lte: $maxNetSupplyApy
-        borrowAssetsUsd_gte: $minBorrowUsd
-        utilization_gte: $minUtilization
-      }
-    ) {
-      items {
-        marketId
-        uniqueKey: marketId
-        loanAsset {
-          address
-          symbol
-          name
-          decimals
-          chain { id network }
-          price { usd }
-        }
-        state {
-          utilization
-          borrowAssetsUsd
-          netSupplyApy
-        }
-      }
-    }
-  }
-`
-
-const MORPHO_GRAPHQL_URL = 'https://api.morpho.org/graphql'
 const CACHE_TTL_SECONDS = 120
 
 interface Env {}
@@ -79,7 +37,7 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: QUERY_INTERESTING_MARKETS,
+          query: QUERY_POPULAR_LOAN_ASSETS,
           variables: {
             first,
             skip,
@@ -92,11 +50,11 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
         }),
       })
 
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(`Upstream error: ${response.status} ${response.statusText}`)
-      }
 
-      return { data: await response.json() }
+      const payload: unknown = await response.json()
+      return { data: parsePopularLoanAssetsEnvelope(payload) }
     },
   })
 }

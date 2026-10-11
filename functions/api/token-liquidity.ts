@@ -3,25 +3,16 @@
 // Returns { liquidityUsd: string | null } — null means "no liquidity data found" and is
 // cached for a shorter period (300s = 5min) to avoid re-hammering GeckoTerminal.
 
+import { chainProviderSlugMap } from '../../app/lib/chain-capabilities'
 import { edgeCacheProxy, errorResponse } from '../api/_cache-utils'
 
 const GECKOTERMINAL_BASE_URL = 'https://api.geckoterminal.com/api/v2'
 const CACHE_TTL_SECONDS = 3600 // 1 hour for successful results
 const NEGATIVE_CACHE_TTL_SECONDS = 300 // 5 minutes for "no data found" results
 
-// Chain ID → GeckoTerminal network slug (must match useTokenLiquidity's mapping)
-const CHAIN_ID_TO_GECKO_NETWORK: Record<number, string> = {
-  1: 'eth',
-  8453: 'base',
-  42161: 'arbitrum',
-  137: 'polygon',
-  130: 'unichain',
-  999: 'hyperevm',
-  747474: 'katana',
-  10: 'optimism',
-  480: 'world-chain',
-  4663: 'robinhood',
-}
+// Chain ID → GeckoTerminal network slug, derived from the shared chain registry
+// so it stays in sync with useTokenLiquidity.
+const CHAIN_ID_TO_GECKO_NETWORK = chainProviderSlugMap('geckoterminal')
 
 interface Env {}
 
@@ -35,7 +26,7 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
   if (!tokenAddress)
     return errorResponse('Missing address', 400)
 
-  const network = CHAIN_ID_TO_GECKO_NETWORK[Number(chainId)]
+  const network = CHAIN_ID_TO_GECKO_NETWORK.get(Number(chainId))
   if (!network)
     return errorResponse(`Unsupported chainId: ${chainId}`, 400)
 

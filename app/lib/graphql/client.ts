@@ -1,5 +1,4 @@
 import { GraphQLClient } from 'graphql-request'
+import { MORPHO_GRAPHQL_URL } from './endpoint'
 
-const MORPHO_API_URL = 'https://api.morpho.org/graphql'
-
-export const graphqlClient = new GraphQLClient(MORPHO_API_URL)
+export const graphqlClient = new GraphQLClient(MORPHO_GRAPHQL_URL)

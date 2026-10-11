@@ -1,15 +1,16 @@
-import type { SupportedChainName } from '~/lib/addresses'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { getSupportedChainName } from '~/lib/addresses'
-
-type GeckoNetworkSlug = 'eth' | 'base' | 'arbitrum' | 'polygon' | 'unichain' | 'hyperevm' | 'katana' | 'optimism' | 'world-chain' | 'robinhood'
+import { chainProviderSlugMap } from '~/lib/chain-capabilities'
 
 const GECKOTERMINAL_BASE_URL = 'https://api.geckoterminal.com/api/v2'
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000
 
-function makeCacheKey(network: GeckoNetworkSlug, tokenAddress: string): string {
+// Derived from the chain capability registry so this list cannot drift from the
+// Pages Function in functions/api/token-liquidity.ts.
+const GECKOTERMINAL_NETWORK_BY_CHAIN_ID = chainProviderSlugMap('geckoterminal')
+
+function makeCacheKey(network: string, tokenAddress: string): string {
   return `gt:liquidity:${network}:${tokenAddress.toLowerCase()}`
 }
 
@@ -56,32 +57,10 @@ export interface UseTokenLiquidityArgs {
   tokenAddress?: string
 }
 
-function mapChainToGeckoNetwork(chainId?: number): GeckoNetworkSlug | undefined {
-  const chainName = getSupportedChainName(chainId) as SupportedChainName
-  switch (chainName) {
-    case 'Ethereum':
-      return 'eth'
-    case 'Base':
-      return 'base'
-    case 'Arbitrum':
-      return 'arbitrum'
-    case 'Polygon':
-      return 'polygon'
-    case 'Unichain':
-      return 'unichain'
-    case 'Hyperliquid':
-      return 'hyperevm'
-    case 'Katana':
-      return 'katana'
-    case 'Optimism':
-      return 'optimism'
-    case 'World Chain':
-      return 'world-chain'
-    case 'Robinhood Chain':
-      return 'robinhood'
-    default:
-      return undefined
-  }
+function mapChainToGeckoNetwork(chainId?: number): string | undefined {
+  if (chainId == null)
+    return undefined
+  return GECKOTERMINAL_NETWORK_BY_CHAIN_ID.get(chainId)
 }
 
 export function useTokenLiquidity({ chainId, tokenAddress }: UseTokenLiquidityArgs) {
