@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.17 - 2026-11-01
+
+### Fixed
+- Morpho API: market list, detail, optimizer discovery, and collateral-whitelist generation now use `oracle { address }` instead of the removed `Market.oracleAddress` field, normalizing addresses at the upstream boundary.
+- Morpho API: market detail uses `price { usd }` instead of the removed `Asset.priceUsd` field.
+- Safety: unavailable-oracle resources are excluded from market discovery without shortening upstream pagination; malformed oracle metadata fails explicitly rather than fabricating an address.
+
+### Tests
+- GraphQL: regression coverage for current field selections, oracle normalization, and missing or malformed metadata; live optimizer fixture uses current market identifiers.
+
 ## v1.6.16 - 2026-10-11
 
 ### Fixed
