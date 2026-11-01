@@ -1,3 +1,4 @@
+import type { RawMarketOracle } from '../market-oracle'
 import { gql } from 'graphql-request'
 
 // Keep this query in a shared, non-React module so both the app and
@@ -56,6 +57,12 @@ export enum OrderDirection {
   Desc = 'Desc',
 }
 
+export interface RawQueryMarketsByChainResult {
+  markets: {
+    items: RawMarketOracle<SupplyMarketData>[]
+  }
+}
+
 export interface QueryMarketsByChainResult {
   markets: {
     items: SupplyMarketData[]
@@ -81,7 +88,7 @@ export const QUERY_MARKETS_BY_CHAIN = gql`
         marketId
         uniqueKey: marketId
         irmAddress
-        oracleAddress
+        oracle { address }
         loanAsset {
           address
           symbol

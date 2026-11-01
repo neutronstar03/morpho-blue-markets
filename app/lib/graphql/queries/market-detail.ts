@@ -2,8 +2,8 @@
 //
 // This module deliberately has no React, graphql-request, wagmi, or
 // market-blacklist imports so the browser hook and local scripts can share the
-// exact same query string and contract. The selection set and the
-// SingleMorphoMarket shape are moved verbatim from the detail hook.
+// exact same query string. The detail hook normalizes oracle.address into the
+// internal SingleMorphoMarket oracleAddress contract.
 
 export const QUERY_SINGLE_MORPHO_MARKET = `
   query GetSingleMorphoMarket($marketId: String!, $chainId: Int!) {
@@ -12,10 +12,10 @@ export const QUERY_SINGLE_MORPHO_MARKET = `
       uniqueKey: marketId
       lltv
       listed
-      oracleAddress
+      oracle { address }
       irmAddress
       loanAsset { address symbol name decimals price { usd } }
-      collateralAsset { address symbol name decimals priceUsd price { usd } }
+      collateralAsset { address symbol name decimals price { usd } }
       supplyingVaults { address }
       supplyingVaultV2s { address }
       morphoBlue { chain { id } }
@@ -80,7 +80,6 @@ export interface SingleMorphoMarket {
     symbol: string
     name: string
     decimals: number
-    priceUsd: number | null
     price: { usd: number } | null
   }
   supplyingVaults: { address: string }[]
