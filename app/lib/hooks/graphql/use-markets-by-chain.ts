@@ -1,6 +1,7 @@
-import type { QueryMarketsByChainResult, SupplyMarketData } from '~/lib/graphql/queries/markets-by-chain'
+import type { RawQueryMarketsByChainResult, SupplyMarketData } from '~/lib/graphql/queries/markets-by-chain'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useMemo } from 'react'
+import { normalizeMarketOracles } from '~/lib/graphql/market-oracle'
 import { MarketOrderBy, OrderDirection, QUERY_MARKETS_BY_CHAIN } from '~/lib/graphql/queries/markets-by-chain'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
 import { useFilteredBlacklistedMarkets } from '~/lib/market-blacklist'
@@ -51,7 +52,7 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
       const markets: SupplyMarketData[] = []
 
       while (true) {
-        const result = await graphqlClient.request<QueryMarketsByChainResult>(
+        const result = await graphqlClient.request<RawQueryMarketsByChainResult>(
           QUERY_MARKETS_BY_CHAIN,
           {
             where,
@@ -62,7 +63,7 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
           },
         )
         const pageItems = result.markets.items || []
-        markets.push(...pageItems)
+        markets.push(...normalizeMarketOracles(pageItems))
 
         if (pageItems.length < first)
           break

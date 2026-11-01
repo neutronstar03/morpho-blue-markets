@@ -1,7 +1,9 @@
-import type { SingleMorphoMarket, SingleMorphoMarketResult } from '~/lib/graphql/queries/market-detail'
+import type { RawMarketOracle } from '~/lib/graphql/market-oracle'
+import type { SingleMorphoMarket } from '~/lib/graphql/queries/market-detail'
 import { useQuery } from '@tanstack/react-query'
 import { request } from 'graphql-request'
 import { MORPHO_GRAPHQL_URL } from '~/lib/graphql/endpoint'
+import { normalizeMarketOracle } from '~/lib/graphql/market-oracle'
 import { QUERY_SINGLE_MORPHO_MARKET } from '~/lib/graphql/queries/market-detail'
 import { STALE_TIME_SHORT_MS } from '~/lib/hooks/query-stale-times'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
@@ -15,7 +17,7 @@ export function useMarketQuery(uniqueKey?: string, chainId?: number) {
     queryFn: async () => {
       if (!uniqueKey || !chainId)
         return null
-      const { marketById } = await request<SingleMorphoMarketResult>(
+      const { marketById } = await request<{ marketById: RawMarketOracle<SingleMorphoMarket> | null }>(
         MORPHO_GRAPHQL_URL,
         QUERY_SINGLE_MORPHO_MARKET,
         {
@@ -23,7 +25,7 @@ export function useMarketQuery(uniqueKey?: string, chainId?: number) {
           chainId,
         },
       )
-      const market: SingleMorphoMarket | null = marketById
+      const market: SingleMorphoMarket | null = marketById ? normalizeMarketOracle(marketById) : null
       if (!market)
         return null
       if (isOracleMisconfiguredWarning(market.warnings))

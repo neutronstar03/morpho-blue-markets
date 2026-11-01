@@ -1,6 +1,8 @@
+import type { RawMarketOracle } from '~/lib/graphql/market-oracle'
 import { useQuery } from '@tanstack/react-query'
 import { gql } from 'graphql-request'
 import { useCallback, useMemo } from 'react'
+import { normalizeMarketOracles } from '~/lib/graphql/market-oracle'
 import { useFilteredBlacklistedMarkets } from '~/lib/market-blacklist'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { graphqlClient } from '../../graphql/client'
@@ -84,7 +86,7 @@ export const QUERY_LIST_MARKETS = gql`
         marketId
         uniqueKey: marketId
         lltv
-        oracleAddress
+        oracle { address }
         irmAddress
         morphoBlue {
           chain { id }
@@ -186,13 +188,14 @@ export function useMarkets({
   const query = useQuery<QueryMarketsResult>({
     queryKey: ['markets', where, orderBy, orderDirection, first, skip],
     queryFn: async () => {
-      return await graphqlClient.request<QueryMarketsResult>(QUERY_LIST_MARKETS, {
+      const result = await graphqlClient.request<{ markets: { items: RawMarketOracle<MorphoMarket>[] } }>(QUERY_LIST_MARKETS, {
         where,
         orderBy,
         orderDirection,
         first,
         skip,
       })
+      return { ...result, markets: { ...result.markets, items: normalizeMarketOracles(result.markets.items) } }
     },
     staleTime,
   })
