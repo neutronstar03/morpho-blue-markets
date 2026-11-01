@@ -22,11 +22,6 @@ function getCollateralPriceUsd(market: SingleMorphoMarket): number | null {
     return market.collateralAsset.price.usd
   }
 
-  // Direct price from Morpho (added to query in use-market.ts)
-  if (market.collateralAsset.priceUsd != null && Number.isFinite(market.collateralAsset.priceUsd)) {
-    return market.collateralAsset.priceUsd
-  }
-
   // Fallback: collateralAssetsUsd / collateralAssets
   const collateralAssets = market.state.collateralAssets
   const collateralAssetsUsd = market.state.collateralAssetsUsd
