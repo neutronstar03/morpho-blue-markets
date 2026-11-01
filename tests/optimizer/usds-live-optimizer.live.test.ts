@@ -1,8 +1,10 @@
+import type { RawMarketOracle } from '../../app/lib/graphql/market-oracle'
 import { describe, expect, test } from 'bun:test'
 import { gql } from 'graphql-request'
 import { createPublicClient, formatUnits } from 'viem'
 import { mainnet } from 'viem/chains'
 import { graphqlClient } from '../../app/lib/graphql/client'
+import { normalizeMarketOracles } from '../../app/lib/graphql/market-oracle'
 import { optimizeSupplyAllocationWithPositions } from '../../app/lib/optimizer/supply-optimizer'
 import { ADAPTIVE_CURVE_IRM_ABI, MORPHO_BLUE_ABI, MORPHO_BLUE_MAINNET } from '../irm/abi'
 import { makeMainnetTransport } from '../irm/rpc'
@@ -42,11 +44,11 @@ const QUERY_MARKETS_FOR_OPTIMIZER = gql`
       where: $where
     ) {
       items {
-        uniqueKey
+        uniqueKey: marketId
         lltv
-        oracleAddress
+        oracle { address }
         irmAddress
-        whitelisted
+        whitelisted: listed
         morphoBlue { chain { id } }
         loanAsset { address symbol decimals }
         collateralAsset { address symbol decimals }
@@ -102,7 +104,7 @@ async function fetchMarkets(
     where.collateralAssetAddress_in = assets.collateralAssetAddresses
 
   while (hasMore) {
-    const res = await graphqlClient.request<{ markets: { items: GqlMarket[] } }>(
+    const res = await graphqlClient.request<{ markets: { items: RawMarketOracle<GqlMarket>[] } }>(
       QUERY_MARKETS_FOR_OPTIMIZER,
       {
         first: PAGE_SIZE,
@@ -113,9 +115,9 @@ async function fetchMarkets(
         orderDirection: 'Desc',
       },
     )
-    const items = res.markets.items ?? []
+    const items = normalizeMarketOracles(res.markets.items)
     all = all.concat(items)
-    if (items.length < PAGE_SIZE)
+    if (res.markets.items.length < PAGE_SIZE)
       hasMore = false
     else
       skip += PAGE_SIZE
