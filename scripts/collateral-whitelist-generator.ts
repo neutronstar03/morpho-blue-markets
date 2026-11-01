@@ -1,8 +1,9 @@
-import type { SupplyMarketData } from '../app/lib/graphql/queries/markets-by-chain'
+import type { RawQueryMarketsByChainResult, SupplyMarketData } from '../app/lib/graphql/queries/markets-by-chain'
 import { mkdir } from 'node:fs/promises'
 import process from 'node:process'
 import { CHAIN_CAPABILITIES } from '../app/lib/chain-capabilities'
 import { graphqlClient } from '../app/lib/graphql/client'
+import { normalizeMarketOracles } from '../app/lib/graphql/market-oracle'
 import { MarketOrderBy, OrderDirection, QUERY_MARKETS_BY_CHAIN } from '../app/lib/graphql/queries/markets-by-chain'
 import { filterBlacklistedMarkets } from '../app/lib/market-blacklist'
 import { isOracleMisconfiguredWarning } from '../app/lib/morpho/morpho-warnings'
@@ -93,7 +94,7 @@ async function fetchOptimizerMarketsByChain(chainId: number): Promise<SupplyMark
   const markets: SupplyMarketData[] = []
   let skip = 0
   while (true) {
-    const result = await graphqlClient.request<any>(QUERY_MARKETS_BY_CHAIN, {
+    const result = await graphqlClient.request<RawQueryMarketsByChainResult>(QUERY_MARKETS_BY_CHAIN, {
       where,
       orderBy: MarketOrderBy.NetSupplyApy,
       orderDirection: OrderDirection.Desc,
@@ -101,9 +102,9 @@ async function fetchOptimizerMarketsByChain(chainId: number): Promise<SupplyMark
       skip,
     })
 
-    const items = (result?.markets?.items ?? []) as SupplyMarketData[]
+    const items = normalizeMarketOracles(result.markets.items)
     markets.push(...items)
-    if (items.length < PAGE_SIZE)
+    if (result.markets.items.length < PAGE_SIZE)
       break
     skip += PAGE_SIZE
   }
