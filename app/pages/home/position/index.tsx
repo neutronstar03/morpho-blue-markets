@@ -20,6 +20,7 @@ interface ChainPortfolioState {
   portfolio: Portfolio
   positionCount: number
   isLoading: boolean
+  isError: boolean
 }
 
 // This component is the general position in the homepage
@@ -38,12 +39,14 @@ function PositionClient() {
   )
   const {
     data: directCrossChainPositions,
+    isError: isDirectDiscoveryError,
     isLoading: isLoadingDirectPositions,
     refetch: refetchDirectPositions,
     dataUpdatedAt: directPositionsUpdatedAt,
   } = useUserPositionsAcrossChains(effectiveAddress)
   const {
     data: vaultV2CrossChainPositions,
+    isError: isVaultDiscoveryError,
     isLoading: isLoadingVaultV2Positions,
     refetch: refetchVaultV2Positions,
     dataUpdatedAt: vaultV2PositionsUpdatedAt,
@@ -124,12 +127,14 @@ function PositionClient() {
       dailyUsd += state.portfolio.dailyUsd ?? 0
     }
 
+    const incomplete = networkChainIds.some(id => !chainPortfolioById[id] || chainPortfolioById[id].isLoading || chainPortfolioById[id].isError)
     return {
+      incomplete,
       positionCount,
-      totalAssetsUsd: totalAssetsUsd || undefined,
-      yearlyUsd: yearlyUsd || undefined,
-      dailyUsd: dailyUsd || undefined,
-      weightedAprPct: totalAssetsUsd > 0 ? (yearlyUsd / totalAssetsUsd) * 100 : undefined,
+      totalAssetsUsd: !incomplete && totalAssetsUsd ? totalAssetsUsd : undefined,
+      yearlyUsd: !incomplete && yearlyUsd ? yearlyUsd : undefined,
+      dailyUsd: !incomplete && dailyUsd ? dailyUsd : undefined,
+      weightedAprPct: !incomplete && totalAssetsUsd > 0 ? (yearlyUsd / totalAssetsUsd) * 100 : undefined,
     }
   }, [chainPortfolioById, networkChainIds])
 
@@ -142,6 +147,25 @@ function PositionClient() {
         <div className="p-6">
           <p className="text-gray-400">Please connect your wallet to see your positions.</p>
         </div>
+      </Card>
+    )
+  }
+
+  if (isDirectDiscoveryError || isVaultDiscoveryError) {
+    const retained = crossChainPositions.length > 0
+    return (
+      <Card className="mb-8 p-6">
+        <h2 className="text-xl font-bold text-white">Positions</h2>
+        <div role="alert" className="mt-3 text-red-300">
+          <p>Position discovery failed. Totals and action plans are unavailable until discovery completes.</p>
+          <p>
+            {isDirectDiscoveryError ? 'Direct positions unavailable.' : 'Direct discovery available.'}
+            {' '}
+            {isVaultDiscoveryError ? 'Vault positions unavailable.' : 'Vault discovery available.'}
+          </p>
+          {retained && <p>Previously loaded data is retained but may be stale.</p>}
+        </div>
+        <Button type="button" onClick={() => handleRefresh()} disabled={isRefreshing || isCooldown} className="mt-3">Retry position discovery</Button>
       </Card>
     )
   }
@@ -200,6 +224,7 @@ function PositionClient() {
         </div>
       </div>
       <div className="py-4 sm:py-6 px-3 sm:px-4">
+        {globalPortfolio.incomplete && <p role="status" className="mb-3 text-gray-400">Live position totals are incomplete or still loading.</p>}
         {isLoading
           ? <p className="text-gray-400">Discovering your positions...</p>
           : networkChainIds.length === 0

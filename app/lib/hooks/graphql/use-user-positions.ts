@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { gql } from 'graphql-request'
 import { supportedChainMap } from '~/lib/addresses'
+import { collectPositionPages, validatePositionIdentity } from '~/lib/graphql/position-pages'
+import { QUERY_USER_POSITIONS, QUERY_USER_POSITIONS_ALL_CHAINS } from '~/lib/graphql/queries/user-positions'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { graphqlClient } from '../../graphql/client'
@@ -65,12 +66,6 @@ export interface UserPosition {
   }
 }
 
-interface QueryUserPositionsResult {
-  marketPositions: {
-    items: UserPosition[]
-  }
-}
-
 export interface CrossChainUserPosition {
   chainId: number
   uniqueKey: string
@@ -110,89 +105,6 @@ interface QueryCrossChainUserPositionsResult {
   }
 }
 
-// Query to get user's positions on a specific chain
-// This is the efficient discovery query - only fetches markets where user has a position
-export const QUERY_USER_POSITIONS = gql`
-  query GetUserPositions($user: String!, $chainId: Int!) {
-    marketPositions(
-      where: { userAddress_in: [$user], chainId_in: [$chainId], supplyShares_gte: "1" }
-      first: 100
-    ) {
-      items {
-        market {
-          marketId
-          uniqueKey: marketId
-          loanAsset {
-            symbol
-            decimals
-            address
-            price {
-              usd
-            }
-          }
-          collateralAsset {
-            symbol
-            decimals
-            address
-          }
-          oracle {
-            address
-          }
-          irmAddress
-          lltv
-          warnings { type level }
-          state {
-            netSupplyApy
-            utilization
-            supplyAssets
-            supplyShares
-            supplyAssetsUsd
-            rewards {
-              id
-              supplyApr
-              asset { address symbol decimals }
-            }
-          }
-        }
-        state {
-          supplyShares
-          borrowShares
-          collateral
-        }
-      }
-    }
-  }
-`
-
-const QUERY_USER_POSITIONS_ALL_CHAINS = gql`
-  query GetUserPositionsAllChains($user: String!, $chainIds: [Int!]) {
-    marketPositions(
-      where: { userAddress_in: [$user], chainId_in: $chainIds, supplyShares_gte: "1" }
-      first: 500
-    ) {
-      items {
-        market {
-          marketId
-          uniqueKey: marketId
-          state {
-            supplyAssets
-            supplyShares
-          }
-          warnings { type level }
-          morphoBlue {
-            chain {
-              id
-            }
-          }
-        }
-        state {
-          supplyShares
-        }
-      }
-    }
-  }
-`
-
 function isVisibleUserPosition(position: UserPosition) {
   return hasVisibleSuppliedAssets({
     userSupplyShares: position.state.supplyShares,
@@ -201,16 +113,22 @@ function isVisibleUserPosition(position: UserPosition) {
   }) && !isOracleMisconfiguredWarning(position.market.warnings)
 }
 
-export async function fetchUserPositions(userAddress: string, chainId: number) {
-  const result = await graphqlClient.request<QueryUserPositionsResult>(
-    QUERY_USER_POSITIONS,
-    {
-      user: userAddress,
-      chainId,
+export async function fetchUserPositions(userAddress: string, chainId: number, options: { signal?: AbortSignal, pageSize?: number } = {}) {
+  const positions = await collectPositionPages<UserPosition>({
+    pageSize: options.pageSize ?? 100,
+    signal: options.signal,
+    fetchPage: (first, skip) => graphqlClient.request({
+      document: QUERY_USER_POSITIONS,
+      variables: { user: userAddress, chainId, first, skip },
+      signal: options.signal,
+    }),
+    parseItem: (raw) => {
+      validatePositionIdentity(raw, false)
+      return raw as UserPosition
     },
-  )
-
-  return (result.marketPositions.items || [])
+    key: position => `${chainId}:${position.market.uniqueKey.toLowerCase()}`,
+  })
+  return positions
     .map(position => ({ ...position, source: { kind: 'direct' as const } }))
     .filter(isVisibleUserPosition)
 }
@@ -218,11 +136,11 @@ export async function fetchUserPositions(userAddress: string, chainId: number) {
 export function useUserPositions(userAddress?: string, chainId?: number) {
   return useQuery<UserPosition[]>({
     queryKey: ['user-positions-graph', userAddress, chainId],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userAddress || !chainId)
         return []
 
-      return fetchUserPositions(userAddress, chainId)
+      return fetchUserPositions(userAddress, chainId, { signal })
     },
     enabled: !!userAddress && !!chainId,
     staleTime: 30 * 1000, // 30 seconds - positions don't change that often
@@ -232,21 +150,28 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
 export function useUserPositionsAcrossChains(userAddress?: string) {
   return useQuery<CrossChainUserPosition[]>({
     queryKey: ['user-positions-graph-all-chains', userAddress],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userAddress)
         return []
 
       // Discovery-only query used for cross-chain pills.
       // Keep it lean: we only need chain + market identity, not full live position data.
-      const result = await graphqlClient.request<QueryCrossChainUserPositionsResult>(
-        QUERY_USER_POSITIONS_ALL_CHAINS,
-        {
-          user: userAddress,
-          chainIds: [...supportedChainMap.keys()],
+      const positions = await collectPositionPages<QueryCrossChainUserPositionsResult['marketPositions']['items'][number]>({
+        pageSize: 500,
+        signal,
+        fetchPage: (first, skip) => graphqlClient.request({
+          document: QUERY_USER_POSITIONS_ALL_CHAINS,
+          variables: { user: userAddress, chainIds: [...supportedChainMap.keys()], first, skip },
+          signal,
+        }),
+        parseItem: (raw) => {
+          validatePositionIdentity(raw, true)
+          return raw as QueryCrossChainUserPositionsResult['marketPositions']['items'][number]
         },
-      )
+        key: position => `${position.market.morphoBlue.chain.id}:${position.market.uniqueKey.toLowerCase()}`,
+      })
 
-      return (result.marketPositions.items || [])
+      return positions
         .filter(position => hasVisibleSuppliedAssets({
           userSupplyShares: position.state.supplyShares,
           totalSupplyAssets: position.market.state.supplyAssets,

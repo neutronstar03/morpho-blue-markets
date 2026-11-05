@@ -56,6 +56,7 @@ function ExpandedSupplyAprOptimizer({ onCollapse }: { onCollapse: () => void }) 
     isViewingWallet,
     chain,
     isLoadingPositions,
+    positionsError,
     ownedLoanAssetOptions,
     popularLoanAssetOptions,
     loanAssetOptions,
@@ -131,7 +132,8 @@ function ExpandedSupplyAprOptimizer({ onCollapse }: { onCollapse: () => void }) 
 
             {userAddress && (
               <>
-                {!isLoadingPositions && ownedLoanAssetOptions.length === 0 && (
+                {positionsError && <p role="alert">Position discovery failed. Refresh or retry before creating a plan.</p>}
+                {!positionsError && !isLoadingPositions && ownedLoanAssetOptions.length === 0 && (
                   <div className="text-sm text-gray-300 border border-gray-700 bg-gray-900/40 rounded-md p-3">
                     No current supply positions detected. You can still pick a supported asset and simulate a new deposit.
                   </div>
@@ -175,7 +177,7 @@ function ExpandedSupplyAprOptimizer({ onCollapse }: { onCollapse: () => void }) 
                   </div>
                 )}
 
-                {displayResult && selectedOption && (
+                {!positionsError && displayResult && selectedOption && (
                   <SupplyAprOptimizerResults
                     displayResult={displayResult}
                     selectedOption={selectedOption}

@@ -36,6 +36,8 @@ interface RateAtTargetCall {
 }
 
 interface GraphPositionsQueryState {
+  error: Error | null
+  isError: boolean
   data?: UserPosition[]
   isLoading: boolean
   isFetching: boolean
@@ -130,6 +132,7 @@ function useLiveMarketPositionsFromGraphPositions(options: {
   // Step 3: Fetch live position data from RPC
   const {
     data: positionResults,
+    error: positionError,
     isLoading: isLoadingPositions,
     isFetching: isFetchingPositions,
     refetch: refetchPositions,
@@ -148,6 +151,7 @@ function useLiveMarketPositionsFromGraphPositions(options: {
 
   const {
     data: rateAtTargetResults,
+    error: rateError,
     isLoading: isLoadingRateAtTarget,
     isFetching: isFetchingRateAtTarget,
     refetch: refetchRateAtTarget,
@@ -163,6 +167,7 @@ function useLiveMarketPositionsFromGraphPositions(options: {
 
   const {
     data: marketResults,
+    error: marketError,
     isLoading: isLoadingMarkets,
     isFetching: isFetchingMarkets,
     refetch: refetchMarkets,
@@ -241,11 +246,30 @@ function useLiveMarketPositionsFromGraphPositions(options: {
     void refetch()
   }, [options.refreshKey, refetch])
 
-  const hasPendingLiveReads = !!graphPositions?.length && (!positionResults || !marketResults)
+  const error = useMemo(() => {
+    const queryError = options.graphPositionsQuery.error ?? positionError ?? marketError ?? rateError
+    if (queryError)
+      return queryError
+    if (graphPositions?.length && (
+      (positionResults && positionResults.length !== graphPositions.length)
+      || (marketResults && marketResults.length !== graphPositions.length)
+      || positionResults?.some(result => result.status !== 'success')
+      || marketResults?.some(result => result.status !== 'success')
+      || rateAtTargetResults?.some(result => result.status !== 'success')
+    )) {
+      return new Error('Some live position reads failed; totals and plans are incomplete')
+    }
+    return null
+  }, [graphPositions?.length, marketError, marketResults, options.graphPositionsQuery.error, positionError, positionResults, rateAtTargetResults, rateError])
+  const hasPendingLiveReads = !error && !!graphPositions?.length && (!positionResults || !marketResults)
 
   return {
-    data: userPositions,
-    isLoading: isLoadingGraph || isLoadingPositions || isLoadingMarkets || isLoadingRateAtTarget || hasPendingLiveReads,
+    // Prevent downstream planners from treating partial or stale discovery as complete.
+    data: error ? undefined : userPositions,
+    staleData: error ? userPositions : undefined,
+    error,
+    isError: !!error,
+    isLoading: !error && (isLoadingGraph || isLoadingPositions || isLoadingMarkets || isLoadingRateAtTarget || hasPendingLiveReads),
     isFetching: isFetchingGraph || isFetchingPositions || isFetchingMarkets || isFetchingRateAtTarget,
     refetch,
     dataUpdatedAt: Math.max(graphUpdatedAt, rpcUpdatedAt, marketsUpdatedAt, rateAtTargetUpdatedAt),

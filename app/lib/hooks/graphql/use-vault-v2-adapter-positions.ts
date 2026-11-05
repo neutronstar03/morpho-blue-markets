@@ -192,6 +192,9 @@ export function useUserVaultV2PositionChains(userAddress?: string) {
           }))
       }))
 
+      const failures = results.filter(result => result.status === 'rejected')
+      if (failures.length > 0)
+        throw new Error(`Vault position discovery failed on ${failures.length} chain(s); results are incomplete`)
       return results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
     },
     enabled: !!userAddress,

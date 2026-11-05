@@ -106,7 +106,7 @@ export function useSupplyAprOptimizerController() {
     const parsed = parseTokenAmount(raw, 16)
     return parsed >= 0n ? parsed : 2_500_000_000_000_000n
   }, [skipThreshold])
-  const { data: livePositions, isLoading: isLoadingPositions } = useLiveMarketPositions({ address: effectiveUserAddress, chainId: effectiveChainId })
+  const { data: livePositions, isLoading: isLoadingPositions, error: positionsError } = useLiveMarketPositions({ address: effectiveUserAddress, chainId: effectiveChainId })
 
   const ownedLoanAssetOptions = useMemo<LoanAssetOption[]>(() => {
     const map = new Map<string, LoanAssetOption>()
@@ -564,7 +564,7 @@ export function useSupplyAprOptimizerController() {
     return parseTokenAmount(ctx.inputs.newDepositAmount ?? '', selectedOption.decimals)
   }, [selectedOption, ctx.inputs.newDepositAmount])
 
-  const canOptimize = !!selectedOption
+  const canOptimize = !positionsError && !!selectedOption
     && ((ctx.derived.positions?.length ?? 0) > 0 || parsedDepositAssetsForGate > 0n)
     && (() => {
       const parsed = Number.parseInt((maxMarketsInput ?? '').trim(), 10)
@@ -833,6 +833,7 @@ export function useSupplyAprOptimizerController() {
     isViewingWallet,
     chain,
     isLoadingPositions,
+    positionsError,
     ownedLoanAssetOptions,
     popularLoanAssetOptions,
     loanAssetOptions,

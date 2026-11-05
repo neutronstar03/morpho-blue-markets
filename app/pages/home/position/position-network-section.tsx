@@ -104,7 +104,7 @@ export function PositionNetworkSection({
   onOpenChange: (isOpen: boolean) => void
   marketAprBySymbol: MarketAprBySymbolMap
   refreshKey?: number
-  onPortfolioChange?: (chainId: number, state: { portfolio: Portfolio, positionCount: number, isLoading: boolean }) => void
+  onPortfolioChange?: (chainId: number, state: { portfolio: Portfolio, positionCount: number, isLoading: boolean, isError: boolean }) => void
 }) {
   const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'native' | 'yearly'>('total')
   const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
@@ -114,11 +114,13 @@ export function PositionNetworkSection({
 
   const {
     data: directPositions,
+    isError: isDirectError,
     isLoading: isLoadingDirectPositions,
     isFetching: isFetchingDirectPositions,
   } = useLiveMarketPositions({ address, chainId, refreshKey })
   const {
     data: vaultV2Positions,
+    isError: isVaultError,
     isLoading: isLoadingVaultV2Positions,
     isFetching: isFetchingVaultV2Positions,
   } = useLiveVaultV2Positions(address, chainId, refreshKey)
@@ -126,6 +128,7 @@ export function PositionNetworkSection({
     ...(directPositions ?? []),
     ...(vaultV2Positions ?? []),
   ], [directPositions, vaultV2Positions])
+  const isError = !!isDirectError || !!isVaultError
   const isLoading = isLoadingDirectPositions || isLoadingVaultV2Positions
   const isFetching = isFetchingDirectPositions || isFetchingVaultV2Positions
   const markets = useMemo(() => (positions ?? []).map(p => p.market), [positions])
@@ -181,8 +184,9 @@ export function PositionNetworkSection({
       portfolio,
       positionCount: visiblePositions.length,
       isLoading,
+      isError,
     })
-  }, [chainId, isLoading, onPortfolioChange, portfolio, visiblePositions.length])
+  }, [chainId, isError, isLoading, onPortfolioChange, portfolio, visiblePositions.length])
 
   const handleOpenOptimizerForGroup = (group: PositionGroup) => {
     const firstPosition = group.positions[0]
@@ -213,6 +217,15 @@ export function PositionNetworkSection({
       const top = el.getBoundingClientRect().top + window.scrollY - 88
       window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
     })
+  }
+
+  if (isError) {
+    return (
+      <section role="alert" className="rounded-xl border border-red-900 p-4 text-red-300">
+        {chainName}
+        : live position data is incomplete. Use Refresh to retry; totals and plans are unavailable.
+      </section>
+    )
   }
 
   if (!isLoading && visiblePositions.length === 0)
