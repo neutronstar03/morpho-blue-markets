@@ -1,3 +1,5 @@
+import { normalizeUnsignedInteger, validateSupplyRewards } from './market-responses'
+
 export interface PositionPage {
   items: unknown[]
   pageInfo: { countTotal: number, count: number, limit: number, skip: number }
@@ -61,10 +63,8 @@ function object(value: unknown): Record<string, unknown> {
     throw new Error('Invalid position object')
   return value as Record<string, unknown>
 }
-function quantity(value: unknown) {
-  if (typeof value !== 'string' || !/^\d+$/.test(value))
-    throw new Error('Invalid position quantity')
-}
+const quantity = (value: unknown) => normalizeUnsignedInteger(value, 'position quantity')
+
 function address(value: unknown, bytes = 20) {
   if (typeof value !== 'string' || !new RegExp(`^0x[a-fA-F0-9]{${bytes * 2}}$`).test(value))
     throw new Error('Invalid position identity')
@@ -78,22 +78,20 @@ function finite(value: unknown, nullable = false) {
 
 export function validatePositionIdentity(raw: unknown, crossChain: boolean) {
   const item = object(raw)
-  const market = object(item.market)
-  const state = object(item.state)
-  const marketState = object(market.state)
+  const market = { ...object(item.market) }
+  const state = { ...object(item.state) }
+  const marketState = { ...object(market.state) }
   address(market.uniqueKey, 32)
   address(market.marketId, 32)
-  quantity(state.supplyShares)
-  quantity(marketState.supplyAssets)
-  quantity(marketState.supplyShares)
-  if (market.warnings != null) {
-    if (!Array.isArray(market.warnings))
-      throw new Error('Invalid position warnings')
-    for (const rawWarning of market.warnings) {
-      const warning = object(rawWarning)
-      if (typeof warning.type !== 'string' || !['YELLOW', 'RED'].includes(String(warning.level)))
-        throw new Error('Invalid position warning')
-    }
+  state.supplyShares = quantity(state.supplyShares)
+  marketState.supplyAssets = quantity(marketState.supplyAssets)
+  marketState.supplyShares = quantity(marketState.supplyShares)
+  if (!Array.isArray(market.warnings))
+    throw new Error('Invalid position warnings')
+  for (const rawWarning of market.warnings) {
+    const warning = object(rawWarning)
+    if (typeof warning.type !== 'string' || !['YELLOW', 'RED'].includes(String(warning.level)))
+      throw new Error('Invalid position warning')
   }
   if (crossChain) {
     const chainId = object(object(market.morphoBlue).chain).id
@@ -102,7 +100,7 @@ export function validatePositionIdentity(raw: unknown, crossChain: boolean) {
   }
   else {
     for (const field of ['borrowShares', 'collateral'])
-      quantity(state[field])
+      state[field] = quantity(state[field])
     for (const field of ['loanAsset', 'collateralAsset']) {
       const asset = object(market[field])
       address(asset.address)
@@ -118,9 +116,11 @@ export function validatePositionIdentity(raw: unknown, crossChain: boolean) {
     if (market.oracle !== null)
       address(object(market.oracle).address)
     address(market.irmAddress)
-    quantity(market.lltv)
+    market.lltv = quantity(market.lltv)
     finite(marketState.netSupplyApy)
     finite(marketState.utilization)
     finite(marketState.supplyAssetsUsd, true)
+    validateSupplyRewards(marketState.rewards)
   }
+  return { ...item, state, market: { ...market, state: marketState } }
 }

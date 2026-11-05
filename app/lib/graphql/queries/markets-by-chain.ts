@@ -15,17 +15,17 @@ export interface SupplyMarketData {
     address: string
     symbol: string
     name?: string | null
-    decimals?: number | null
-    chain?: {
+    decimals: number
+    chain: {
       id: number
-      network?: string | null
+      network: string | null
     }
   }
   collateralAsset: {
     address: string
     symbol: string
     name?: string | null
-    decimals?: number | null
+    decimals: number
   }
   state: {
     netSupplyApy: number
@@ -39,7 +39,7 @@ export interface SupplyMarketData {
       asset: {
         address: string
         symbol: string
-        decimals?: number | null
+        decimals: number
       }
     }> | null
   }

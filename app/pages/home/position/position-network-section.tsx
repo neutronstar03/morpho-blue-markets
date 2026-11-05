@@ -104,7 +104,7 @@ export function PositionNetworkSection({
   onOpenChange: (isOpen: boolean) => void
   marketAprBySymbol: MarketAprBySymbolMap
   refreshKey?: number
-  onPortfolioChange?: (chainId: number, state: { portfolio: Portfolio, positionCount: number, isLoading: boolean, isError: boolean }) => void
+  onPortfolioChange?: (chainId: number, state: { portfolio: Portfolio, positionCount: number, isLoading: boolean, isError: boolean, isIncomplete: boolean }) => void
 }) {
   const [assetSummaryMode, setAssetSummaryMode] = useState<'total' | 'native' | 'yearly'>('total')
   const setOptimizerPreset = useHomeMagicOptimizerStore(state => state.setOptimizerPreset)
@@ -165,7 +165,8 @@ export function PositionNetworkSection({
     }))
   }, [chainId, visibleDirectMarketPositions])
   const riskStatusByKey = useMarketRiskStatusMap(riskMarkets)
-  const portfolio = useMemo(() => computePortfolio(visiblePositions, aprByMarketKey), [visiblePositions, aprByMarketKey])
+  const isIncomplete = visiblePositions.some(position => getMarketSupplyUsd(position) == null || aprByMarketKey[position.market.uniqueKey]?.apr == null)
+  const portfolio = useMemo(() => computePortfolio(isIncomplete ? undefined : visiblePositions, aprByMarketKey), [isIncomplete, visiblePositions, aprByMarketKey])
   const groupedPositions = usePositionGroups(visibleDirectMarketPositions, chainId, aprByMarketKey)
   const visibleAssetCount = useMemo(() => {
     const assets = new Set<string>()
@@ -185,8 +186,9 @@ export function PositionNetworkSection({
       positionCount: visiblePositions.length,
       isLoading,
       isError,
+      isIncomplete,
     })
-  }, [chainId, isError, isLoading, onPortfolioChange, portfolio, visiblePositions.length])
+  }, [chainId, isError, isIncomplete, isLoading, onPortfolioChange, portfolio, visiblePositions.length])
 
   const handleOpenOptimizerForGroup = (group: PositionGroup) => {
     const firstPosition = group.positions[0]

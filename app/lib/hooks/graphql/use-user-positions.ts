@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supportedChainMap } from '~/lib/addresses'
 import { collectPositionPages, validatePositionIdentity } from '~/lib/graphql/position-pages'
 import { QUERY_USER_POSITIONS, QUERY_USER_POSITIONS_ALL_CHAINS } from '~/lib/graphql/queries/user-positions'
+import { graphqlRetryDelay, shouldRetryGraphqlRequest } from '~/lib/graphql/request-policy'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
 import { graphqlClient } from '../../graphql/client'
@@ -123,8 +124,7 @@ export async function fetchUserPositions(userAddress: string, chainId: number, o
       signal: options.signal,
     }),
     parseItem: (raw) => {
-      validatePositionIdentity(raw, false)
-      return raw as UserPosition
+      return validatePositionIdentity(raw, false) as unknown as UserPosition
     },
     key: position => `${chainId}:${position.market.uniqueKey.toLowerCase()}`,
   })
@@ -135,6 +135,8 @@ export async function fetchUserPositions(userAddress: string, chainId: number, o
 
 export function useUserPositions(userAddress?: string, chainId?: number) {
   return useQuery<UserPosition[]>({
+    retry: shouldRetryGraphqlRequest,
+    retryDelay: graphqlRetryDelay,
     queryKey: ['user-positions-graph', userAddress, chainId],
     queryFn: async ({ signal }) => {
       if (!userAddress || !chainId)
@@ -149,6 +151,8 @@ export function useUserPositions(userAddress?: string, chainId?: number) {
 
 export function useUserPositionsAcrossChains(userAddress?: string) {
   return useQuery<CrossChainUserPosition[]>({
+    retry: shouldRetryGraphqlRequest,
+    retryDelay: graphqlRetryDelay,
     queryKey: ['user-positions-graph-all-chains', userAddress],
     queryFn: async ({ signal }) => {
       if (!userAddress)
@@ -165,8 +169,7 @@ export function useUserPositionsAcrossChains(userAddress?: string) {
           signal,
         }),
         parseItem: (raw) => {
-          validatePositionIdentity(raw, true)
-          return raw as QueryCrossChainUserPositionsResult['marketPositions']['items'][number]
+          return validatePositionIdentity(raw, true) as unknown as QueryCrossChainUserPositionsResult['marketPositions']['items'][number]
         },
         key: position => `${position.market.morphoBlue.chain.id}:${position.market.uniqueKey.toLowerCase()}`,
       })

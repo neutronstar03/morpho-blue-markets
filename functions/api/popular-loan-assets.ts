@@ -1,3 +1,4 @@
+import { MORPHO_GRAPHQL_URL } from '../../app/lib/graphql/endpoint'
 // Edge-cached API endpoint: GET /api/popular-loan-assets
 // Caches normalized Morpho GraphQL "interesting markets" data at the Cloudflare
 // edge (120s TTL) and returns the normalized { data: { markets: { items } } }
@@ -6,8 +7,8 @@
 // The upstream payload is validated before caching: a malformed body or a
 // GraphQL error responds 502 and is never cached.
 
-import { MORPHO_GRAPHQL_URL } from '../../app/lib/graphql/endpoint'
 import { parsePopularLoanAssetsEnvelope, QUERY_POPULAR_LOAN_ASSETS } from '../../app/lib/graphql/queries/popular-loan-assets'
+import { fetchWithDeadline } from '../../app/lib/graphql/request-policy'
 import { edgeCacheProxy, errorResponse } from '../api/_cache-utils'
 
 const CACHE_TTL_SECONDS = 120
@@ -33,8 +34,9 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
     waitUntil: context.waitUntil,
     cacheTtlSeconds: CACHE_TTL_SECONDS,
     fetchUpstream: async () => {
-      const response = await fetch(MORPHO_GRAPHQL_URL, {
+      const response = await fetchWithDeadline(MORPHO_GRAPHQL_URL, {
         method: 'POST',
+        signal: context.request.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: QUERY_POPULAR_LOAN_ASSETS,

@@ -169,7 +169,7 @@ export function listPopularVaultAssetSymbols(vaults: SupplyVaultData[]) {
     .map(([symbol, count]) => ({ symbol, count }))
 }
 
-export async function fetchMarketAprByVaults(chainIds: number[], config: MarketAprByVaultsConfig = {}) {
+export async function fetchMarketAprByVaults(chainIds: number[], config: MarketAprByVaultsConfig = {}, signal?: AbortSignal) {
   const minLiquidityUsd = config.minLiquidityUsd ?? 50_000
 
   const whereV1: VaultV1Filters = {
@@ -184,20 +184,20 @@ export async function fetchMarketAprByVaults(chainIds: number[], config: MarketA
   }
 
   const [v1Result, v2Result] = await Promise.all([
-    graphqlClient.request<QueryVaultsV1Result>(QUERY_VAULTS_V1, {
+    graphqlClient.request<QueryVaultsV1Result>({ document: QUERY_VAULTS_V1, variables: {
       where: whereV1,
       orderBy: VaultOrderBy.AvgNetApy,
       orderDirection: OrderDirection.Desc,
       first: 200,
       skip: 0,
-    }),
-    graphqlClient.request<QueryVaultsV2Result>(QUERY_VAULTS_V2, {
+    }, signal }),
+    graphqlClient.request<QueryVaultsV2Result>({ document: QUERY_VAULTS_V2, variables: {
       where: whereV2,
       orderBy: VaultV2OrderBy.Address,
       orderDirection: OrderDirection.Desc,
       first: 200,
       skip: 0,
-    }),
+    }, signal }),
   ])
 
   const allVaults = [

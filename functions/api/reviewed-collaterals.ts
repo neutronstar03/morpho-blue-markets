@@ -1,3 +1,4 @@
+import { fetchWithDeadline } from '../../app/lib/graphql/request-policy'
 import { parseSharedDecisions, SHARED_DECISIONS_URL } from '../../app/lib/reviews/shared-decisions'
 import { edgeCacheProxy, errorResponse } from '../api/_cache-utils'
 
@@ -14,8 +15,9 @@ function parseOptionalChainId(value: string | null) {
   return Number.isSafeInteger(chainId) && chainId > 0 ? chainId : null
 }
 
-async function fetchDecisionManifest() {
-  const res = await fetch(DECISION_MANIFEST_URL, {
+async function fetchDecisionManifest(signal?: AbortSignal) {
+  const res = await fetchWithDeadline(DECISION_MANIFEST_URL, {
+    signal,
     headers: {
       'accept': 'application/vnd.github+json',
       'user-agent': 'morpho-blue-markets',
@@ -41,7 +43,7 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
     waitUntil: context.waitUntil,
     cacheTtlSeconds: CACHE_TTL_SECONDS,
     fetchUpstream: async () => {
-      const tree = await fetchDecisionManifest()
+      const tree = await fetchDecisionManifest(context.request.signal)
       const data = parseSharedDecisions(tree)
         .filter(entry => entry.decision === 'whitelist' && (chainId == null || entry.chainId === chainId))
         .map(entry => [entry.chainId, entry.collateralAddress])

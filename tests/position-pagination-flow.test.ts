@@ -15,9 +15,10 @@ function position(index: number): UserPosition {
       loanAsset: { address: `0x${'1'.repeat(40)}`, symbol: 'TEST', decimals: 18 },
       collateralAsset: { address: `0x${'2'.repeat(40)}`, symbol: 'COL', decimals: 18 },
       oracle: null,
+      warnings: [],
       irmAddress: `0x${'3'.repeat(40)}`,
       lltv: '800000000000000000',
-      state: { supplyAssets: '1000', supplyShares: '1000000', netSupplyApy: 0.1, utilization: 0, supplyAssetsUsd: 1000 },
+      state: { supplyAssets: '1000', supplyShares: '1000000', netSupplyApy: 0.1, utilization: 0, supplyAssetsUsd: 1000, rewards: [] },
     },
     state: { supplyShares: '1000000', borrowShares: '0', collateral: '0' },
   }

@@ -1,6 +1,7 @@
-import type { PopularLoanAssetsEnvelope, PopularLoanAssetsMarketItem, PopularLoanAssetsQueryResult } from '~/lib/graphql/queries/popular-loan-assets'
+import type { PopularLoanAssetsMarketItem } from '~/lib/graphql/queries/popular-loan-assets'
 import { useQuery } from '@tanstack/react-query'
-import { QUERY_POPULAR_LOAN_ASSETS } from '~/lib/graphql/queries/popular-loan-assets'
+import { parsePopularLoanAssetsEnvelope, QUERY_POPULAR_LOAN_ASSETS } from '~/lib/graphql/queries/popular-loan-assets'
+import { fetchWithDeadline, graphqlRetryDelay, shouldRetryGraphqlRequest } from '~/lib/graphql/request-policy'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
 import { isAssetBlacklisted } from '~/lib/market-blacklist'
 import { graphqlClient } from '../../graphql/client'
@@ -116,8 +117,10 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
   // Edge-cached placeholder: fetches pre-processed data from our edge cache
   // for instant first paint while the live GraphQL query runs in background.
   const edgeQuery = useQuery<PopularLoanAsset[]>({
+    retry: shouldRetryGraphqlRequest,
+    retryDelay: graphqlRetryDelay,
     queryKey: ['edge-cached', 'popular-loan-assets', chainId, first, skip, minNetSupplyApy, maxNetSupplyApy, minBorrowUsd, minUtilization, topN],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!chainId)
         return []
       const params = new URLSearchParams({
@@ -129,10 +132,10 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
         minBorrowUsd: String(minBorrowUsd),
         minUtilization: String(minUtilization),
       })
-      const res = await fetch(`/api/popular-loan-assets?${params}`)
+      const res = await fetchWithDeadline(`/api/popular-loan-assets?${params}`, { signal })
       if (!res.ok)
         throw new Error(`Edge cache error: ${res.status}`)
-      const raw = await res.json() as PopularLoanAssetsEnvelope
+      const raw = parsePopularLoanAssetsEnvelope(await res.json())
       return aggregatePopularLoanAssets(raw.data.markets.items, topN)
     },
     enabled: !!chainId && enabled,
@@ -142,6 +145,8 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
   })
 
   const query = useQuery<PopularLoanAsset[]>({
+    retry: shouldRetryGraphqlRequest,
+    retryDelay: graphqlRetryDelay,
     queryKey: [
       'popular-loan-assets-by-chain',
       chainId,
@@ -153,24 +158,21 @@ export function usePopularLoanAssetsByChain(chainId?: number, opts: UsePopularLo
       minUtilization,
       topN,
     ],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!chainId)
         return []
 
-      const result = await graphqlClient.request<PopularLoanAssetsQueryResult>(
-        QUERY_POPULAR_LOAN_ASSETS,
-        {
-          first,
-          skip,
-          chainId,
-          minNetSupplyApy,
-          maxNetSupplyApy,
-          minBorrowUsd,
-          minUtilization,
-        },
-      )
+      const result = await graphqlClient.request<unknown>({ document: QUERY_POPULAR_LOAN_ASSETS, variables: {
+        first,
+        skip,
+        chainId,
+        minNetSupplyApy,
+        maxNetSupplyApy,
+        minBorrowUsd,
+        minUtilization,
+      }, signal })
 
-      return aggregatePopularLoanAssets(result.markets.items, topN)
+      return aggregatePopularLoanAssets(parsePopularLoanAssetsEnvelope({ data: result }).data.markets.items, topN)
     },
     enabled: !!chainId && enabled,
     placeholderData: edgeQuery.data,

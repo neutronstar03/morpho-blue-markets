@@ -1,4 +1,5 @@
 import type { CollateralReview, CollateralReviewApiResponse, OracleReview, ReviewSource } from '../../app/lib/reviews/types'
+import { fetchWithDeadline } from '../../app/lib/graphql/request-policy'
 import { edgeCacheProxy, errorResponse } from '../api/_cache-utils'
 
 const CACHE_TTL_SECONDS = 30 * 60
@@ -155,9 +156,10 @@ export function normalizeOracleReview(raw: unknown, chainId: number, oracleAddre
   }
 }
 
-async function fetchReviewJson(path: string) {
-  const res = await fetch(`${REVIEW_REPO_BASE_URL}/${path}`, {
+async function fetchReviewJson(path: string, signal?: AbortSignal) {
+  const res = await fetchWithDeadline(`${REVIEW_REPO_BASE_URL}/${path}`, {
     headers: { accept: 'application/json' },
+    signal,
   })
 
   if (res.status === 404)
@@ -168,12 +170,14 @@ async function fetchReviewJson(path: string) {
   return await res.json()
 }
 
-async function fetchOptionalOracleReview(chainId: number, oracleAddress: string) {
+async function fetchOptionalOracleReview(chainId: number, oracleAddress: string, signal?: AbortSignal) {
   try {
-    const json = await fetchReviewJson(`${chainId}/oracle/${oracleAddress}.json`)
+    const json = await fetchReviewJson(`${chainId}/oracle/${oracleAddress}.json`, signal)
     return normalizeOracleReview(json, chainId, oracleAddress)
   }
-  catch {
+  catch (error) {
+    if (signal?.aborted)
+      throw error
     return null
   }
 }
@@ -197,8 +201,8 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
     cacheTtlSeconds: CACHE_TTL_SECONDS,
     fetchUpstream: async () => {
       const [collateralJson, oracleJson] = await Promise.all([
-        fetchReviewJson(`${chainId}/${address}.json`),
-        oracleAddress ? fetchOptionalOracleReview(chainId, oracleAddress) : Promise.resolve(null),
+        fetchReviewJson(`${chainId}/${address}.json`, context.request.signal),
+        oracleAddress ? fetchOptionalOracleReview(chainId, oracleAddress, context.request.signal) : Promise.resolve(null),
       ])
 
       const profile = normalizeReview(collateralJson, chainId, address)

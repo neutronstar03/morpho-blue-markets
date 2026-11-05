@@ -1,9 +1,10 @@
+import { chainProviderSlugMap } from '../../app/lib/chain-capabilities'
 // Edge-cached API endpoint: GET /api/token-liquidity
 // Caches GeckoTerminal token liquidity data at the Cloudflare edge (3600s TTL = 1 hour).
 // Returns { liquidityUsd: string | null } — null means "no liquidity data found" and is
 // cached for a shorter period (300s = 5min) to avoid re-hammering GeckoTerminal.
 
-import { chainProviderSlugMap } from '../../app/lib/chain-capabilities'
+import { fetchWithDeadline } from '../../app/lib/graphql/request-policy'
 import { edgeCacheProxy, errorResponse } from '../api/_cache-utils'
 
 const GECKOTERMINAL_BASE_URL = 'https://api.geckoterminal.com/api/v2'
@@ -42,7 +43,8 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
       // Try the token endpoint first (includes top_pools and total_reserve_in_usd)
       let tokenStatus = 0
       try {
-        const tokenRes = await fetch(geckoTokenUrl, {
+        const tokenRes = await fetchWithDeadline(geckoTokenUrl, {
+          signal: context.request.signal,
           headers: { accept: 'application/json' },
         })
         tokenStatus = tokenRes.status
@@ -65,45 +67,42 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
           }
         }
 
-        // Don't bother with the pools endpoint if token was 4xx
-        // (token not found on GeckoTerminal means pools won't help either)
-        if (tokenStatus >= 400 && tokenStatus < 500 && tokenStatus !== 429) {
+        // A confirmed missing token is an unavailable resource, unlike transport errors.
+        if (tokenStatus === 404) {
           return { data: { liquidityUsd: null }, negativeTtlSeconds: NEGATIVE_CACHE_TTL_SECONDS }
         }
       }
-      catch {
-        // Network error fetching token endpoint — try pools as fallback
+      catch (error) {
+        if (context.request.signal.aborted)
+          throw error
+        // A different public endpoint may still provide a result.
       }
 
       // Second attempt: pools endpoint
-      try {
-        const poolsRes = await fetch(geckoPoolsUrl, {
-          headers: { accept: 'application/json' },
-        })
+      const poolsRes = await fetchWithDeadline(geckoPoolsUrl, {
+        signal: context.request.signal,
+        headers: { accept: 'application/json' },
+      })
 
-        if (!poolsRes.ok) {
-          // GeckoTerminal is erroring — cache null for a short period
+      if (!poolsRes.ok) {
+        if (poolsRes.status === 404)
           return { data: { liquidityUsd: null }, negativeTtlSeconds: NEGATIVE_CACHE_TTL_SECONDS }
-        }
-
-        const poolsJson: any = await poolsRes.json()
-        const pools = (poolsJson?.data ?? []) as Array<any>
-        const total = pools.reduce((acc: number, item: any) => {
-          const value = Number(item?.attributes?.reserve_in_usd ?? 0)
-          return acc + (Number.isFinite(value) ? value : 0)
-        }, 0)
-
-        if (Number.isFinite(total) && total > 0) {
-          return { data: { liquidityUsd: String(Math.round(total)) } }
-        }
-
-        // GeckoTerminal returned data but no liquidity found — cache null briefly
-        return { data: { liquidityUsd: null }, negativeTtlSeconds: NEGATIVE_CACHE_TTL_SECONDS }
+        throw new Error(`GeckoTerminal upstream error: ${poolsRes.status}`)
       }
-      catch {
-        // Both endpoints failed — cache null briefly
-        return { data: { liquidityUsd: null }, negativeTtlSeconds: NEGATIVE_CACHE_TTL_SECONDS }
+
+      const poolsJson: any = await poolsRes.json()
+      const pools = (poolsJson?.data ?? []) as Array<any>
+      const total = pools.reduce((acc: number, item: any) => {
+        const value = Number(item?.attributes?.reserve_in_usd ?? 0)
+        return acc + (Number.isFinite(value) ? value : 0)
+      }, 0)
+
+      if (Number.isFinite(total) && total > 0) {
+        return { data: { liquidityUsd: String(Math.round(total)) } }
       }
+
+      // GeckoTerminal returned data but no liquidity found — cache null briefly
+      return { data: { liquidityUsd: null }, negativeTtlSeconds: NEGATIVE_CACHE_TTL_SECONDS }
     },
   })
 }

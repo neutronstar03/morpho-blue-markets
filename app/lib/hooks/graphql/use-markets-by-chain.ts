@@ -1,8 +1,9 @@
-import type { RawQueryMarketsByChainResult, SupplyMarketData } from '~/lib/graphql/queries/markets-by-chain'
+import type { SupplyMarketData } from '~/lib/graphql/queries/markets-by-chain'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useMemo } from 'react'
-import { normalizeMarketOracles } from '~/lib/graphql/market-oracle'
+import { parseOptimizerMarketPage } from '~/lib/graphql/market-responses'
 import { MarketOrderBy, OrderDirection, QUERY_MARKETS_BY_CHAIN } from '~/lib/graphql/queries/markets-by-chain'
+import { graphqlRetryDelay, shouldRetryGraphqlRequest } from '~/lib/graphql/request-policy'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
 import { useFilteredBlacklistedMarkets } from '~/lib/market-blacklist'
 import { isOracleMisconfiguredWarning } from '~/lib/morpho/morpho-warnings'
@@ -31,8 +32,10 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
   } = opts
 
   const query = useQuery<SupplyMarketData[]>({
+    retry: shouldRetryGraphqlRequest,
+    retryDelay: graphqlRetryDelay,
     queryKey: ['markets-by-chain', chainId, loanAssetAddrLower, minNetSupplyApy, maxNetSupplyApy, minBorrowUsd],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!chainId)
         return []
 
@@ -52,20 +55,17 @@ export function useMarketsByChain(chainId?: number, loanAssetAddress?: string, o
       const markets: SupplyMarketData[] = []
 
       while (true) {
-        const result = await graphqlClient.request<RawQueryMarketsByChainResult>(
-          QUERY_MARKETS_BY_CHAIN,
-          {
-            where,
-            orderBy: MarketOrderBy.NetSupplyApy,
-            orderDirection: OrderDirection.Desc,
-            first,
-            skip,
-          },
-        )
-        const pageItems = result.markets.items || []
-        markets.push(...normalizeMarketOracles(pageItems))
+        const result = await graphqlClient.request<unknown>({ document: QUERY_MARKETS_BY_CHAIN, variables: {
+          where,
+          orderBy: MarketOrderBy.NetSupplyApy,
+          orderDirection: OrderDirection.Desc,
+          first,
+          skip,
+        }, signal })
+        const page = parseOptimizerMarketPage(result, chainId)
+        markets.push(...page.items)
 
-        if (pageItems.length < first)
+        if (page.rawCount < first)
           break
 
         skip += first

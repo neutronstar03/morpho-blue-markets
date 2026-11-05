@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo } from 'react'
 import { graphqlClient } from '~/lib/graphql/client'
 import { QUERY_COLLATERAL_SUPPLY_AGGREGATE } from '~/lib/graphql/queries/collateral-supply-aggregate'
+import { graphqlRetryDelay, shouldRetryGraphqlRequest } from '~/lib/graphql/request-policy'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 
@@ -50,8 +51,10 @@ export function useCollateralSupplyAggregate({
   const initialData = cached.updatedAt > 0 ? cached.data : undefined
 
   const query = useQuery<number | undefined>({
+    retry: shouldRetryGraphqlRequest,
+    retryDelay: graphqlRetryDelay,
     queryKey: ['collateral-supply-agg', chainId, collateralLower],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!chainId || !collateralLower)
         return undefined
 
@@ -63,10 +66,7 @@ export function useCollateralSupplyAggregate({
         collateralAssetAddress_in: [collateralLower],
       }
 
-      const res = await graphqlClient.request<QueryCollateralSupplyAggregateResult>(
-        QUERY_COLLATERAL_SUPPLY_AGGREGATE,
-        { first, skip, where },
-      )
+      const res = await graphqlClient.request<QueryCollateralSupplyAggregateResult>({ document: QUERY_COLLATERAL_SUPPLY_AGGREGATE, variables: { first, skip, where }, signal })
 
       const sum = (res.markets?.items || []).reduce((acc, m) => {
         const v = m.state?.supplyAssetsUsd

@@ -2,10 +2,13 @@ import type { CrossChainUserPosition } from './use-user-positions'
 import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 import { useQuery } from '@tanstack/react-query'
 import { supportedChainMap } from '~/lib/addresses'
+import { UnavailableMarketMetadataError } from '~/lib/graphql/market-responses'
 import { QUERY_USER_VAULT_V2_CHAINS, QUERY_USER_VAULT_V2_POSITIONS } from '~/lib/graphql/queries/vault-v2-positions'
+import { graphqlRetryDelay, shouldRetryGraphqlRequest } from '~/lib/graphql/request-policy'
+import { parseVaultV2ChainPositionsResponse, parseVaultV2PositionsResponse } from '~/lib/graphql/vault-position-responses'
 import { graphqlClient } from '../../graphql/client'
 
-interface QueryUserVaultV2PositionsResult {
+export interface QueryUserVaultV2PositionsResult {
   userByAddress: {
     vaultV2Positions: Array<{
       shares: string
@@ -29,7 +32,7 @@ interface QueryUserVaultV2PositionsResult {
   } | null
 }
 
-interface QueryCrossChainVaultV2PositionsResult {
+export interface QueryCrossChainVaultV2PositionsResult {
   userByAddress: {
     vaultV2Positions: Array<{
       shares: string
@@ -51,6 +54,9 @@ function vaultPositionToLivePosition(position: NonNullable<QueryUserVaultV2Posit
   if (shares <= 0n || assets <= 0n)
     return null
 
+  if (position.vault.netApy === null)
+    throw new UnavailableMarketMetadataError('Vault APR is currently unavailable; totals cannot be presented as complete')
+
   const vaultKey = `vault-v2:${position.vault.address.toLowerCase()}`
   return {
     market: {
@@ -71,7 +77,7 @@ function vaultPositionToLivePosition(position: NonNullable<QueryUserVaultV2Posit
         address: position.vault.address,
       },
       state: {
-        netSupplyApy: position.vault.netApy ?? 0,
+        netSupplyApy: position.vault.netApy,
         utilization: 0,
         supplyAssets: position.assets,
         supplyShares: position.shares,
@@ -97,28 +103,27 @@ function vaultPositionToLivePosition(position: NonNullable<QueryUserVaultV2Posit
   }
 }
 
-export async function fetchUserVaultV2Positions(userAddress: string, chainId: number) {
-  const result = await graphqlClient.request<QueryUserVaultV2PositionsResult>(
-    QUERY_USER_VAULT_V2_POSITIONS,
-    {
-      user: userAddress,
-      chainId,
-    },
-  )
+export async function fetchUserVaultV2Positions(userAddress: string, chainId: number, signal?: AbortSignal) {
+  const result = await graphqlClient.request<unknown>({ document: QUERY_USER_VAULT_V2_POSITIONS, variables: {
+    user: userAddress,
+    chainId,
+  }, signal })
 
-  return (result.userByAddress?.vaultV2Positions ?? [])
+  return parseVaultV2PositionsResponse(result)
     .map(vaultPositionToLivePosition)
     .filter((position): position is LiveMarketPosition => position !== null)
 }
 
 export function useLiveVaultV2Positions(userAddress?: string, chainId?: number, refreshKey?: number) {
   return useQuery<LiveMarketPosition[]>({
+    retry: shouldRetryGraphqlRequest,
+    retryDelay: graphqlRetryDelay,
     queryKey: ['user-vault-v2-positions-graph', userAddress, chainId, refreshKey ?? 0],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userAddress || !chainId)
         return []
 
-      return fetchUserVaultV2Positions(userAddress, chainId)
+      return fetchUserVaultV2Positions(userAddress, chainId, signal)
     },
     enabled: !!userAddress && !!chainId,
     staleTime: 30 * 1000,
@@ -127,21 +132,20 @@ export function useLiveVaultV2Positions(userAddress?: string, chainId?: number, 
 
 export function useUserVaultV2PositionChains(userAddress?: string) {
   return useQuery<CrossChainUserPosition[]>({
+    retry: shouldRetryGraphqlRequest,
+    retryDelay: graphqlRetryDelay,
     queryKey: ['user-vault-v2-position-chains', userAddress],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!userAddress)
         return []
 
       const results = await Promise.allSettled([...supportedChainMap.keys()].map(async (chainId) => {
-        const result = await graphqlClient.request<QueryCrossChainVaultV2PositionsResult>(
-          QUERY_USER_VAULT_V2_CHAINS,
-          {
-            user: userAddress,
-            chainId,
-          },
-        )
+        const result = await graphqlClient.request<unknown>({ document: QUERY_USER_VAULT_V2_CHAINS, variables: {
+          user: userAddress,
+          chainId,
+        }, signal })
 
-        return (result.userByAddress?.vaultV2Positions ?? [])
+        return parseVaultV2ChainPositionsResponse(result)
           .filter(position => toBigint(position.shares) > 0n && toBigint(position.assets) > 0n)
           .map(position => ({
             chainId,

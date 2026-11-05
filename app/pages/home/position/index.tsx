@@ -21,6 +21,7 @@ interface ChainPortfolioState {
   positionCount: number
   isLoading: boolean
   isError: boolean
+  isIncomplete: boolean
 }
 
 // This component is the general position in the homepage
@@ -127,7 +128,7 @@ function PositionClient() {
       dailyUsd += state.portfolio.dailyUsd ?? 0
     }
 
-    const incomplete = networkChainIds.some(id => !chainPortfolioById[id] || chainPortfolioById[id].isLoading || chainPortfolioById[id].isError)
+    const incomplete = networkChainIds.some(id => !chainPortfolioById[id] || chainPortfolioById[id].isLoading || chainPortfolioById[id].isError || chainPortfolioById[id].isIncomplete)
     return {
       incomplete,
       positionCount,
