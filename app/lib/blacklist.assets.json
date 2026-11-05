@@ -188,5 +188,11 @@
       "assetContract": "0x35533f54740f1f1aa4179e57ba37039dfa16868b",
       "comment": "RLP: Resolv exposure manually blacklisted after exploit/depeg; avoid new deposits."
     }
+  ],
+  "143": [
+    {
+      "assetContract": "0xa08a69ab9dd3b04d0992bc7afb2c0b907bbdc147",
+      "comment": "PT-USDat-14JAN2027: insufficient verified exit evidence for Monad USDat after PT/SY redemption. Issuer redemption documentation covers Ethereum, while this chain adds bridge/liquidity and admin dependencies; not an allegation of fraud. Review issue morpho-collateral-reviews#1 (2026-11-05)."
+    }
   ]
 }
