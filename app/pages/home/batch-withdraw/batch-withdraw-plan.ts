@@ -94,6 +94,7 @@ export function buildBatchWithdrawMarketItems({
     items.push({
       marketId: p.market.uniqueKey as `0x${string}`,
       collateralSymbol: p.market.collateralAsset.symbol,
+      collateralAddress: p.market.collateralAsset.address,
       userSupplyShares,
       suppliedAssets,
       marketTotalSupplyAssets: totalSupplyAssets,

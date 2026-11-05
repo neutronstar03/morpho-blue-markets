@@ -3,6 +3,7 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import blacklistAssets from './blacklist.assets.json'
 import { baseUrlPrefix, createDatasetCache, localArtifactsEnabled, MARKET_BLACKLIST_FRESHNESS_MS, useDatasetMeta } from './dataset-cache'
 import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue, isOracleLocallyExcluded, subscribeLocalMarketExclusions } from './local-market-exclusions'
+import { getSharedDecision, subscribeSharedDecisions } from './reviews/shared-decisions'
 import { isMarketSystemUnhealthy, subscribeUnhealthyMarkets } from './unhealthy-markets'
 
 interface MarketBlacklistArgs {
@@ -163,10 +164,12 @@ export function subscribeMarketBlacklist(listener: () => void) {
   window.addEventListener(CHANGE_EVENT, onEvent)
   const unsubscribeLocalMarketExclusions = subscribeLocalMarketExclusions(onDependentChange)
   const unsubscribeUnhealthyMarkets = subscribeUnhealthyMarkets(onDependentChange)
+  const unsubscribeShared = subscribeSharedDecisions(onDependentChange)
   return () => {
     window.removeEventListener(CHANGE_EVENT, onEvent)
     unsubscribeLocalMarketExclusions()
     unsubscribeUnhealthyMarkets()
+    unsubscribeShared()
   }
 }
 
@@ -321,7 +324,7 @@ function hasValueInChainMap(
 }
 
 export function isAssetBlacklisted(address?: string | null, chainId?: number) {
-  return hasValueInChainMap(BLACKLISTED_ASSET_ADDRESSES_BY_CHAIN, address, chainId)
+  return getSharedDecision(chainId, address)?.decision === 'blacklist' || hasValueInChainMap(BLACKLISTED_ASSET_ADDRESSES_BY_CHAIN, address, chainId)
 }
 
 export function isMarketIdBlacklisted(uniqueKey?: string | null, chainId?: number) {
@@ -356,3 +359,13 @@ export function filterBlacklistedMarkets<T>(
 // Kick off best-effort load early in the client.
 if (typeof window !== 'undefined')
   ensureMarketBlacklistLoaded()
+
+export function getAssetBlacklistReason(address?: string | null, chainId?: number): string | undefined {
+  if (!address || !chainId)
+    return undefined
+  const shared = getSharedDecision(chainId, address)
+  if (shared?.decision === 'blacklist')
+    return shared.reason
+  const entries = (blacklistAssets as Record<string, { assetContract: string, comment: string }[]>)[String(chainId)]
+  return entries?.find(entry => entry.assetContract.toLowerCase() === address.toLowerCase())?.comment
+}

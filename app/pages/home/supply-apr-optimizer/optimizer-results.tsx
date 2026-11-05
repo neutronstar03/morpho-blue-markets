@@ -109,7 +109,7 @@ export function SupplyAprOptimizerResults({
                               data-umami-event="market_navigate"
                               data-umami-data-source="optimizer"
                             >
-                              <MarketRiskText status={riskStatus}>{marketLabel}</MarketRiskText>
+                              <MarketRiskText status={riskStatus} chainId={chainIdForLinks} collateralAddress={meta?.collateralAddress}>{marketLabel}</MarketRiskText>
                             </Link>
                           )
                         : (

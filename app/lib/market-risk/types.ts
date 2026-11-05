@@ -4,6 +4,7 @@ export type MarketRiskStatus = 'white' | 'blue' | 'yellow' | 'purple' | 'black'
 export type MarketRiskReasonCode
   = | 'ok'
     | 'collateral_review'
+    | 'shared_blacklist'
     | 'unknown_collateral'
     | 'local_blacklist'
     | 'local_oracle_blacklist'
@@ -18,6 +19,7 @@ export type MarketRiskReasonCode
 export interface MarketRiskStatusEntry {
   status: MarketRiskStatus
   reasonCodes: MarketRiskReasonCode[]
+  reason?: string
 }
 
 export interface ExecutionGuard {

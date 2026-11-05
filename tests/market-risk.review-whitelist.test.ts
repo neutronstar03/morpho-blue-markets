@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 import { getMarketRisk } from '../app/lib/market-risk/market-risk'
+import { replaceSharedDecisions } from '../app/lib/reviews/shared-decisions'
 
 const MAINNET_CHAIN_ID = 1
 const ROY_ST_APYUSD = '0xbd373c9d3d8976a4fecc504a93c768bbe8c3227c'
@@ -26,10 +27,16 @@ describe('collateral review risk allowlist', () => {
     })
   })
 
-  test('treats the reviewed mainnet ROY-ST-apyUSD collateral as whitelisted', () => {
+  test('does not grant approval from a descriptive review signal', () => {
+    expect(reviewedRoyaltyMarket({ hasCollateralReview: true }).status).toBe('yellow')
+  })
+
+  test('uses explicit positive review decisions', () => {
+    replaceSharedDecisions([{ chainId: 1, collateralAddress: ROY_ST_APYUSD, decision: 'whitelist', reason: 'Verified exit', reviewPath: `v1/chain/1/${ROY_ST_APYUSD}.json` }])
     expect(reviewedRoyaltyMarket({ hasCollateralReview: true })).toEqual({
       status: 'white',
       reasonCodes: ['collateral_review'],
+      reason: 'Verified exit',
     })
   })
 
@@ -43,3 +50,5 @@ describe('collateral review risk allowlist', () => {
     })
   })
 })
+
+afterEach(() => replaceSharedDecisions([]))

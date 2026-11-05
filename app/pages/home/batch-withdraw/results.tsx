@@ -2,6 +2,7 @@ import type { BatchWithdrawPlanState, LoanAssetOption } from './shared'
 import { createSearchParams, Link } from 'react-router-dom'
 import { formatUnits } from 'viem'
 import LinkNewWindow from '~/assets/link-new-window.svg?react'
+import { MarketRiskText } from '~/components/ui/market-risk-text'
 import { formatBigintShort } from '~/lib/formatters'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 import { pctFromWad, trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
@@ -92,7 +93,7 @@ export function BatchWithdrawResults({
                               data-umami-event="market_navigate"
                               data-umami-data-source="batch_withdraw"
                             >
-                              {marketLabel}
+                              <MarketRiskText chainId={chainId} collateralAddress={p.collateralAddress}>{marketLabel}</MarketRiskText>
                             </Link>
                           )
                         : (

@@ -14,6 +14,7 @@ export interface BatchWithdrawChainOption {
 export interface MarketPlanItem {
   marketId: `0x${string}`
   collateralSymbol: string
+  collateralAddress?: string
   userSupplyShares: bigint
   suppliedAssets: bigint
   marketTotalSupplyAssets: bigint

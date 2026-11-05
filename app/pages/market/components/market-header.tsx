@@ -5,7 +5,6 @@ import LinkNewWindow from '~/assets/link-new-window.svg?react'
 import { Button } from '~/components/ui/button'
 import { MarketRiskText } from '~/components/ui/market-risk-text'
 import { getSupportedChainName } from '~/lib/addresses'
-import { useCollateralReview } from '~/lib/hooks/use-collateral-review'
 import { useMarketRiskStatus } from '~/lib/market-risk/hooks'
 import { morphoAppMarketUrl } from '~/lib/morpho/morpho-app'
 import { getMarketSystemUnhealthyEntry, useUnhealthyMarketsVersion } from '~/lib/unhealthy-markets'
@@ -25,11 +24,6 @@ export function MarketHeader({ market }: MarketHeaderProps) {
   const copiedResetTimeout = useRef<number | null>(null)
   const unhealthyMarketsVersion = useUnhealthyMarketsVersion()
   const chainName = getSupportedChainName(market.morphoBlue.chain.id)
-  const { data: review } = useCollateralReview(
-    market.morphoBlue.chain.id,
-    market.collateralAsset.address,
-    market.oracleAddress,
-  )
   const { status } = useMarketRiskStatus({
     chainId: market.morphoBlue.chain.id,
     uniqueKey: market.uniqueKey,
@@ -38,7 +32,6 @@ export function MarketHeader({ market }: MarketHeaderProps) {
     loanAssetSymbol: market.loanAsset.symbol,
     collateralAssetSymbol: market.collateralAsset.symbol,
     oracleAddress: market.oracleAddress,
-    hasCollateralReview: !!review?.collateralReview,
     warnings: market.warnings,
   })
 
@@ -73,7 +66,7 @@ export function MarketHeader({ market }: MarketHeaderProps) {
           <div className="mb-1 flex items-center gap-2">
             <h2 className="flex min-w-0 flex-wrap items-center gap-x-2 text-xl font-bold text-white sm:text-2xl">
               <span className="flex items-center gap-x-2">
-                <MarketRiskText status={status} size="xl">
+                <MarketRiskText chainId={market.morphoBlue.chain.id} collateralAddress={market.collateralAsset.address} status={status} size="xl">
                   {market.collateralAsset.symbol}
                 </MarketRiskText>
                 <button

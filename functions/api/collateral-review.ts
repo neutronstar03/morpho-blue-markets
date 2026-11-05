@@ -114,7 +114,7 @@ function normalizeReview(raw: unknown, chainId: number, collateralAddress: strin
 function normalizeRank(value: unknown) {
   if (value == null)
     return null
-  const rank = Number(value)
+  const rank = typeof value === 'number' ? value : Number.NaN
   return Number.isInteger(rank) && rank >= 0 && rank <= 5 ? rank : null
 }
 

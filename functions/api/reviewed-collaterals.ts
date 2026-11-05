@@ -1,8 +1,8 @@
-import { parseReviewedCollateralTree } from '../../app/lib/reviews/reviewed-collaterals'
+import { parseSharedDecisions, SHARED_DECISIONS_URL } from '../../app/lib/reviews/shared-decisions'
 import { edgeCacheProxy, errorResponse } from '../api/_cache-utils'
 
 const CACHE_TTL_SECONDS = 5 * 60
-const REVIEW_REPO_TREE_URL = 'https://api.github.com/repos/neutronstar03/morpho-collateral-reviews/git/trees/main?recursive=1'
+const DECISION_MANIFEST_URL = SHARED_DECISIONS_URL
 
 interface Env {}
 
@@ -14,8 +14,8 @@ function parseOptionalChainId(value: string | null) {
   return Number.isSafeInteger(chainId) && chainId > 0 ? chainId : null
 }
 
-async function fetchReviewTree() {
-  const res = await fetch(REVIEW_REPO_TREE_URL, {
+async function fetchDecisionManifest() {
+  const res = await fetch(DECISION_MANIFEST_URL, {
     headers: {
       'accept': 'application/vnd.github+json',
       'user-agent': 'morpho-blue-markets',
@@ -41,8 +41,10 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
     waitUntil: context.waitUntil,
     cacheTtlSeconds: CACHE_TTL_SECONDS,
     fetchUpstream: async () => {
-      const tree = await fetchReviewTree()
-      const data = parseReviewedCollateralTree(tree, chainId)
+      const tree = await fetchDecisionManifest()
+      const data = parseSharedDecisions(tree)
+        .filter(entry => entry.decision === 'whitelist' && (chainId == null || entry.chainId === chainId))
+        .map(entry => [entry.chainId, entry.collateralAddress])
       return { data }
     },
   })

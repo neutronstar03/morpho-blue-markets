@@ -2,15 +2,16 @@ import type { ReviewedCollateralListItem } from '~/lib/reviews/types'
 import { useQuery } from '@tanstack/react-query'
 import {
   parseReviewedCollateralsApiResponse,
-  parseReviewedCollateralTree,
   reviewedCollateralListToKeySet,
 } from '~/lib/reviews/reviewed-collaterals'
 
-const REVIEW_REPO_TREE_URL = 'https://api.github.com/repos/neutronstar03/morpho-collateral-reviews/git/trees/main?recursive=1'
+import { parseSharedDecisions, SHARED_DECISIONS_URL } from '~/lib/reviews/shared-decisions'
+
+const DECISION_MANIFEST_URL = SHARED_DECISIONS_URL
 const REVIEWED_COLLATERALS_STALE_TIME_MS = 5 * 60 * 1000
 
 async function fetchDirectReviewedCollaterals(chainId?: number): Promise<ReviewedCollateralListItem[]> {
-  const res = await fetch(REVIEW_REPO_TREE_URL, {
+  const res = await fetch(DECISION_MANIFEST_URL, {
     headers: {
       'accept': 'application/vnd.github+json',
       'x-github-api-version': '2022-11-28',
@@ -20,7 +21,9 @@ async function fetchDirectReviewedCollaterals(chainId?: number): Promise<Reviewe
   if (!res.ok)
     throw new Error(`Reviewed collaterals direct fetch failed: ${res.status}`)
 
-  return parseReviewedCollateralTree(await res.json(), chainId)
+  return parseSharedDecisions(await res.json())
+    .filter(entry => entry.decision === 'whitelist' && (chainId == null || entry.chainId === chainId))
+    .map(entry => [entry.chainId, entry.collateralAddress])
 }
 
 export async function fetchReviewedCollaterals(chainId?: number): Promise<ReviewedCollateralListItem[]> {

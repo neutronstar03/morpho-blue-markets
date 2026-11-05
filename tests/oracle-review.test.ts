@@ -20,7 +20,7 @@ describe('oracle review rank compatibility', () => {
   })
 
   test('rejects unsupported and fractional ranks without upgrading them', () => {
-    for (const rank of [-1, 6, 0.5, null])
+    for (const rank of [-1, 6, 0.5, null, true, '0'])
       expect(normalizeOracleReview({ ...review, rank }, 8453, address)).toBeNull()
   })
 

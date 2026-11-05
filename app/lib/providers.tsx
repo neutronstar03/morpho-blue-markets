@@ -15,6 +15,7 @@ import { HomeMagicOptimizerEffects } from './home-magic-optimizer-effects'
 import { useAnalytics } from './hooks/use-analytics'
 import { useMarketBlacklistPreload } from './market-blacklist'
 import { useOracleProvidersPreload } from './oracle-providers'
+import { useSharedDecisionsPreload } from './reviews/use-shared-decisions'
 import { useUnhealthyMarketsPreload } from './unhealthy-markets'
 import { useUserBlacklistSyncEngine } from './user-blacklist-sync'
 import { config } from './wagmi'
@@ -26,6 +27,7 @@ function GlobalDataEffects() {
   useMarketBlacklistPreload()
   useUnhealthyMarketsPreload()
   useOracleProvidersPreload()
+  useSharedDecisionsPreload()
   useAnalytics()
   return null
 }

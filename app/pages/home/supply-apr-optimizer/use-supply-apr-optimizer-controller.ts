@@ -737,12 +737,14 @@ export function useSupplyAprOptimizerController() {
     for (const m of (topMarkets ?? [])) {
       map.set(m.uniqueKey.toLowerCase(), {
         collateralSymbol: m.collateralAsset?.symbol,
+        collateralAddress: m.collateralAsset?.address,
         status: getOptimizerRiskStatus(m.uniqueKey),
       })
     }
     for (const p of selectedUserMarkets) {
       map.set(p.market.uniqueKey.toLowerCase(), {
         collateralSymbol: p.market.collateralAsset?.symbol,
+        collateralAddress: p.market.collateralAsset?.address,
         status: getOptimizerRiskStatus(p.market.uniqueKey),
       })
     }

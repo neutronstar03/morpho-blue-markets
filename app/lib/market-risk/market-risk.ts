@@ -2,8 +2,9 @@
 import type { MarketRiskInput, MarketRiskReasonCode, MarketRiskStatus, MarketRiskStatusEntry } from './types'
 import { isCollateralWhitelisted } from '../collateral-whitelist'
 import { isCollateralLocallyExcluded, isMarketLocallyMarkedLostValue, isOracleLocallyExcluded } from '../local-market-exclusions'
-import { isMarketBlacklisted } from '../market-blacklist'
+import { getAssetBlacklistReason, isMarketBlacklisted } from '../market-blacklist'
 import { isOracleMisconfiguredWarning } from '../morpho/morpho-warnings'
+import { getSharedDecision } from '../reviews/shared-decisions'
 import { isMarketSystemUnhealthy } from '../unhealthy-markets'
 import { getCollateralDecision } from './collateral-decisions'
 
@@ -47,6 +48,11 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     }
   }
 
+  const shared = getSharedDecision(chainId, collateralAddress)
+  if (shared?.decision === 'blacklist') {
+    return { status: 'black', reasonCodes: ['shared_blacklist'], reason: shared.reason }
+  }
+
   if (isMarketBlacklisted({
     chainId,
     uniqueKey,
@@ -59,6 +65,7 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     return {
       status: 'black',
       reasonCodes: ['blacklist'],
+      reason: getAssetBlacklistReason(collateralAddress, chainId) ?? getAssetBlacklistReason(input.loanAssetAddress, chainId),
     }
   }
 
@@ -90,10 +97,11 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     }
   }
 
-  if (input.hasCollateralReview) {
+  if (shared?.decision === 'whitelist') {
     return {
       status: 'white',
       reasonCodes: ['collateral_review'],
+      reason: shared.reason,
     }
   }
 

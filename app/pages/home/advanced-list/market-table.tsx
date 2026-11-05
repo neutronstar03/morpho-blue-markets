@@ -72,7 +72,7 @@ export function MarketTable({
                     data-umami-event="market_navigate"
                     data-umami-data-source="table"
                   >
-                    <MarketRiskText status={riskStatusByKey[`${market.chainId}:${market.id.toLowerCase()}`]}>
+                    <MarketRiskText chainId={market.chainId} collateralAddress={market.collateralAddress} status={riskStatusByKey[`${market.chainId}:${market.id.toLowerCase()}`]}>
                       {market.marketLabel}
                     </MarketRiskText>
                   </Link>

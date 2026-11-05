@@ -18,6 +18,7 @@ export interface AutoStepInfo {
 }
 
 export interface OptimizerMarketMeta {
+  collateralAddress?: string
   collateralSymbol?: string
   status?: 'white' | 'blue' | 'yellow' | 'purple' | 'black'
 }
