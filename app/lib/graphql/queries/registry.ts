@@ -1,4 +1,5 @@
 import { QUERY_COLLATERAL_SUPPLY_AGGREGATE } from './collateral-supply-aggregate'
+import { QUERY_COLLATERAL_CANDIDATES, QUERY_DATASET_MARKETS, QUERY_DATASET_UNHEALTHY_POSITIONS } from './dataset-generation'
 import { QUERY_LIST_MARKETS } from './list-markets'
 import { QUERY_SINGLE_MORPHO_MARKET } from './market-detail'
 import { GetMarketLiquidationCount } from './market-liquidations'
@@ -10,6 +11,9 @@ import { QUERY_VAULTS_V1, QUERY_VAULTS_V2 } from './vaults-by-asset'
 
 // All production Morpho operations. Keep this list explicit and validate it offline.
 export const PRODUCTION_OPERATIONS = {
+  QUERY_COLLATERAL_CANDIDATES,
+  QUERY_DATASET_MARKETS,
+  QUERY_DATASET_UNHEALTHY_POSITIONS,
   QUERY_COLLATERAL_SUPPLY_AGGREGATE,
   QUERY_LIST_MARKETS,
   QUERY_SINGLE_MORPHO_MARKET,

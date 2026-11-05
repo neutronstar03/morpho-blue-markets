@@ -1,5 +1,10 @@
 import process from 'node:process'
+import blacklistAssets from '../app/lib/blacklist.assets.json'
 import { MORPHO_GRAPHQL_URL } from '../app/lib/graphql/endpoint'
+import { QUERY_DATASET_MARKETS, QUERY_DATASET_UNHEALTHY_POSITIONS } from '../app/lib/graphql/queries/dataset-generation'
+import { fetchWithDeadline } from '../app/lib/graphql/request-policy'
+import { createCollateralPublicationPolicy } from '../app/lib/reviews/publication-policy'
+import { loadReviewDecisions } from './lib/review-decisions'
 
 const OUTPUT_PATH = 'public/blacklist.markets.json'
 const UNHEALTHY_OUTPUT_PATH = 'public/unhealthy.markets.json'
@@ -12,6 +17,8 @@ interface MarketCandidate {
   chainId: number
   uniqueKey: string
   slug: string
+  loanAssetAddress: string | null
+  collateralAssetAddress: string | null
   warnings: Array<{
     type: string
     level: 'YELLOW' | 'RED'
@@ -90,21 +97,9 @@ function resolveAssetLabel(asset: { symbol: string | null, address: string } | n
 }
 
 async function fetchMarkets(skip: number) {
-  const query = `
-    query EnumerateMarkets($first: Int!, $skip: Int!) {
-      markets(first: $first, skip: $skip) {
-        items {
-          uniqueKey: marketId
-          morphoBlue { chain { id } }
-          collateralAsset { symbol address }
-          loanAsset { symbol address }
-          warnings { type level }
-        }
-      }
-    }
-  `
+  const query = QUERY_DATASET_MARKETS
 
-  const response = await fetch(MORPHO_GRAPHQL_URL, {
+  const response = await fetchWithDeadline(MORPHO_GRAPHQL_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -120,40 +115,16 @@ async function fetchMarkets(skip: number) {
     throw new Error(`GraphQL request failed (${response.status})`)
 
   const payload = (await response.json()) as { data?: MarketsResponse, errors?: unknown }
-  if (!payload.data)
+  if (payload.errors || !payload.data)
     throw new Error(`GraphQL response missing data: ${JSON.stringify(payload.errors ?? {})}`)
 
   return payload.data.markets.items
 }
 
 async function fetchUnhealthyPositions(skip: number) {
-  const query = `
-    query EnumerateUnhealthyPositions($first: Int!, $skip: Int!) {
-      marketPositions(
-        first: $first
-        skip: $skip
-        orderBy: HealthFactor
-        orderDirection: Asc
-        where: { healthFactor_lte: 1, borrowShares_gte: "1", marketListed: true }
-      ) {
-        items {
-          healthFactor
-          market {
-            marketId
-            morphoBlue { chain { id } }
-            collateralAsset { symbol address }
-            loanAsset { symbol address }
-          }
-          state {
-            collateralUsd
-            borrowAssetsUsd
-          }
-        }
-      }
-    }
-  `
+  const query = QUERY_DATASET_UNHEALTHY_POSITIONS
 
-  const response = await fetch(MORPHO_GRAPHQL_URL, {
+  const response = await fetchWithDeadline(MORPHO_GRAPHQL_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -169,7 +140,7 @@ async function fetchUnhealthyPositions(skip: number) {
     throw new Error(`GraphQL unhealthy positions request failed (${response.status})`)
 
   const payload = (await response.json()) as { data?: UnhealthyMarketPositionResponse, errors?: unknown }
-  if (!payload.data)
+  if (payload.errors || !payload.data)
     throw new Error(`GraphQL unhealthy positions response missing data: ${JSON.stringify(payload.errors ?? {})}`)
 
   return payload.data.marketPositions.items
@@ -273,6 +244,7 @@ function mergeBlacklistEntries(...groups: BlacklistEntry[][]) {
 }
 
 async function main() {
+  const policy = createCollateralPublicationPolicy(await loadReviewDecisions(), blacklistAssets)
   const candidates: MarketCandidate[] = []
   const generatedAt = new Date().toISOString()
   let skip = 0
@@ -290,6 +262,8 @@ async function main() {
         chainId: market.morphoBlue.chain.id,
         uniqueKey: market.uniqueKey,
         slug,
+        loanAssetAddress: market.loanAsset?.address ?? null,
+        collateralAssetAddress: market.collateralAsset?.address ?? null,
         warnings: market.warnings ?? [],
       })
     }
@@ -305,7 +279,7 @@ async function main() {
       warning.type === 'incorrect_oracle_configuration'
       || warning.type === 'bad_debt_unrealized'
       || warning.type === 'bad_debt_unrealized_market'
-    )))
+    )) || policy.isExcluded(candidate.chainId, candidate.loanAssetAddress) || policy.isExcluded(candidate.chainId, candidate.collateralAssetAddress))
     .map(candidate => ({ chainId: candidate.chainId, uniqueKey: candidate.uniqueKey }))
 
   const manualBlacklist = await readManualBlacklist()

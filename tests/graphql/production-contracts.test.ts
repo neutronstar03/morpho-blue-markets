@@ -21,7 +21,7 @@ describe('production GraphQL contracts (offline snapshot)', () => {
     expect(validate(schema, parse(invalid)).length).toBeGreaterThan(0)
   })
   test('operations live in non-React query modules and are explicitly registered', async () => {
-    for (const glob of ['app/**/*.ts', 'app/**/*.tsx', 'functions/**/*.ts']) {
+    for (const glob of ['app/**/*.ts', 'app/**/*.tsx', 'functions/**/*.ts', 'scripts/**/*.ts']) {
       for (const path of new Bun.Glob(glob).scanSync({ cwd: root.pathname, onlyFiles: true })) {
         const source = readFileSync(new URL(path, root), 'utf8')
         if (!path.startsWith('app/lib/graphql/queries/')) {

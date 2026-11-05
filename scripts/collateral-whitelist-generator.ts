@@ -1,12 +1,12 @@
-import type { RawQueryMarketsByChainResult, SupplyMarketData } from '../app/lib/graphql/queries/markets-by-chain'
 import { mkdir } from 'node:fs/promises'
 import process from 'node:process'
+import blacklistAssets from '../app/lib/blacklist.assets.json'
 import { CHAIN_CAPABILITIES } from '../app/lib/chain-capabilities'
 import { graphqlClient } from '../app/lib/graphql/client'
-import { normalizeMarketOracles } from '../app/lib/graphql/market-oracle'
-import { MarketOrderBy, OrderDirection, QUERY_MARKETS_BY_CHAIN } from '../app/lib/graphql/queries/markets-by-chain'
-import { filterBlacklistedMarkets } from '../app/lib/market-blacklist'
-import { isOracleMisconfiguredWarning } from '../app/lib/morpho/morpho-warnings'
+import { QUERY_COLLATERAL_CANDIDATES } from '../app/lib/graphql/queries/dataset-generation'
+import { createCollateralPublicationPolicy } from '../app/lib/reviews/publication-policy'
+import { parseCollateralCandidates } from './lib/collateral-candidates'
+import { loadReviewDecisions } from './lib/review-decisions'
 
 const OUTPUT_GOOD_PATH = 'public/whitelist.collaterals.json'
 const OUTPUT_UNKNOWN_PATH = 'scripts/.cache/whitelist.collaterals.unknown.json'
@@ -19,14 +19,8 @@ const MIN_CANDIDATE_NET_SUPPLY_APY = 0.01
 const MAX_CANDIDATE_NET_SUPPLY_APY = 6
 const MIN_CANDIDATE_BORROW_USD = 5
 
-// Derived from the shared chain registry; the DefiLlama slug drives the
-// collateral validation keys.
-const CHAINS = CHAIN_CAPABILITIES.flatMap((chain) => {
-  const llamaSlug = chain.providers.defillama
-  if (!llamaSlug)
-    return []
-  return [{ chainId: chain.id, name: chain.name, llamaSlug }]
-})
+// Research discovery uses all supported chains; a price listing is not an approval.
+const CHAINS = CHAIN_CAPABILITIES.map(chain => ({ chainId: chain.id, name: chain.name }))
 
 interface GoodEntry {
   chainId: number
@@ -44,11 +38,6 @@ function normalizeAddress(address: string) {
 
 function nowMs() {
   return Date.now()
-}
-
-function jittered(ms: number) {
-  const spread = Math.max(50, Math.floor(ms * 0.2))
-  return ms + Math.floor(Math.random() * spread)
 }
 
 function parseArgFlag(name: string) {
@@ -83,93 +72,27 @@ function toKey(chainId: number, collateralAddress: string) {
   return `${chainId}:${normalizeAddress(collateralAddress)}`
 }
 
-async function fetchOptimizerMarketsByChain(chainId: number): Promise<SupplyMarketData[]> {
-  const where: any = {
-    chainId_in: [chainId],
-    netSupplyApy_gte: MIN_CANDIDATE_NET_SUPPLY_APY,
-    netSupplyApy_lte: MAX_CANDIDATE_NET_SUPPLY_APY,
-    borrowAssetsUsd_gte: MIN_CANDIDATE_BORROW_USD,
-  }
-
-  const markets: SupplyMarketData[] = []
+async function fetchCollateralCandidates(chainId: number): Promise<string[]> {
+  const addresses: string[] = []
   let skip = 0
   while (true) {
-    const result = await graphqlClient.request<RawQueryMarketsByChainResult>(QUERY_MARKETS_BY_CHAIN, {
-      where,
-      orderBy: MarketOrderBy.NetSupplyApy,
-      orderDirection: OrderDirection.Desc,
+    const result = await graphqlClient.request<unknown>(QUERY_COLLATERAL_CANDIDATES, {
+      where: {
+        chainId_in: [chainId],
+        netSupplyApy_gte: MIN_CANDIDATE_NET_SUPPLY_APY,
+        netSupplyApy_lte: MAX_CANDIDATE_NET_SUPPLY_APY,
+        borrowAssetsUsd_gte: MIN_CANDIDATE_BORROW_USD,
+      },
       first: PAGE_SIZE,
       skip,
     })
-
-    const items = normalizeMarketOracles(result.markets.items)
-    markets.push(...items)
-    if (result.markets.items.length < PAGE_SIZE)
+    const page = parseCollateralCandidates(result, chainId)
+    addresses.push(...page.addresses)
+    if (page.rawCount < PAGE_SIZE)
       break
     skip += PAGE_SIZE
   }
-
-  return filterBlacklistedMarkets(markets, market => ({
-    uniqueKey: market.uniqueKey,
-    loanAssetAddress: market.loanAsset?.address,
-    collateralAssetAddress: market.collateralAsset?.address,
-    loanAssetSymbol: market.loanAsset?.symbol,
-    collateralAssetSymbol: market.collateralAsset?.symbol,
-    oracleAddress: market.oracleAddress,
-    chainId,
-  })).filter(m => !isOracleMisconfiguredWarning(m.warnings))
-}
-
-interface LlamaPriceResponse {
-  coins: Record<string, {
-    decimals?: number
-    symbol?: string
-    price?: number
-    timestamp?: number
-    confidence?: number
-  }>
-}
-
-async function fetchLlamaPricesWithBackoff(keys: string[]): Promise<LlamaPriceResponse> {
-  const maxRetries = 12
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const url = `https://coins.llama.fi/prices/current/${keys.join(',')}`
-    try {
-      const res = await fetch(url, {
-        headers: {
-          accept: 'application/json',
-        },
-      })
-
-      if (res.ok)
-        return (await res.json()) as LlamaPriceResponse
-
-      if (res.status === 429) {
-        const retryAfterRaw = res.headers.get('retry-after')
-        const retryAfterMs = retryAfterRaw ? Number(retryAfterRaw) * 1000 : Number.NaN
-        const base = Number.isFinite(retryAfterMs) ? retryAfterMs : 1_000 * (2 ** Math.min(10, attempt))
-        const waitMs = Math.min(5 * 60_000, jittered(Math.max(1_000, base)))
-        await Bun.sleep(waitMs)
-        continue
-      }
-
-      if (res.status >= 500 && res.status <= 599) {
-        const waitMs = Math.min(3 * 60_000, jittered(1_000 * (2 ** Math.min(10, attempt))))
-        await Bun.sleep(waitMs)
-        continue
-      }
-
-      throw new Error(`DefiLlama HTTP ${res.status}`)
-    }
-    catch (e) {
-      if (attempt === maxRetries)
-        throw e
-      const waitMs = Math.min(3 * 60_000, jittered(500 * (2 ** Math.min(10, attempt))))
-      await Bun.sleep(waitMs)
-    }
-  }
-
-  return { coins: {} }
+  return addresses
 }
 
 async function main() {
@@ -181,15 +104,16 @@ async function main() {
   const unknownCooldownHours = parseArgNumber('--unknown-cooldown-hours', 100)
   const unknownCooldownMs = unknownCooldownHours * 60 * 60 * 1000
 
-  const goodPrev = (resetAll || resetGood)
-    ? []
-    : await readJsonFile<GoodEntry[]>(OUTPUT_GOOD_PATH, [])
+  const decisions = await loadReviewDecisions()
+  const policy = createCollateralPublicationPolicy(decisions, blacklistAssets)
+  const previousFile = Bun.file(OUTPUT_GOOD_PATH)
+  const goodPrev: unknown = resetAll || resetGood || !(await previousFile.exists()) ? [] : await previousFile.json()
   const unknownPrev = (resetAll || resetUnknown)
     ? []
     : await readJsonFile<UnknownEntry[]>(OUTPUT_UNKNOWN_PATH, [])
 
   const goodByKey = new Map<string, GoodEntry>()
-  for (const e of goodPrev) {
+  for (const e of policy.applyWhitelist(goodPrev)) {
     if (!e || !e.chainId || !e.collateralAddress)
       continue
     goodByKey.set(toKey(e.chainId, e.collateralAddress), {
@@ -213,85 +137,37 @@ async function main() {
 
   console.log(`Loaded: ${goodByKey.size} good collaterals, ${unknownByKey.size} unknown collaterals.`)
 
-  const candidates = new Map<string, { chainId: number, collateralAddress: string, llamaSlug: string }>()
-
+  let discovered = 0
   for (const chain of CHAINS) {
-    console.log(`Fetching markets: ${chain.name} (${chain.chainId})...`)
-    const markets = await fetchOptimizerMarketsByChain(chain.chainId)
-    console.log(`  got ${markets.length} candidate markets after filters`)
-
-    for (const m of markets) {
-      const addr = normalizeAddress(m.collateralAsset?.address ?? '')
-      if (!addr)
+    console.log(`Fetching research candidates: ${chain.name} (${chain.chainId})...`)
+    const addresses = await fetchCollateralCandidates(chain.chainId)
+    for (const address of addresses) {
+      const key = toKey(chain.chainId, address)
+      if (policy.isExcluded(chain.chainId, address) || goodByKey.has(key)) {
+        unknownByKey.delete(key)
         continue
-      const key = toKey(chain.chainId, addr)
-      if (goodByKey.has(key))
-        continue
-      if (!recheckUnknown && unknownByKey.has(key))
-        continue
-      candidates.set(key, { chainId: chain.chainId, collateralAddress: addr, llamaSlug: chain.llamaSlug })
-    }
-  }
-
-  // Optional: add unknown entries back for periodic recheck.
-  if (recheckUnknown) {
-    const now = nowMs()
-    for (const [key, entry] of unknownByKey.entries()) {
-      const shouldRecheck = (now - entry.lastCheckedAtMs) >= unknownCooldownMs
-      if (!shouldRecheck)
-        continue
-      const chain = CHAINS.find(c => c.chainId === entry.chainId)
-      if (!chain)
-        continue
-      candidates.set(key, { chainId: entry.chainId, collateralAddress: entry.collateralAddress, llamaSlug: chain.llamaSlug })
-    }
-  }
-
-  console.log(`To validate with DefiLlama: ${candidates.size}`)
-  if (candidates.size === 0)
-    return
-
-  const batchSize = 40
-  const keys = [...candidates.values()].map(c => ({
-    key: `${c.llamaSlug}:${c.collateralAddress}`,
-    chainId: c.chainId,
-    collateralAddress: c.collateralAddress,
-  }))
-
-  let okCount = 0
-  let unknownCount = 0
-
-  for (let i = 0; i < keys.length; i += batchSize) {
-    const batch = keys.slice(i, i + batchSize)
-    const llamaKeys = batch.map(b => b.key)
-    const res = await fetchLlamaPricesWithBackoff(llamaKeys)
-    const coins = res?.coins ?? {}
-
-    for (const item of batch) {
-      const found = coins[item.key]
-      const k = toKey(item.chainId, item.collateralAddress)
-      if (found && Number.isFinite(found.price)) {
-        goodByKey.set(k, { chainId: item.chainId, collateralAddress: item.collateralAddress })
-        unknownByKey.delete(k)
-        okCount++
       }
-      else {
-        const prev = unknownByKey.get(k)
-        const entry: UnknownEntry = {
-          chainId: item.chainId,
-          collateralAddress: item.collateralAddress,
-          firstSeenAtMs: prev?.firstSeenAtMs ?? nowMs(),
-          lastCheckedAtMs: nowMs(),
-        }
-        unknownByKey.set(k, entry)
-        unknownCount++
-      }
+      const previous = unknownByKey.get(key)
+      if (previous && (!recheckUnknown || nowMs() - previous.lastCheckedAtMs < unknownCooldownMs))
+        continue
+      unknownByKey.set(key, {
+        chainId: chain.chainId,
+        collateralAddress: address,
+        firstSeenAtMs: previous?.firstSeenAtMs ?? nowMs(),
+        lastCheckedAtMs: nowMs(),
+      })
+      discovered++
     }
-
-    console.log(`Validated ${Math.min(i + batch.length, keys.length)}/${keys.length} (ok=${okCount}, unknown=${unknownCount})`)
   }
+  for (const [key, entry] of unknownByKey) {
+    if (goodByKey.has(key) || policy.isExcluded(entry.chainId, entry.collateralAddress))
+      unknownByKey.delete(key)
+  }
+  for (const conflict of policy.conflicts)
+    console.warn(`Existing exclusion preserved over positive review: ${conflict.chainId}:${conflict.collateralAddress}`)
+  console.log(`Queued ${discovered} discovery updates for research; only explicit positive decisions add approvals.`)
 
-  const goodOut = [...goodByKey.values()]
+  const goodOut = policy.applyWhitelist([...goodByKey.values()])
     .sort((a, b) => a.chainId - b.chainId || a.collateralAddress.localeCompare(b.collateralAddress))
   const unknownOut = [...unknownByKey.values()]
     .sort((a, b) => a.chainId - b.chainId || a.collateralAddress.localeCompare(b.collateralAddress))
