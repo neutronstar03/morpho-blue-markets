@@ -18,6 +18,7 @@ import {
   onRequestPost as userBlacklistPost,
   onRequestPut as userBlacklistPut,
 } from './functions/api/user-blacklist'
+import { onRequestGet as vaultAprs } from './functions/api/vault-aprs'
 import { onRequestPost as analyticsProxyPost, onRequest as analyticsProxyReject } from './functions/ev'
 
 function versionJsonPlugin(gitSha: string | null): Plugin {
@@ -60,6 +61,7 @@ const DEV_API_HANDLERS: Record<string, DevApiRoute> = {
   '/api/collateral-review': { GET: collateralReview as unknown as PagesFunctionHandler },
   '/api/popular-loan-assets': { GET: popularLoanAssets as unknown as PagesFunctionHandler },
   '/api/reviewed-collaterals': { GET: reviewedCollaterals as unknown as PagesFunctionHandler },
+  '/api/vault-aprs': { GET: vaultAprs as unknown as PagesFunctionHandler },
   '/api/token-liquidity': { GET: tokenLiquidity as unknown as PagesFunctionHandler },
   '/api/user-blacklist': {
     GET: userBlacklistGet as unknown as PagesFunctionHandler,

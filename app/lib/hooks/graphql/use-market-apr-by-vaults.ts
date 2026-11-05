@@ -1,40 +1,13 @@
-import type { QueryVaultsV1Result, QueryVaultsV2Result, SupplyVaultV1Data, SupplyVaultV2Data } from '~/lib/graphql/queries/vaults-by-asset'
-import { OrderDirection, QUERY_VAULTS_V1, QUERY_VAULTS_V2, VaultOrderBy, VaultV2OrderBy } from '~/lib/graphql/queries/vaults-by-asset'
+import type { SupplyVaultData, VaultAprResponse } from '../../graphql/vault-aprs'
+import { useQuery } from '@tanstack/react-query'
 import { trimTrailingZerosDecimalString } from '~/lib/optimizer/supply-optimizer-ui-utils'
-import { graphqlClient } from '../../graphql/client'
+import { fetchWithDeadline, graphqlRetryDelay, shouldRetryGraphqlRequest } from '../../graphql/request-policy'
+import { fetchSupplyVaults } from '../../graphql/vault-aprs'
+
+export type { SupplyVaultData } from '../../graphql/vault-aprs'
 
 const MAINNET_CHAIN_ID = 1
 export const BLOCKED_VAULT_ASSET_SYMBOLS = new Set(['APXUSD', 'AUSD', 'FXUSD'])
-
-interface VaultV1Filters {
-  chainId_in?: number[]
-  totalAssetsUsd_gte?: number
-  listed?: boolean
-}
-
-interface VaultV2Filters {
-  chainId_in?: number[]
-  totalAssetsUsd_gte?: number
-  listed?: boolean
-}
-
-export interface SupplyVaultData {
-  address: string
-  name: string
-  symbol: string
-  whitelisted: boolean
-  chain: {
-    id: number
-  }
-  asset: {
-    address: string
-    symbol: string
-    decimals: number
-  }
-  avgNetApy?: number | null
-  liquidityUsd?: number | null
-  version: 'v1' | 'v2'
-}
 
 export interface MarketAprByVaultsConfig {
   minNetApy?: number
@@ -58,34 +31,6 @@ function toAprInput(netApy: number): string {
 
 function normalizeAssetSymbol(symbol?: string | null) {
   return (symbol ?? '').trim().toUpperCase()
-}
-
-function normalizeVaultV1(vault: SupplyVaultV1Data): SupplyVaultData {
-  return {
-    address: vault.address,
-    name: vault.name,
-    symbol: vault.symbol,
-    whitelisted: vault.whitelisted,
-    chain: vault.chain,
-    asset: vault.asset,
-    avgNetApy: vault.state?.avgNetApy,
-    liquidityUsd: vault.liquidity?.usd ?? vault.state?.totalAssetsUsd,
-    version: 'v1',
-  }
-}
-
-function normalizeVaultV2(vault: SupplyVaultV2Data): SupplyVaultData {
-  return {
-    address: vault.address,
-    name: vault.name,
-    symbol: vault.symbol,
-    whitelisted: vault.whitelisted,
-    chain: vault.chain,
-    asset: vault.asset,
-    avgNetApy: vault.avgNetApy,
-    liquidityUsd: vault.liquidityUsd ?? vault.totalAssetsUsd,
-    version: 'v2',
-  }
 }
 
 export function filterEligibleVaults(vaults: SupplyVaultData[], config: MarketAprByVaultsConfig = {}) {
@@ -169,47 +114,38 @@ export function listPopularVaultAssetSymbols(vaults: SupplyVaultData[]) {
     .map(([symbol, count]) => ({ symbol, count }))
 }
 
-export async function fetchMarketAprByVaults(chainIds: number[], config: MarketAprByVaultsConfig = {}, signal?: AbortSignal) {
-  const minLiquidityUsd = config.minLiquidityUsd ?? 50_000
-
-  const whereV1: VaultV1Filters = {
-    chainId_in: chainIds,
-    totalAssetsUsd_gte: minLiquidityUsd,
-    listed: true,
-  }
-  const whereV2: VaultV2Filters = {
-    chainId_in: chainIds,
-    totalAssetsUsd_gte: minLiquidityUsd,
-    listed: true,
-  }
-
-  const [v1Result, v2Result] = await Promise.all([
-    graphqlClient.request<QueryVaultsV1Result>({ document: QUERY_VAULTS_V1, variables: {
-      where: whereV1,
-      orderBy: VaultOrderBy.AvgNetApy,
-      orderDirection: OrderDirection.Desc,
-      first: 200,
-      skip: 0,
-    }, signal }),
-    graphqlClient.request<QueryVaultsV2Result>({ document: QUERY_VAULTS_V2, variables: {
-      where: whereV2,
-      orderBy: VaultV2OrderBy.Address,
-      orderDirection: OrderDirection.Desc,
-      first: 200,
-      skip: 0,
-    }, signal }),
-  ])
-
-  const allVaults = [
-    ...(v1Result.vaults.items ?? []).map(normalizeVaultV1),
-    ...(v2Result.vaultV2s.items ?? []).map(normalizeVaultV2),
-  ]
+function deriveVaultAprs(allVaults: SupplyVaultData[], chainIds: number[], config: MarketAprByVaultsConfig) {
   const eligibleVaults = filterEligibleVaults(allVaults, config)
+  return { allVaults, eligibleVaults, effectiveByChainId: buildEffectiveVaultAprMap(eligibleVaults, chainIds), popularAssets: listPopularVaultAssetSymbols(eligibleVaults) }
+}
 
-  return {
-    allVaults,
-    eligibleVaults,
-    effectiveByChainId: buildEffectiveVaultAprMap(eligibleVaults, chainIds),
-    popularAssets: listPopularVaultAssetSymbols(eligibleVaults),
-  }
+export async function fetchMarketAprByVaults(chainIds: number[], config: MarketAprByVaultsConfig = {}, signal?: AbortSignal) {
+  return deriveVaultAprs(await fetchSupplyVaults(chainIds, signal), chainIds, config)
+}
+
+// Opt-in hook: mounting it owns these requests; it does not preload on unrelated pages.
+export function useMarketAprByVaults(chainIds: number[], config: MarketAprByVaultsConfig = {}) {
+  const chains = [...new Set(chainIds)].sort((a, b) => a - b)
+  const edge = useQuery({
+    queryKey: ['edge-cached', 'vault-aprs'],
+    queryFn: async ({ signal }) => {
+      const response = await fetchWithDeadline('/api/vault-aprs', { signal })
+      if (!response.ok)
+        throw new Error(`Vault APR edge request failed: ${response.status}`)
+      return await response.json() as VaultAprResponse
+    },
+    enabled: chains.length > 0,
+    staleTime: 120_000,
+    retry: false,
+  })
+  return useQuery({
+    queryKey: ['vault-aprs', chains],
+    queryFn: ({ signal }) => fetchSupplyVaults(chains, signal),
+    enabled: chains.length > 0,
+    staleTime: 120_000,
+    placeholderData: edge.data?.vaults.filter(vault => chains.includes(vault.chain.id)),
+    select: vaults => deriveVaultAprs(vaults, chains, config),
+    retry: shouldRetryGraphqlRequest,
+    retryDelay: graphqlRetryDelay,
+  })
 }
