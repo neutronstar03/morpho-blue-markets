@@ -11,6 +11,7 @@ import { cn } from '~/lib/utils'
 import { SupplyAprOptimizerForm } from '~/pages/home/supply-apr-optimizer/optimizer-form'
 import { SupplyAprOptimizerResults } from '~/pages/home/supply-apr-optimizer/optimizer-results'
 import { useSupplyAprOptimizerController } from '~/pages/home/supply-apr-optimizer/use-supply-apr-optimizer-controller'
+import { VaultYieldComparison } from '~/pages/home/supply-apr-optimizer/vault-yield-comparison'
 
 const OPEN_SUPPLY_APR_OPTIMIZER_EVENT = 'open-supply-apr-optimizer'
 
@@ -129,6 +130,12 @@ function ExpandedSupplyAprOptimizer({ onCollapse }: { onCollapse: () => void }) 
             <p role="status" aria-label="Optimizer status" aria-live="polite" aria-atomic="true" className="sr-only">
               {ctx.run.isRunning ? 'Optimization in progress.' : ctx.run.error ? 'Optimization could not complete.' : displayResult ? 'Optimization complete. Results are available.' : 'Optimizer ready.'}
             </p>
+            <VaultYieldComparison
+              chainId={optimizerChainId ?? 1}
+              chainName={optimizerChainName ?? 'Ethereum'}
+              assetAddress={selectedOption?.address ?? ctx.selection.loanAssetAddress}
+              assetSymbol={selectedOption?.symbol}
+            />
             {!userAddress && (
               <div className="text-sm text-gray-300">Connect your wallet to compute an optimized supply plan.</div>
             )}
