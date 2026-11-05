@@ -68,6 +68,7 @@ export function MarketFilters({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         <input
           type="text"
+          aria-label="Search markets"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="Search assets..."
@@ -91,7 +92,7 @@ export function MarketFilters({
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-medium text-gray-400 hidden sm:inline">Chain:</span>
           <Select value={chainFilter} onValueChange={v => setChainFilter(v as MarketChainFilter)}>
-            <SelectTrigger className="h-9 w-auto min-w-[5rem] bg-gray-700 border-gray-600 text-white text-sm">
+            <SelectTrigger aria-label="Chain" className="h-9 w-auto min-w-[5rem] bg-gray-700 border-gray-600 text-white text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -107,7 +108,7 @@ export function MarketFilters({
         <div className="hidden sm:flex items-center gap-1.5">
           <span className="text-xs font-medium text-gray-400">Filter:</span>
           <Select value={aprType} onValueChange={v => onChangeDirection(v as MarketSide)}>
-            <SelectTrigger className="h-9 w-auto min-w-[6rem] bg-gray-700 border-gray-600 text-white text-sm">
+            <SelectTrigger aria-label="APY type" className="h-9 w-auto min-w-[6rem] bg-gray-700 border-gray-600 text-white text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -116,7 +117,7 @@ export function MarketFilters({
             </SelectContent>
           </Select>
           <Select value={comparison} onValueChange={v => setComparison(v as '>' | '<')}>
-            <SelectTrigger className="h-9 w-auto min-w-[5rem] justify-center bg-gray-700 border-gray-600 text-white text-base font-semibold">
+            <SelectTrigger aria-label="APY comparison" className="h-9 w-auto min-w-[5rem] justify-center bg-gray-700 border-gray-600 text-white text-base font-semibold">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -126,6 +127,7 @@ export function MarketFilters({
           </Select>
           <input
             type="number"
+            aria-label={`${aprType === 'supply' ? 'Supply' : 'Borrow'} APY threshold percent`}
             value={aprValue}
             onChange={e => setAprValue(Number(e.target.value))}
             className="h-9 bg-gray-700 border border-gray-600 rounded-md px-3 text-sm text-white w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -148,7 +150,7 @@ export function MarketFilters({
                 <h4 className="text-sm font-medium text-white">Filter</h4>
                 <div className="flex items-center gap-2">
                   <Select value={aprType} onValueChange={v => onChangeDirection(v as MarketSide)}>
-                    <SelectTrigger className="h-9 w-36 bg-gray-700 border-gray-600 text-white text-sm">
+                    <SelectTrigger aria-label="APY type" className="h-9 w-36 bg-gray-700 border-gray-600 text-white text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -157,7 +159,7 @@ export function MarketFilters({
                     </SelectContent>
                   </Select>
                   <Select value={comparison} onValueChange={v => setComparison(v as '>' | '<')}>
-                    <SelectTrigger className="h-9 w-14 justify-center bg-gray-700 border-gray-600 text-white text-base font-semibold">
+                    <SelectTrigger aria-label="APY comparison" className="h-9 w-14 justify-center bg-gray-700 border-gray-600 text-white text-base font-semibold">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -168,6 +170,7 @@ export function MarketFilters({
                   <div className="flex items-center gap-1">
                     <input
                       type="number"
+                      aria-label={`${aprType === 'supply' ? 'Supply' : 'Borrow'} APY threshold percent`}
                       value={aprValue}
                       onChange={e => setAprValue(Number(e.target.value))}
                       className="h-9 w-16 bg-gray-700 border border-gray-600 rounded-md px-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -185,7 +188,7 @@ export function MarketFilters({
         <div className="hidden sm:flex items-center gap-1.5 ml-auto">
           <span className="text-xs font-medium text-gray-400">Order by:</span>
           <Select value={orderBy} onValueChange={v => setOrderBy(v as MarketOrderBy)}>
-            <SelectTrigger className="h-9 w-auto min-w-[6rem] bg-gray-700 border-gray-600 text-white text-sm">
+            <SelectTrigger aria-label="Sort markets by" className="h-9 w-auto min-w-[6rem] bg-gray-700 border-gray-600 text-white text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -195,7 +198,7 @@ export function MarketFilters({
             </SelectContent>
           </Select>
           <Select value={orderDirection} onValueChange={v => setOrderDirection(v as OrderDirection)}>
-            <SelectTrigger className="h-9 w-auto min-w-[4rem] bg-gray-700 border-gray-600 text-white text-sm">
+            <SelectTrigger aria-label="Sort direction" className="h-9 w-auto min-w-[4rem] bg-gray-700 border-gray-600 text-white text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -218,7 +221,7 @@ export function MarketFilters({
               <div className="space-y-3">
                 <h4 className="text-sm font-medium text-white">Order by</h4>
                 <Select value={orderBy} onValueChange={v => setOrderBy(v as MarketOrderBy)}>
-                  <SelectTrigger className="h-9 w-full bg-gray-700 border-gray-600 text-white text-sm">
+                  <SelectTrigger aria-label="Sort markets by" className="h-9 w-full bg-gray-700 border-gray-600 text-white text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -228,7 +231,7 @@ export function MarketFilters({
                   </SelectContent>
                 </Select>
                 <Select value={orderDirection} onValueChange={v => setOrderDirection(v as OrderDirection)}>
-                  <SelectTrigger className="h-9 w-full bg-gray-700 border-gray-600 text-white text-sm">
+                  <SelectTrigger aria-label="Sort direction" className="h-9 w-full bg-gray-700 border-gray-600 text-white text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

@@ -170,7 +170,11 @@ describe('form label associations', () => {
       />,
     )
 
-    const deposit = screen.getByLabelText('Additional amount to supply')
+    expect(screen.getByRole('combobox', { name: 'Asset to optimize' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Max Yield', pressed: true })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Max Deploy', pressed: false })).toBeInTheDocument()
+
+    const deposit = screen.getByLabelText('Additional amount to supply (USDC)')
     expect(deposit.tagName).toBe('INPUT')
     expect(deposit.id).toBeTruthy()
 

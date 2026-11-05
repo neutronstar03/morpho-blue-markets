@@ -9,6 +9,7 @@ import { useMarketPreview } from '~/lib/hooks/rpc/use-market-preview'
 import { useMarket } from '~/lib/hooks/rpc/use-morpho'
 import { useMarketRiskStatus } from '~/lib/market-risk/hooks'
 import { DepositForm } from './deposit-form'
+import { MarketActionTabs } from './market-action-tabs'
 import { MarketPosition } from './market-position'
 import { WithdrawForm } from './withdraw-form'
 
@@ -129,56 +130,15 @@ export function MarketActions({ market }: MarketActionsProps) {
           )}
         </div>
 
-        <div className="mb-4 flex gap-2 sm:mb-6 sm:gap-3">
-          <button
-            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
-              activeTab === 'deposit'
-                ? isSupplyBlocked ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
-                : isSupplyBlocked ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer'
-            }`}
-            onClick={() => {
-              if (!isSupplyBlocked)
-                setActiveTab('deposit')
-            }}
-            disabled={isSupplyBlocked}
-          >
-            Supply
-          </button>
-          <button
-            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
-              activeTab === 'withdraw'
-                ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer'
-            }`}
-            onClick={() => setActiveTab('withdraw')}
-          >
-            Withdraw
-          </button>
-        </div>
-
-        <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-          {activeTab === 'deposit'
-            ? isSupplyBlocked
-              ? (
-                  <div className="rounded-lg border border-red-700/30 bg-red-900/10 p-4 text-sm text-red-200">
-                    {supplyBlockedMessage}
-                  </div>
-                )
-              : (
-                  <DepositForm
-                    market={market}
-                    loanTokenSymbol={market.loanAsset.symbol}
-                    prefill={depositPrefill}
-                  />
-                )
-            : (
-                <WithdrawForm
-                  market={market}
-                  loanTokenSymbol={market.loanAsset.symbol}
-                  prefill={withdrawPrefill}
-                />
-              )}
-        </div>
+        <MarketActionTabs
+          value={activeTab}
+          onChange={setActiveTab}
+          supplyBlocked={isSupplyBlocked}
+          supplyPanel={isSupplyBlocked
+            ? <div className="rounded-lg border border-red-700/30 bg-red-900/10 p-4 text-sm text-red-200">{supplyBlockedMessage}</div>
+            : <DepositForm market={market} loanTokenSymbol={market.loanAsset.symbol} prefill={depositPrefill} />}
+          withdrawPanel={<WithdrawForm market={market} loanTokenSymbol={market.loanAsset.symbol} prefill={withdrawPrefill} />}
+        />
 
         {!address && !isViewingWallet && (
           <p className="text-sm text-gray-400 mt-4 text-center">

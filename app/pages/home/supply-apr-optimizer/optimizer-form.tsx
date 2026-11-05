@@ -81,6 +81,7 @@ export function SupplyAprOptimizerForm({
   optimizeLoading,
   optimizeLabel,
 }: SupplyAprOptimizerFormProps) {
+  const assetInputId = useId()
   const marketAprInputId = useId()
   const depositAmountInputId = useId()
   const maxMarketsInputId = useId()
@@ -92,7 +93,7 @@ export function SupplyAprOptimizerForm({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-2 md:gap-4 items-start" data-testid="supply-apr-optimizer-form">
       <div className="flex flex-col gap-1.5 md:gap-2">
         <div className="h-5 flex items-center">
-          <Label>Asset to optimize</Label>
+          <Label htmlFor={assetInputId}>Asset to optimize</Label>
         </div>
         <div className="flex gap-2">
           <Select value={optimizerChainId != null ? String(optimizerChainId) : ''} onValueChange={value => onChangeOptimizerChain(Number(value))}>
@@ -130,7 +131,7 @@ export function SupplyAprOptimizerForm({
             value={selectedOption?.address ?? selectedLoanAssetAddress ?? ''}
             onValueChange={onChangeLoanAsset}
           >
-            <SelectTrigger className="h-10 min-w-0 flex-1 bg-gray-900 border-gray-700 text-white text-sm data-[placeholder]:text-gray-500">
+            <SelectTrigger id={assetInputId} className="h-10 min-w-0 flex-1 bg-gray-900 border-gray-700 text-white text-sm data-[placeholder]:text-gray-500">
               <SelectValue placeholder="Select an asset" />
             </SelectTrigger>
             <SelectContent>
@@ -232,9 +233,10 @@ export function SupplyAprOptimizerForm({
             )}
           />
         </div>
-        <div className="grid grid-cols-2 h-10 overflow-hidden rounded-md border border-gray-700 bg-gray-900">
+        <div role="group" aria-label="Optimizer strategy" className="grid grid-cols-2 h-10 overflow-hidden rounded-md border border-gray-700 bg-gray-900">
           <button
             type="button"
+            aria-pressed={strategy === 'maxYield'}
             onClick={() => onChangeStrategy('maxYield')}
             className={`text-sm font-medium transition-colors cursor-pointer ${strategy === 'maxYield' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
           >
@@ -242,6 +244,7 @@ export function SupplyAprOptimizerForm({
           </button>
           <button
             type="button"
+            aria-pressed={strategy === 'maxDeploy'}
             onClick={() => onChangeStrategy('maxDeploy')}
             className={`text-sm font-medium transition-colors cursor-pointer ${strategy === 'maxDeploy' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
           >
@@ -255,7 +258,11 @@ export function SupplyAprOptimizerForm({
 
       <div className="flex flex-col gap-1.5 md:gap-2">
         <div className="h-5 flex items-center">
-          <Label htmlFor={depositAmountInputId}>Additional amount to supply</Label>
+          <Label htmlFor={depositAmountInputId}>
+            Additional amount to supply (
+            {symbol}
+            )
+          </Label>
         </div>
         <div className="relative">
           <Input

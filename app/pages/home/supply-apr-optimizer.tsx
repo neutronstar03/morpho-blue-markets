@@ -126,6 +126,9 @@ function ExpandedSupplyAprOptimizer({ onCollapse }: { onCollapse: () => void }) 
       <Collapsible.Root open={isExpanded} onOpenChange={setIsExpanded}>
         <Collapsible.Content className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
           <div className="p-4 sm:p-6 space-y-6">
+            <p role="status" aria-label="Optimizer status" aria-live="polite" aria-atomic="true" className="sr-only">
+              {ctx.run.isRunning ? 'Optimization in progress.' : ctx.run.error ? 'Optimization could not complete.' : displayResult ? 'Optimization complete. Results are available.' : 'Optimizer ready.'}
+            </p>
             {!userAddress && (
               <div className="text-sm text-gray-300">Connect your wallet to compute an optimized supply plan.</div>
             )}
@@ -172,7 +175,7 @@ function ExpandedSupplyAprOptimizer({ onCollapse }: { onCollapse: () => void }) 
                 />
 
                 {ctx.run.error && (
-                  <div className="text-sm text-red-300 border border-red-900/40 bg-red-950/20 rounded-md p-3">
+                  <div role="alert" className="text-sm text-red-300 border border-red-900/40 bg-red-950/20 rounded-md p-3">
                     {ctx.run.error}
                   </div>
                 )}

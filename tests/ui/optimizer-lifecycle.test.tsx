@@ -16,7 +16,7 @@ vi.mock('../../app/pages/home/supply-apr-optimizer/use-supply-apr-optimizer-cont
   useSupplyAprOptimizerController: () => {
     const ctx = useSupplyAprOptimizer()
     useQuery({ queryKey: ['manual-positions'], queryFn: requests.manual, refetchInterval: 1000 })
-    return { ctx, ownedLoanAssetOptions: [], hasSomethingToClear: !!ctx.selection.loanAssetAddress }
+    return { ctx, userAddress: `0x${'0'.repeat(40)}`, ownedLoanAssetOptions: [], hasSomethingToClear: !!ctx.selection.loanAssetAddress, displayResult: ctx.result, topMarketsQuery: { isLoading: false, isFetching: false }, getDefaultMarketAprByAssetSymbol: () => '10' }
   },
 }))
 vi.mock('../../app/pages/home/supply-apr-optimizer/optimizer-form', () => ({ SupplyAprOptimizerForm: () => null }))
@@ -35,6 +35,17 @@ function SavedSelection() {
   return <output>{ctx.selection.loanAssetAddress}</output>
 }
 
+function RunControls() {
+  const ctx = useSupplyAprOptimizer()
+  return (
+    <>
+      <button onClick={() => ctx.beginRun()}>Start test run</button>
+      <button onClick={() => ctx.applyPrefetchedResult({ current: { totalAssets: 0n, blendedAprWad: 0n, blendedApyWad: 0n }, optimized: { totalAssets: 0n, blendedAprWad: 0n, blendedApyWad: 0n }, positions: [], iterations: 0, unallocatedNewDepositAssets: 0n, infeasibleWithdrawAssets: 0n })}>Finish test run</button>
+      <button onClick={() => ctx.finishRun(ctx.run.runId, undefined, 'Enter a valid amount')}>Fail test run</button>
+    </>
+  )
+}
+
 function setup(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
   return render(
@@ -45,6 +56,7 @@ function setup(path: string) {
           <Navigation />
           <SupplyAprOptimizer />
           <SavedSelection />
+          <RunControls />
         </SupplyAprOptimizerProvider>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -119,4 +131,23 @@ describe('freshness updates', () => {
     expect(commits).toHaveBeenCalledTimes(2)
     expect(screen.getByText('Filtered rows')).toBeInTheDocument()
   })
+})
+
+it('announces optimizer start/completion and actionable errors without moving focus', () => {
+  setup('/')
+  fireEvent.click(screen.getAllByRole('button', { name: 'Expand Supply APR optimizer' })[0])
+  expect(screen.getByRole('status', { name: 'Optimizer status' })).toHaveTextContent('Optimizer ready')
+  const start = screen.getByRole('button', { name: 'Start test run' })
+  start.focus()
+  fireEvent.click(start)
+  expect(screen.getByRole('status', { name: 'Optimizer status' })).toHaveTextContent('Optimization in progress')
+  expect(start).toHaveFocus()
+  const finish = screen.getByRole('button', { name: 'Finish test run' })
+  finish.focus()
+  fireEvent.click(finish)
+  expect(screen.getByRole('status', { name: 'Optimizer status' })).toHaveTextContent('Optimization complete')
+  expect(finish).toHaveFocus()
+  fireEvent.click(start)
+  fireEvent.click(screen.getByRole('button', { name: 'Fail test run' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter a valid amount')
 })

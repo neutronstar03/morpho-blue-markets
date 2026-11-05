@@ -37,8 +37,9 @@ export function MarketTable({
   const colors = getMarketSideColors(rateType)
 
   return (
-    <div className="overflow-x-auto">
+    <div role="region" aria-label="Market table, scroll horizontally for all columns" tabIndex={0} className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-700">
+        <caption className="sr-only">Morpho markets</caption>
         <thead className={colors.background}>
           <tr>
             <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>

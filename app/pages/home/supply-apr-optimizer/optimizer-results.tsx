@@ -61,8 +61,9 @@ export function SupplyAprOptimizerResults({
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-gray-700 rounded-md">
+      <div role="region" aria-label="Optimizer results, scroll horizontally for all columns" tabIndex={0} className="overflow-x-auto border border-gray-700 rounded-md">
         <table className="min-w-full divide-y divide-gray-700" data-testid="supply-apr-optimizer-result-table">
+          <caption className="sr-only">Supply optimizer allocation results</caption>
           <thead className="bg-gray-800/40">
             <tr>
               <th className="px-3 sm:px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market</th>
