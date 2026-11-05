@@ -5,6 +5,7 @@ import { CollapsibleCardHeader } from '~/components/collapsible-card-header'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { trackEvent } from '~/lib/analytics'
+import { useSupplyAprOptimizer } from '~/lib/contexts/optimizer.context'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 import { cn } from '~/lib/utils'
 import { SupplyAprOptimizerForm } from '~/pages/home/supply-apr-optimizer/optimizer-form'
@@ -22,6 +23,33 @@ export function SupplyAprOptimizer() {
     return () => window.removeEventListener(OPEN_SUPPLY_APR_OPTIMIZER_EVENT, openOptimizer)
   }, [setIsExpanded])
 
+  const ctx = useSupplyAprOptimizer()
+  const toggle = () => {
+    if (isExpanded && ctx.run.isRunning)
+      ctx.cancelRun(ctx.run.runId)
+    setIsExpanded(value => !value)
+  }
+
+  if (isExpanded)
+    return <ExpandedSupplyAprOptimizer onCollapse={toggle} />
+
+  const canClear = !!ctx.selection.loanAssetAddress || ctx.inputs.newDepositAmount != null || !!ctx.result || !!ctx.run.error
+  return (
+    <Card className="mb-6" data-testid="supply-apr-optimizer-card">
+      <CollapsibleCardHeader
+        title="Supply APR optimizer"
+        subtitle="Suggests how to rebalance your existing supply to improve APR."
+        isExpanded={false}
+        onToggle={toggle}
+        actions={canClear && <Button type="button" variant="outline" size="sm" onClick={ctx.clear}>Clear</Button>}
+      />
+    </Card>
+  )
+}
+
+function ExpandedSupplyAprOptimizer({ onCollapse }: { onCollapse: () => void }) {
+  const isExpanded = true
+  const setIsExpanded = onCollapse
   const {
     ctx,
     userAddress,
@@ -70,7 +98,7 @@ export function SupplyAprOptimizer() {
         title="Supply APR optimizer"
         subtitle="Suggests how to rebalance your existing supply to improve APR."
         isExpanded={isExpanded}
-        onToggle={() => setIsExpanded(v => !v)}
+        onToggle={onCollapse}
         actions={hasSomethingToClear && (
           <Button
             type="button"

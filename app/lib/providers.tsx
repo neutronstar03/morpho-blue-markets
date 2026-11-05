@@ -11,22 +11,21 @@ import { NetworkProvider } from './contexts/network'
 import { SupplyAprOptimizerProvider } from './contexts/optimizer.context'
 import { TransactionFeedbackProvider } from './contexts/transaction-feedback.context'
 import { ViewingWalletProvider } from './contexts/viewing-wallet'
+import { HomeMagicOptimizerEffects } from './home-magic-optimizer-effects'
 import { useAnalytics } from './hooks/use-analytics'
-import { useHomeMagicOptimizerScan } from './hooks/use-home-magic-optimizer-scan'
 import { useMarketBlacklistPreload } from './market-blacklist'
 import { useOracleProvidersPreload } from './oracle-providers'
 import { useUnhealthyMarketsPreload } from './unhealthy-markets'
 import { useUserBlacklistSyncEngine } from './user-blacklist-sync'
 import { config } from './wagmi'
 
-function HomeMagicOptimizerEffects() {
+function GlobalDataEffects() {
   // Runs background magic scan side effects from inside provider context.
   // This component intentionally renders nothing.
   useCollateralWhitelistPreload()
   useMarketBlacklistPreload()
   useUnhealthyMarketsPreload()
   useOracleProvidersPreload()
-  useHomeMagicOptimizerScan()
   useAnalytics()
   return null
 }
@@ -61,6 +60,7 @@ export function Providers({ children }: { children: ReactNode }) {
             <ViewingWalletProvider>
               <SupplyAprOptimizerProvider>
                 <BatchWithdrawProvider>
+                  <GlobalDataEffects />
                   <HomeMagicOptimizerEffects />
                   <BlacklistSyncEffects />
                   <RainbowKitProvider theme={darkTheme()}>{children}</RainbowKitProvider>

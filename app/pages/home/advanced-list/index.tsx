@@ -2,12 +2,12 @@ import type { MarketChainFilter, MarketData, MarketSide } from './shared'
 import type { MorphoMarket, MarketFilters as TypeMarketFilters } from '~/lib/hooks/graphql/use-list-markets'
 import type { LiveAprMarketInput } from '~/lib/hooks/rpc/use-live-market-apr'
 import type { MarketRiskInput } from '~/lib/market-risk/types'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useAccount } from 'wagmi'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { getSupportedChainName, supportedChainIdMap, supportedChainMap } from '~/lib/addresses'
-import { formatMarketSize, formatTimeAgo } from '~/lib/formatters'
+import { formatMarketSize } from '~/lib/formatters'
 import {
   MarketOrderBy,
   OrderDirection,
@@ -19,6 +19,7 @@ import { useRefreshWithCooldown } from '~/lib/hooks/use-refresh-with-cooldown'
 import { useMarketRiskStatusMapWithCollateralReviews } from '~/lib/market-risk/hooks'
 import { OpportunityRecap } from '~/pages/home/opportunity-recap'
 import { MarketFilters } from './market-filters'
+import { MarketFreshnessLabel } from './market-freshness-label'
 import { MarketTable } from './market-table'
 import { getMarketSideColors } from './shared'
 
@@ -206,18 +207,7 @@ export function AdvancedList() {
 
   const { aprByMarketKey } = useLiveMarketApr(liveAprMarkets, { chainId: liveChainId })
 
-  const [timeAgo, setTimeAgo] = useState('')
   const { handleRefresh, isRefreshing, isCooldown } = useRefreshWithCooldown(refetch)
-
-  useEffect(() => {
-    if (dataUpdatedAt) {
-      setTimeAgo(formatTimeAgo(dataUpdatedAt))
-      const interval = setInterval(() => {
-        setTimeAgo(formatTimeAgo(dataUpdatedAt))
-      }, 5000)
-      return () => clearInterval(interval)
-    }
-  }, [dataUpdatedAt])
 
   const colors = getMarketSideColors(displayRateType)
 
@@ -226,12 +216,7 @@ export function AdvancedList() {
       <div className={`p-4 border-b ${colors.border} flex items-center`}>
         <div className="flex flex-col items-start space-y-1 md:flex-row md:items-center md:space-x-4 md:space-y-0">
           <h2 className="text-xl font-bold text-white">Markets</h2>
-          <span className="hidden md:inline-block text-sm text-gray-400 tabular-nums pr-4 w-32 text-right">
-            {timeAgo || '—'}
-          </span>
-          <span className="md:hidden text-xs text-gray-500">
-            {timeAgo || '—'}
-          </span>
+          <MarketFreshnessLabel dataUpdatedAt={dataUpdatedAt} />
         </div>
         <div className="ml-auto flex items-center gap-2">
           {displayRateType === 'supply' && (
