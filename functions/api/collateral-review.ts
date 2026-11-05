@@ -115,10 +115,10 @@ function normalizeRank(value: unknown) {
   if (value == null)
     return null
   const rank = Number(value)
-  return Number.isFinite(rank) && rank >= 1 && rank <= 5 ? Math.round(rank) : null
+  return Number.isInteger(rank) && rank >= 0 && rank <= 5 ? rank : null
 }
 
-function normalizeOracleReview(raw: unknown, chainId: number, oracleAddress: string): OracleReview | null {
+export function normalizeOracleReview(raw: unknown, chainId: number, oracleAddress: string): OracleReview | null {
   if (!raw || typeof raw !== 'object')
     return null
 
