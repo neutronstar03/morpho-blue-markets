@@ -1,26 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { gql } from 'graphql-request'
 import { graphqlClient } from '~/lib/graphql/client'
+import { GetMarketLiquidationCount, parseLiquidationCount } from '~/lib/graphql/queries/market-liquidations'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
-
-const GetMarketLiquidationCount = gql`
-  query GetMarketLiquidationCount($uniqueKey: String!, $chainId: Int!) {
-    transactions(
-      first: 1
-      where: { marketUniqueKey_in: [$uniqueKey], chainId_in: [$chainId], type_in: [MarketLiquidation] }
-    ) {
-      pageInfo { countTotal }
-    }
-  }
-`
-
-interface QueryResult {
-  transactions: {
-    pageInfo: {
-      countTotal: number
-    }
-  }
-}
 
 export function useMarketLiquidations(uniqueKey?: string, chainId?: number) {
   return useQuery<number>({
@@ -29,12 +10,12 @@ export function useMarketLiquidations(uniqueKey?: string, chainId?: number) {
       if (!uniqueKey || !chainId)
         return 0
 
-      const result = await graphqlClient.request<QueryResult>(
+      const result = await graphqlClient.request<unknown>(
         GetMarketLiquidationCount,
         { uniqueKey, chainId },
       )
 
-      return result.transactions.pageInfo.countTotal
+      return parseLiquidationCount(result)
     },
     enabled: !!uniqueKey && !!chainId,
     staleTime: STALE_TIME_LONG_MS,

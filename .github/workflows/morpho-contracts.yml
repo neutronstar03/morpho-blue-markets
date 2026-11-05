@@ -1,0 +1,22 @@
+name: Live Morpho contract check
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '35 6 * * 1'
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '20'
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      # Distinguishes incompatible operations (exit 1) from transport/rate limit/schema availability (exit 2).
+      - run: bun run contract:live

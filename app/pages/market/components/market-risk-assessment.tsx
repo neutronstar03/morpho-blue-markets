@@ -146,7 +146,7 @@ export function RiskAssessmentSection({ market }: Props) {
             label="Liquidations"
             value={(
               <span className={liquidationCount === 0 ? 'text-red-400' : 'text-green-400'}>
-                {isLiqCountLoading ? '…' : liquidationCount}
+                {isLiqCountLoading ? '…' : liquidationCount ?? 'Unavailable'}
               </span>
             )}
           />

@@ -1,8 +1,8 @@
 import type { CrossChainUserPosition } from './use-user-positions'
 import type { LiveMarketPosition } from '~/lib/morpho/live-position'
 import { useQuery } from '@tanstack/react-query'
-import { gql } from 'graphql-request'
 import { supportedChainMap } from '~/lib/addresses'
+import { QUERY_USER_VAULT_V2_CHAINS, QUERY_USER_VAULT_V2_POSITIONS } from '~/lib/graphql/queries/vault-v2-positions'
 import { graphqlClient } from '../../graphql/client'
 
 interface QueryUserVaultV2PositionsResult {
@@ -40,46 +40,6 @@ interface QueryCrossChainVaultV2PositionsResult {
     }>
   } | null
 }
-
-const QUERY_USER_VAULT_V2_POSITIONS = gql`
-  query GetUserVaultV2Positions($user: String!, $chainId: Int!) {
-    userByAddress(address: $user, chainId: $chainId) {
-      vaultV2Positions {
-        shares
-        assets
-        assetsUsd
-        vault {
-          address
-          name
-          symbol
-          netApy
-          asset {
-            address
-            symbol
-            decimals
-            price {
-              usd
-            }
-          }
-        }
-      }
-    }
-  }
-`
-
-const QUERY_USER_VAULT_V2_CHAINS = gql`
-  query GetUserVaultV2Chains($user: String!, $chainId: Int!) {
-    userByAddress(address: $user, chainId: $chainId) {
-      vaultV2Positions {
-        shares
-        assets
-        vault {
-          address
-        }
-      }
-    }
-  }
-`
 
 function toBigint(value: string | number | bigint | undefined | null): bigint {
   return BigInt(value || '0')

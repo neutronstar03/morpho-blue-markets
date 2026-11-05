@@ -1,22 +1,16 @@
-import { readFileSync } from 'node:fs'
 // Guard the upstream oracle selection and the normalized address used by market safety checks.
 import { describe, expect, test } from 'bun:test'
 import { parse, visit } from 'graphql'
 import { normalizeMarketOracle, normalizeMarketOracles } from '../../app/lib/graphql/market-oracle'
+import { QUERY_LIST_MARKETS } from '../../app/lib/graphql/queries/list-markets'
 import { QUERY_SINGLE_MORPHO_MARKET } from '../../app/lib/graphql/queries/market-detail'
 import { QUERY_MARKETS_BY_CHAIN } from '../../app/lib/graphql/queries/markets-by-chain'
 
 const ORACLE = '0x1234567890123456789012345678901234567890'
 
-// Read the production operation without importing its React/blacklist hook graph.
-const listSource = readFileSync(new URL('../../app/lib/hooks/graphql/use-list-markets.ts', import.meta.url), 'utf8')
-const listQuery = listSource.match(/export const QUERY_LIST_MARKETS = gql`([\s\S]*?)`/)?.[1]
-if (!listQuery)
-  throw new Error('Market-list query not found')
-
 describe('Morpho oracle API compatibility', () => {
   for (const [name, query] of [
-    ['market list', listQuery],
+    ['market list', QUERY_LIST_MARKETS],
     ['market detail', QUERY_SINGLE_MORPHO_MARKET],
     ['optimizer discovery', QUERY_MARKETS_BY_CHAIN],
   ]) {

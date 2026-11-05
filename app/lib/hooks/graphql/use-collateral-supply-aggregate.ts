@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { gql } from 'graphql-request'
 import { useEffect, useMemo } from 'react'
 import { graphqlClient } from '~/lib/graphql/client'
+import { QUERY_COLLATERAL_SUPPLY_AGGREGATE } from '~/lib/graphql/queries/collateral-supply-aggregate'
 import { STALE_TIME_LONG_MS } from '~/lib/hooks/query-stale-times'
 import { useLocalStorage } from '~/lib/hooks/use-local-storage'
 
@@ -14,22 +14,6 @@ interface QueryCollateralSupplyAggregateResult {
     }>
   }
 }
-
-const QUERY_COLLATERAL_SUPPLY_AGGREGATE = gql`
-  query GetCollateralSupplyAggregate(
-    $first: Int!
-    $skip: Int!
-    $where: MarketFilters
-  ) {
-    markets(first: $first, skip: $skip, where: $where) {
-      items {
-        state {
-          supplyAssetsUsd
-        }
-      }
-    }
-  }
-`
 
 export interface UseCollateralSupplyAggregateArgs {
   chainId?: number

@@ -37,7 +37,9 @@
     "test:ui:run": "vitest run --config vitest.config.ts",
     "test:unit": "bun scripts/run-tests.ts",
     "test:live": "bun scripts/run-tests.ts --live",
-    "snapshot:usds:24164776": "bun tests/scripts/rpc-snapshot01.ts"
+    "snapshot:usds:24164776": "bun tests/scripts/rpc-snapshot01.ts",
+    "contract:live": "bun scripts/check-morpho-contracts.ts",
+    "contract:refresh": "bun scripts/check-morpho-contracts.ts --refresh"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
