@@ -34,3 +34,19 @@ The publisher consumes the review checkout's validated decision manifest and cop
 it into the versioned dataset bundle. Explicit decisions and stronger durable
 exclusions are authoritative inputs; generated JSON is not the place to persist a
 research decision. Discovery is a temporary research queue, not a completed outcome.
+
+## Overlapping whitelist provenance (2026-11-06)
+
+- [x] Reproduce a published whitelist entry hiding the explicit shared review reason.
+- [x] Prefer the shared whitelist decision after stronger exclusions and personal decisions,
+  before the generated whitelist fallback, so classification provenance remains visible.
+- [x] Exercise positive/negative decisions and oracle exclusion with the same loaded dataset.
+- [x] Node 20.20.2: lint, typecheck, 157 offline tests and 50 UI tests pass (2 existing skips).
+- [ ] Production propagation remains pending; no release or software deployment is part of this run.
+
+The current production compatibility endpoint responds HTTP 200 but returns 39
+entries, compared with 2 explicit positive decisions in the manifest. The extra
+37 legacy paths show that positive-only consumer propagation is still unverified.
+Do not close the integration or dependent research issues on this source fix alone.
+The system Node 26 runtime failed UI tests because localStorage was unavailable;
+verification uses the repository-required Node 20 runtime installed in isolation.

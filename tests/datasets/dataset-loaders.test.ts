@@ -14,7 +14,9 @@ import {
   isMarketIdManuallyBlacklisted,
   refreshMarketBlacklistDataset,
 } from '../../app/lib/market-blacklist'
+import { getMarketRisk } from '../../app/lib/market-risk/market-risk'
 import { getOracleProvider, getOracleProvidersDatasetMeta, refreshOracleProvidersDataset } from '../../app/lib/oracle-providers'
+import { replaceSharedDecisions } from '../../app/lib/reviews/shared-decisions'
 import { getUnhealthyMarketsDatasetMeta, isMarketSystemUnhealthy, refreshUnhealthyMarketsDataset } from '../../app/lib/unhealthy-markets'
 
 const HOUR_MS = 60 * 60 * 1000
@@ -104,6 +106,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  replaceSharedDecisions([])
   delete (globalThis as { window?: unknown }).window
   globalThis.fetch = originalFetch
   delete (globalThis as { __MBM_LOCAL_ARTIFACTS__?: boolean }).__MBM_LOCAL_ARTIFACTS__
@@ -127,6 +130,27 @@ describe('collateral whitelist freshness', () => {
     expect(meta.source).toBe('cache')
     expect(meta.observedAtMs).toBe(cachedAtMs)
     expect(classifyDatasetFreshness(meta, Date.now()).level).toBe('stale')
+  })
+})
+
+describe('shared review provenance with published datasets', () => {
+  test('retains the shared decision reason when the same collateral is whitelisted', async () => {
+    installRoutes([{ match: '/whitelist.collaterals.json', handler: () => jsonResponse([{ chainId: 1, collateralAddress: WHITELIST_COLLATERAL }]) }])
+    refreshCollateralWhitelistDataset()
+    await settle(() => isTerminal(getCollateralWhitelistDatasetMeta()))
+    expect(isCollateralWhitelisted(1, WHITELIST_COLLATERAL)).toBe(true)
+
+    const collateralAddress = WHITELIST_COLLATERAL.toLowerCase()
+    const market = { chainId: 1, uniqueKey: `0x${'f'.repeat(64)}`, collateralAssetAddress: collateralAddress }
+    const review = { chainId: 1, collateralAddress, decision: 'whitelist' as const, reason: 'Verified identity and issuer redemption with restrictions', reviewPath: `v1/chain/1/${collateralAddress}.json` }
+    replaceSharedDecisions([review])
+    expect(getMarketRisk(market)).toEqual({ status: 'white', reasonCodes: ['collateral_review'], reason: review.reason })
+    expect(getMarketRisk({ ...market, warnings: [{ type: 'incorrect_oracle_configuration' }] }).status).toBe('black')
+
+    replaceSharedDecisions([{ ...review, decision: 'blacklist', reason: 'Exit evidence no longer sufficient' }])
+    expect(getMarketRisk(market)).toEqual({ status: 'black', reasonCodes: ['shared_blacklist'], reason: 'Exit evidence no longer sufficient' })
+    replaceSharedDecisions([])
+    expect(getMarketRisk(market)).toEqual({ status: 'white', reasonCodes: ['ok'] })
   })
 })
 

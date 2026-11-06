@@ -90,18 +90,19 @@ export function getMarketRisk(input: MarketRiskInput): MarketRiskStatusEntry {
     }
   }
 
-  if (isCollateralWhitelisted(chainId, collateralAddress)) {
-    return {
-      status: 'white',
-      reasonCodes: ['ok'],
-    }
-  }
-
+  // Prefer explicit review provenance over an overlapping generated allowlist entry.
   if (shared?.decision === 'whitelist') {
     return {
       status: 'white',
       reasonCodes: ['collateral_review'],
       reason: shared.reason,
+    }
+  }
+
+  if (isCollateralWhitelisted(chainId, collateralAddress)) {
+    return {
+      status: 'white',
+      reasonCodes: ['ok'],
     }
   }
 
