@@ -40,7 +40,7 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
 
   return edgeCacheProxy({
     requestUrl: url.toString(),
-    waitUntil: context.waitUntil,
+    waitUntil: promise => context.waitUntil(promise),
     cacheTtlSeconds: CACHE_TTL_SECONDS,
     fetchUpstream: async () => {
       const tree = await fetchDecisionManifest(context.request.signal)

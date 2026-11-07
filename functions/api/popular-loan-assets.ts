@@ -15,23 +15,39 @@ const CACHE_TTL_SECONDS = 120
 
 interface Env {}
 
+function numericParam(params: URLSearchParams, name: string, fallback: number): number {
+  const raw = params.get(name)
+  return raw === null ? fallback : raw.trim() === '' ? Number.NaN : Number(raw)
+}
+
+function isGraphqlInt(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= 2_147_483_647
+}
+
 export async function onRequestGet(context: EventContext<Env>): Promise<Response> {
   const url = new URL(context.request.url)
-  const chainId = url.searchParams.get('chainId')
-  if (!chainId)
+  const chainId = numericParam(url.searchParams, 'chainId', Number.NaN)
+  if (!url.searchParams.has('chainId'))
     return errorResponse('Missing chainId', 400)
 
-  // Parse optional filter params with defaults matching the frontend hook
-  const first = Number(url.searchParams.get('first')) || 100
-  const skip = Number(url.searchParams.get('skip')) || 0
-  const minNetSupplyApy = Number(url.searchParams.get('minNetSupplyApy')) || 0.05
-  const maxNetSupplyApy = Number(url.searchParams.get('maxNetSupplyApy')) || 10
-  const minBorrowUsd = Number(url.searchParams.get('minBorrowUsd')) || 10_000
-  const minUtilization = Number(url.searchParams.get('minUtilization')) || 0.1
+  // Only absent filters use defaults; zero is an explicit frontend value.
+  const first = numericParam(url.searchParams, 'first', 100)
+  const skip = numericParam(url.searchParams, 'skip', 0)
+  const minNetSupplyApy = numericParam(url.searchParams, 'minNetSupplyApy', 0.05)
+  const maxNetSupplyApy = numericParam(url.searchParams, 'maxNetSupplyApy', 10)
+  const minBorrowUsd = numericParam(url.searchParams, 'minBorrowUsd', 10_000)
+  const minUtilization = numericParam(url.searchParams, 'minUtilization', 0.1)
+
+  if (!isGraphqlInt(chainId) || chainId === 0 || !isGraphqlInt(first) || !isGraphqlInt(skip))
+    return errorResponse('chainId must be a positive GraphQL Int; first and skip must be non-negative GraphQL Int values', 400)
+  if (![minNetSupplyApy, maxNetSupplyApy, minBorrowUsd, minUtilization].every(Number.isFinite)
+    || minNetSupplyApy > maxNetSupplyApy || minBorrowUsd < 0 || minUtilization < 0 || minUtilization > 1) {
+    return errorResponse('Invalid numeric market filters', 400)
+  }
 
   return edgeCacheProxy({
     requestUrl: url.toString(),
-    waitUntil: context.waitUntil,
+    waitUntil: promise => context.waitUntil(promise),
     cacheTtlSeconds: CACHE_TTL_SECONDS,
     fetchUpstream: async () => {
       const response = await fetchWithDeadline(MORPHO_GRAPHQL_URL, {
@@ -43,7 +59,7 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
           variables: {
             first,
             skip,
-            chainId: Number(chainId),
+            chainId,
             minNetSupplyApy,
             maxNetSupplyApy,
             minBorrowUsd,

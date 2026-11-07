@@ -22,7 +22,13 @@ export async function getFromCache(url: string): Promise<Response | undefined> {
   if (!cfCache)
     return undefined
   const cacheKey = new Request(url, { method: 'GET' })
-  return cfCache.match(cacheKey)
+  try {
+    return await cfCache.match(cacheKey)
+  }
+  catch {
+    // Caching is optional: an unavailable cache must not prevent a live fetch.
+    return undefined
+  }
 }
 
 /**
@@ -34,7 +40,12 @@ export async function putInCache(url: string, response: Response): Promise<void>
   if (!cfCache)
     return
   const cacheKey = new Request(url, { method: 'GET' })
-  await cfCache.put(cacheKey, response.clone())
+  try {
+    await cfCache.put(cacheKey, response.clone())
+  }
+  catch {
+    // A failed background write must not reject a valid upstream response.
+  }
 }
 
 /**

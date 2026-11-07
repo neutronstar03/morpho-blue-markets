@@ -17,3 +17,13 @@ test('explicit missing token remains an intentional nullable resource', async ()
   expect(response.status).toBe(200)
   expect(await response.json()).toEqual({ liquidityUsd: null })
 })
+
+test('rejects malformed token addresses without calling upstream', async () => {
+  const fetch = spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 404 }))
+  for (const address of ['0x1', '../pools', `0x${'z'.repeat(40)}`, '']) {
+    const request = new Request(`https://example.test/api/token-liquidity?chainId=1&address=${encodeURIComponent(address)}`)
+    const response = await onRequestGet({ ...context(), request })
+    expect(response.status).toBe(400)
+  }
+  expect(fetch).not.toHaveBeenCalled()
+})

@@ -26,6 +26,8 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
     return errorResponse('Missing chainId', 400)
   if (!tokenAddress)
     return errorResponse('Missing address', 400)
+  if (!/^0x[0-9a-f]{40}$/i.test(tokenAddress))
+    return errorResponse('Invalid token address', 400)
 
   const network = CHAIN_ID_TO_GECKO_NETWORK.get(Number(chainId))
   if (!network)
@@ -37,7 +39,7 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
 
   return edgeCacheProxy({
     requestUrl: url.toString(),
-    waitUntil: context.waitUntil,
+    waitUntil: promise => context.waitUntil(promise),
     cacheTtlSeconds: CACHE_TTL_SECONDS,
     fetchUpstream: async () => {
       // Try the token endpoint first (includes top_pools and total_reserve_in_usd)

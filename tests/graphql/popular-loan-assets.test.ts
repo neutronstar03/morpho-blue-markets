@@ -143,6 +143,58 @@ describe('popular-loan-assets edge function', () => {
     })
   })
 
+  test('preserves explicit zero filters instead of replacing them with defaults', async () => {
+    install()
+    upstream = () => jsonResponse(envelope([]))
+    const { context, pending } = makeContext('chainId=1&first=0&skip=0&minNetSupplyApy=0&maxNetSupplyApy=0&minBorrowUsd=0&minUtilization=0')
+    expect((await onRequestGet(context as never)).status).toBe(200)
+    await Promise.all(pending)
+    expect(fetchCalls[0].body.variables).toEqual({ chainId: 1, first: 0, skip: 0, minNetSupplyApy: 0, maxNetSupplyApy: 0, minBorrowUsd: 0, minUtilization: 0 })
+  })
+
+  test('rejects malformed numeric filters before cache lookup or upstream requests', async () => {
+    const queries = [
+      'chainId=bad',
+      'chainId=0',
+      'chainId=-1',
+      'chainId=1.5',
+      'chainId=2147483648',
+      'chainId=1&first=1.5',
+      'chainId=1&first=-1',
+      'chainId=1&skip=Infinity',
+      'chainId=1&skip=2147483648',
+      'chainId=1&minBorrowUsd=NaN',
+      'chainId=1&minBorrowUsd=',
+      'chainId=1&minBorrowUsd=-1',
+      'chainId=1&minNetSupplyApy=Infinity',
+      'chainId=1&minUtilization=1.1',
+      'chainId=1&minNetSupplyApy=2&maxNetSupplyApy=1',
+    ]
+    for (const query of queries) {
+      install()
+      upstream = () => jsonResponse(envelope([]))
+      cache.match = async () => {
+        throw new Error('Invalid requests must not access cache')
+      }
+      const { context, pending } = makeContext(query)
+      expect((await onRequestGet(context as never)).status).toBe(400)
+      expect(fetchCalls).toHaveLength(0)
+      expect(pending).toHaveLength(0)
+    }
+  })
+
+  test('retains the Pages execution context when scheduling cache writes', async () => {
+    install()
+    upstream = () => jsonResponse(envelope([]))
+    const { context, pending } = makeContext('chainId=1')
+    context.waitUntil = function (promise) {
+      expect(this).toBe(context)
+      pending.push(promise)
+    }
+    expect((await onRequestGet(context as never)).status).toBe(200)
+    await Promise.all(pending)
+  })
+
   test('keeps intentional null price and metrics', async () => {
     install()
     const item = validItem({
