@@ -107,7 +107,6 @@ function market(raw: unknown, kind: Kind) {
     : [
         'borrowApy',
         'utilization',
-        'dailyPriceVariation',
         'netSupplyApy',
         'avgNetSupplyApy',
         'dailyNetSupplyApy',
@@ -118,7 +117,7 @@ function market(raw: unknown, kind: Kind) {
         'weeklyNetBorrowApy',
       ]
   if (kind === 'detail')
-    requiredNumbers.push('supplyAssetsUsd', 'borrowAssetsUsd', 'supplyApy', 'avgSupplyApy', 'dailySupplyApy', 'weeklySupplyApy', 'apyAtTarget')
+    requiredNumbers.push('dailyPriceVariation', 'supplyAssetsUsd', 'borrowAssetsUsd', 'supplyApy', 'avgSupplyApy', 'dailySupplyApy', 'weeklySupplyApy', 'apyAtTarget')
   for (const key of requiredNumbers)
     number(state[key], `state.${key}`)
   if (kind !== 'detail') {

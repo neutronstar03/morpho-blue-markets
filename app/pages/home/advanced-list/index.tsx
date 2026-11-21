@@ -105,6 +105,8 @@ export function AdvancedList() {
   const {
     data: marketsData,
     isLoading,
+    isError,
+    isFetching,
     refetch,
     dataUpdatedAt,
   } = useMarkets({
@@ -262,16 +264,29 @@ export function AdvancedList() {
         </div>
       )}
 
-      <MarketTable
-        markets={visibleMarkets}
-        isLoading={isLoading}
-        rateType={displayRateType}
-        immediateAprByMarketKey={aprByMarketKey}
-        canComputeLiveApr={canComputeLiveApr}
-        liveChainId={liveChainId}
-        hideChainColumn={chainFilter !== 'ALL'}
-        riskStatusByKey={riskStatusByKey}
-      />
+      {isError && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 p-4 text-sm text-red-200">
+          {marketsData ? 'Could not refresh markets. Showing the last loaded results.' : 'Could not load markets.'}
+          <Button type="button" variant="outline" size="sm" onClick={() => { void refetch() }} disabled={isFetching}>
+            Retry
+          </Button>
+        </div>
+      )}
+      {!isLoading && !isError && visibleMarkets.length === 0 && (
+        <p role="status" className="p-4 text-sm text-gray-300">No markets match these filters.</p>
+      )}
+      {(!isError || visibleMarkets.length > 0) && (
+        <MarketTable
+          markets={visibleMarkets}
+          isLoading={isLoading}
+          rateType={displayRateType}
+          immediateAprByMarketKey={aprByMarketKey}
+          canComputeLiveApr={canComputeLiveApr}
+          liveChainId={liveChainId}
+          hideChainColumn={chainFilter !== 'ALL'}
+          riskStatusByKey={riskStatusByKey}
+        />
+      )}
     </Card>
   )
 }
