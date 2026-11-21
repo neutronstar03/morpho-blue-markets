@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.18 - 2026-11-22
+
+### Added
+- Collateral review decisions and reasons are shared across MBM. Users can request a review for an asset with no decision.
+- The supply optimizer offers an optional vault yield comparison.
+
+### Fixed
+- Collateral and market exclusions take precedence over approval signals. The reviewed collateral endpoint lists explicit approvals only.
+- Automatic optimizer suggestions require at least $1 of fully priced principal per loan asset. Opportunity cards distinguish percentage-point gains from relative gains and show positive sub-cent estimates.
+- Position discovery and market data handle incomplete responses, edge cache failures, and upstream contract changes more reliably. Oracle reviews can retain a rank of zero.
+
 ## v1.6.17 - 2026-11-01
 
 ### Fixed

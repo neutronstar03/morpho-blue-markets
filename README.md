@@ -16,9 +16,9 @@ Robinhood Chain mainnet (chain ID `4663`) is supported for market discovery, pos
 
 ## Recent updates
 
+- v1.6.18: Explicit collateral decisions, more reliable market data and position discovery, optional vault yield comparisons, and fewer automatic optimizer alerts for dust.
 - v1.6.17: Restored Morpho API compatibility for market discovery, details, and optimizer inputs.
 - v1.6.16: Cached risk-data status now hydrates consistently with the prerendered page.
-- v1.6.15: Robinhood Chain support, reliable transaction feedback and live APR reads, chain capability alignment, and visible risk-data freshness.
 
 ## Development
 
