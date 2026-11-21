@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.21 - 2026-11-22
+
+### Fixed
+- Market names omit generic status badges. Published review outcomes and blocked states remain visible.
+
 ## v1.6.20 - 2026-11-22
 
 ### Fixed
