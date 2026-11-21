@@ -54,7 +54,7 @@ export function MarketRiskText({
     ? 'Blocked'
     : shared?.decision === 'whitelist'
       ? 'Whitelist'
-      : status === 'white' ? 'Allowed' : status === 'yellow' ? 'Pending review' : null
+      : null
   return (
     <span
       title={reason}
@@ -72,6 +72,7 @@ export function MarketRiskText({
           ]
         </span>
       )}
+      {!label && status === 'yellow' && <span className="sr-only"> — No collateral review decision</span>}
       {reason && (
         <span className="block max-w-xs truncate text-xs font-normal">
           {shared?.decision === 'blacklist' || (!blacklistReason && shared) ? 'Dot review: ' : 'Shared blacklist: '}

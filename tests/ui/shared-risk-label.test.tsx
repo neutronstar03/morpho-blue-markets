@@ -24,6 +24,25 @@ function Consumer() {
 }
 
 describe('published risk labels', () => {
+  it('keeps market names free of generic badges and exposes unreviewed status to screen readers', () => {
+    render(
+      <>
+        <MarketRiskText status="white">Allowed pair</MarketRiskText>
+        <MarketRiskText status="yellow">Unreviewed pair</MarketRiskText>
+      </>,
+    )
+    expect(screen.getByText('Allowed pair')).toHaveTextContent(/^Allowed pair$/)
+    expect(screen.queryByText('[Pending review]')).not.toBeInTheDocument()
+    expect(screen.getByText('— No collateral review decision')).toHaveClass('sr-only')
+  })
+
+  it('keeps a published positive outcome visible', () => {
+    replaceSharedDecisions(parseSharedDecisions({ version: 1, decisions: [{ ...entry, decision: 'whitelist' }] }))
+    render(<MarketRiskText chainId={1} collateralAddress={address} status="white">Pair</MarketRiskText>)
+    expect(screen.getByText('[Whitelist]')).toBeInTheDocument()
+    expect(screen.getByText(`Dot review: ${entry.reason}`)).toBeInTheDocument()
+  })
+
   it('renders monochrome readable outcome, provenance and reason', () => {
     replaceSharedDecisions(parseSharedDecisions({ version: 1, decisions: [entry] }))
     render(<MarketRiskText chainId={1} collateralAddress={address}>Pair</MarketRiskText>)

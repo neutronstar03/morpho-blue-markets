@@ -16,9 +16,9 @@ Robinhood Chain mainnet (chain ID `4663`) is supported for market discovery, pos
 
 ## Recent updates
 
+- v1.6.21: Market names display badges for published approvals and blocked states.
 - v1.6.20: Equivalent API requests reuse the edge cache, and vault comparison results load without moving the Markets section.
 - v1.6.19: Markets keeps valid results visible when daily price data is unavailable and offers a retry when a request fails.
-- v1.6.18: Explicit collateral decisions, more reliable market data and position discovery, optional vault yield comparisons, and fewer automatic optimizer alerts for dust.
 
 ## Development
 
