@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NetworkProvider } from '../../app/lib/contexts/network'
@@ -18,6 +18,11 @@ const RATE_AT_TARGET = 1_267_000_000n
 // (evaluated before this module's top-level constants) can see it.
 const wallet = vi.hoisted(() => ({
   chainId: undefined as number | undefined,
+}))
+
+const query = vi.hoisted(() => ({
+  mode: 'loaded' as 'loaded' | 'error' | 'empty' | 'refresh-error',
+  refetch: vi.fn(async () => undefined),
 }))
 
 // Mocked eth_call layer: one Morpho market read plus its IRM rateAtTarget read.
@@ -71,45 +76,50 @@ vi.mock('~/lib/hooks/graphql/use-list-markets', async (importOriginal) => {
   return {
     ...actual,
     useMarkets: () => ({
-      data: {
-        markets: {
-          items: [
-            {
-              marketId: MARKET_UNIQUE_KEY,
-              uniqueKey: MARKET_UNIQUE_KEY,
-              lltv: LLTV,
-              oracleAddress: ORACLE_ADDRESS,
-              irmAddress: IRM_ADDRESS,
-              morphoBlue: { chain: { id: STABLE_CHAIN_ID } },
-              loanAsset: { address: LOAN_ADDRESS, symbol: 'USDC', decimals: 6 },
-              collateralAsset: { address: COLLATERAL_ADDRESS, symbol: 'msY', decimals: 18 },
-              state: {
-                supplyAssets: '1000000000',
-                borrowAssets: '800000000',
-                borrowApy: 0.06,
-                utilization: 0.8,
-                supplyAssetsUsd: 1_000_000,
-                borrowAssetsUsd: 800_000,
-                dailyPriceVariation: 0,
-                netSupplyApy: 0.04,
-                avgNetSupplyApy: 0.04,
-                dailyNetSupplyApy: 0.04,
-                weeklyNetSupplyApy: 0.04,
-                netBorrowApy: 0.06,
-                avgNetBorrowApy: 0.06,
-                dailyNetBorrowApy: 0.06,
-                weeklyNetBorrowApy: 0.06,
-              },
-              listed: true,
-              supplyingVaults: [],
-              supplyingVaultV2s: [],
-              creationTimestamp: '0',
+      data: query.mode === 'error'
+        ? undefined
+        : {
+            markets: {
+              items: query.mode === 'empty'
+                ? []
+                : [
+                    {
+                      marketId: MARKET_UNIQUE_KEY,
+                      uniqueKey: MARKET_UNIQUE_KEY,
+                      lltv: LLTV,
+                      oracleAddress: ORACLE_ADDRESS,
+                      irmAddress: IRM_ADDRESS,
+                      morphoBlue: { chain: { id: STABLE_CHAIN_ID } },
+                      loanAsset: { address: LOAN_ADDRESS, symbol: 'USDC', decimals: 6 },
+                      collateralAsset: { address: COLLATERAL_ADDRESS, symbol: 'msY', decimals: 18 },
+                      state: {
+                        supplyAssets: '1000000000',
+                        borrowAssets: '800000000',
+                        borrowApy: 0.06,
+                        utilization: 0.8,
+                        supplyAssetsUsd: 1_000_000,
+                        borrowAssetsUsd: 800_000,
+                        netSupplyApy: 0.04,
+                        avgNetSupplyApy: 0.04,
+                        dailyNetSupplyApy: 0.04,
+                        weeklyNetSupplyApy: 0.04,
+                        netBorrowApy: 0.06,
+                        avgNetBorrowApy: 0.06,
+                        dailyNetBorrowApy: 0.06,
+                        weeklyNetBorrowApy: 0.06,
+                      },
+                      listed: true,
+                      supplyingVaults: [],
+                      supplyingVaultV2s: [],
+                      creationTimestamp: '0',
+                    },
+                  ],
             },
-          ],
-        },
-      },
+          },
       isLoading: false,
-      refetch: vi.fn(async () => undefined),
+      isError: query.mode === 'error' || query.mode === 'refresh-error',
+      isFetching: false,
+      refetch: query.refetch,
       dataUpdatedAt: Date.now(),
     }),
   }
@@ -155,6 +165,8 @@ function immediateAprText() {
 afterEach(() => {
   window.localStorage.clear()
   wallet.chainId = undefined
+  query.mode = 'loaded'
+  query.refetch.mockClear()
 })
 
 describe('selected-chain immediate APR', () => {
@@ -183,5 +195,30 @@ describe('selected-chain immediate APR', () => {
     renderAdvancedList()
 
     expect(immediateAprText()).toBe('—')
+  })
+})
+
+describe('market list results', () => {
+  it('shows an error and retries a failed request', () => {
+    query.mode = 'error'
+    renderAdvancedList()
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load markets.')
+    expect(screen.queryByText('No markets match these filters.')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(query.refetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows an empty message after a successful search with no results', () => {
+    query.mode = 'empty'
+    renderAdvancedList()
+    expect(screen.getByText('No markets match these filters.')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('retains the last market results when a refresh fails', () => {
+    query.mode = 'refresh-error'
+    renderAdvancedList()
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not refresh markets.')
+    expect(screen.getByText('msY/USDC')).toBeInTheDocument()
   })
 })

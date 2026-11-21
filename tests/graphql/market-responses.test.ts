@@ -50,6 +50,15 @@ describe('critical market response boundaries', () => {
     expect(parseOptimizerMarketPage({ markets: { items: [market()] } }, 1).items[0].state.supplyShares).toBe('9007199254740993000')
     expect(() => normalizeUnsignedInteger(Number.MAX_SAFE_INTEGER + 1, 'shares')).toThrow()
   })
+  test('keeps matching markets when daily price variation is missing or null', () => {
+    const missing = market()
+    delete missing.state.dailyPriceVariation
+    const unavailable = market()
+    unavailable.state.dailyPriceVariation = null
+    const result = parseMarketListResponse({ markets: { items: [missing, unavailable] } })
+    expect(result.markets.items).toHaveLength(2)
+    expect(result.markets.items.map(item => item.state.netSupplyApy)).toEqual([0.1, 0.1])
+  })
   test('rejects malformed envelopes instead of reporting empty markets', () => {
     for (const raw of [null, {}, { markets: null }, { markets: { items: null } }, { markets: { items: [{}] } }])
       expect(() => parseMarketListResponse(raw)).toThrow(ApiContractError)

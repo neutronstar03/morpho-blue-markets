@@ -37,8 +37,6 @@ export const QUERY_LIST_MARKETS = gql`
           borrowAssetsUsd
           utilization
           borrowApy
-          # this value is awesome, it's the variation of the collateral price over the last 24 hours
-          dailyPriceVariation
 
           netSupplyApy
           avgNetSupplyApy
@@ -88,8 +86,6 @@ export interface MorphoMarket {
     utilization: number
     supplyAssetsUsd?: number
     borrowAssetsUsd?: number
-
-    dailyPriceVariation: number
 
     netSupplyApy: number
     avgNetSupplyApy: number

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.19 - 2026-11-22
+
+### Fixed
+- Markets loads when a market has no daily collateral price change. Failed requests show a retry and retain the last results. Successful empty searches show a separate message.
+
 ## v1.6.18 - 2026-11-22
 
 ### Added
