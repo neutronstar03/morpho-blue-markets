@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.20 - 2026-11-22
+
+### Fixed
+- Equivalent market filters and token addresses share edge cache entries. The vault comparison keeps a stable results area while cached and live data arrive.
+
 ## v1.6.19 - 2026-11-22
 
 ### Fixed

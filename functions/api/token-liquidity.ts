@@ -19,21 +19,23 @@ interface Env {}
 
 export async function onRequestGet(context: EventContext<Env>): Promise<Response> {
   const url = new URL(context.request.url)
-  const chainId = url.searchParams.get('chainId')
+  const chainParam = url.searchParams.get('chainId')
   const tokenAddress = url.searchParams.get('address')
 
-  if (!chainId)
+  if (!chainParam)
     return errorResponse('Missing chainId', 400)
   if (!tokenAddress)
     return errorResponse('Missing address', 400)
   if (!/^0x[0-9a-f]{40}$/i.test(tokenAddress))
     return errorResponse('Invalid token address', 400)
 
-  const network = CHAIN_ID_TO_GECKO_NETWORK.get(Number(chainId))
+  const chainId = Number(chainParam)
+  const network = CHAIN_ID_TO_GECKO_NETWORK.get(chainId)
   if (!network)
-    return errorResponse(`Unsupported chainId: ${chainId}`, 400)
+    return errorResponse(`Unsupported chainId: ${chainParam}`, 400)
 
   const address = tokenAddress.toLowerCase()
+  url.search = new URLSearchParams({ chainId: String(chainId), address }).toString()
   const geckoTokenUrl = `${GECKOTERMINAL_BASE_URL}/networks/${network}/tokens/${address}?include=top_pools`
   const geckoPoolsUrl = `${GECKOTERMINAL_BASE_URL}/networks/${network}/tokens/${address}/pools?page=1`
 

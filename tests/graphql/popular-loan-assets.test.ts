@@ -270,19 +270,19 @@ describe('popular-loan-assets edge function', () => {
     expect(cache.store.size).toBe(0)
   })
 
-  test('serves a cached envelope without calling upstream', async () => {
+  test('equivalent market filters share a cache entry', async () => {
     install()
-    const url = 'https://mbm.test/api/popular-loan-assets?chainId=1'
-    cache.store.set(url, jsonResponse(envelope([validItem()])))
-    upstream = () => {
-      throw new Error('should not fetch')
-    }
+    upstream = () => jsonResponse(envelope([validItem()]))
+    const first = makeContext('chainId=1')
+    expect((await onRequestGet(first.context as never)).status).toBe(200)
+    await Promise.all(first.pending)
 
-    const { context } = makeContext('chainId=1')
+    const { context } = makeContext('skip=0&foo=ignored&minBorrowUsd=10000.0&first=100&chainId=01')
     const response = await onRequestGet(context as never)
 
     expect(response.status).toBe(200)
-    expect(fetchCalls).toHaveLength(0)
+    expect(fetchCalls).toHaveLength(1)
+    expect(cache.store.size).toBe(1)
   })
 
   test('rejects a request without chainId', async () => {
