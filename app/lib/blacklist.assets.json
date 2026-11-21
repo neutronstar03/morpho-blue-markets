@@ -1,10 +1,6 @@
 {
   "1": [
     {
-      "assetContract": "0x99cd4ec3f88a45940936f469e4bb72a2a701eeb9",
-      "comment": "stUSDS: Sky Lockstake risk capital can absorb bad debt. Redemption depends on idle USDS and was severely constrained on 2026-11-21. Excluded from new allocations pending evidence of a viable exit at size."
-    },
-    {
       "assetContract": "0x5c5b196abe0d54485975d1ec29617d42d9198326",
       "comment": "sdeUSD: illiquid/depegged collateral reported as toxic."
     },

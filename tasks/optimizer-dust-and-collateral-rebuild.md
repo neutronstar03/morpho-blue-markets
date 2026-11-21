@@ -8,9 +8,9 @@ collateral approval traceable to a current, explicit review.
   across eligible positions. Leave manual optimization and balance visibility
   available. Show absolute APR gains in percentage points.
 - [x] Verify Ethereum stUSDS by exact chain and address. Prepare its canonical
-  blacklist decision in the reviews repository and the durable exclusion in
-  MBM. Cite the observed redemption limit and first-loss design, and preserve
-  direct withdrawal access.
+  blacklist decision in the reviews repository. The dataset publisher derives
+  market exclusions from the decision manifest. Withdrawal access remains
+  available subject to liquidity.
 - [ ] Release the MBM consumer after the checks below. Verify the deployed
   SHA and positive-only reviewed-collaterals endpoint. Then publish the stUSDS
   review on the reviews default branch and observe the artifact refresh.
