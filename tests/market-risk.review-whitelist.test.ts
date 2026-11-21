@@ -40,6 +40,20 @@ describe('collateral review risk allowlist', () => {
     })
   })
 
+  test('excludes the Ethereum stUSDS contract even if a whitelist suggests approval', () => {
+    const collateralAddress = '0x99cd4ec3f88a45940936f469e4bb72a2a701eeb9'
+    replaceSharedDecisions([{ chainId: 1, collateralAddress, decision: 'whitelist', reason: 'Earlier approval', reviewPath: `v1/chain/1/${collateralAddress}.json` }])
+    const market = {
+      uniqueKey: '0xd570c19c0dc0fbe4ab7faf4a37c4150e1c141c8aada8ca3e1b4b6c1b712af93d',
+      loanAssetAddress: USDC,
+      collateralAssetAddress: collateralAddress,
+      collateralAssetSymbol: 'stUSDS',
+    }
+
+    expect(getMarketRisk({ ...market, chainId: 1 })).toMatchObject({ status: 'black', reason: expect.stringContaining('Redemption') })
+    expect(getMarketRisk({ ...market, chainId: 8453 }).status).toBe('yellow')
+  })
+
   test('does not let a collateral review override stronger black risk signals', () => {
     expect(reviewedRoyaltyMarket({
       hasCollateralReview: true,

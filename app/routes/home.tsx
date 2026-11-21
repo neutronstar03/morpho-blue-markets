@@ -22,6 +22,10 @@ import { SupplyAprOptimizer } from '~/pages/home/supply-apr-optimizer'
 
 const OPEN_SUPPLY_APR_OPTIMIZER_EVENT = 'open-supply-apr-optimizer'
 
+function formatOpportunityGain(value: number): string {
+  return value > 0 && value < 0.01 ? '<$0.01' : `+${formatUsd(value)}`
+}
+
 export function meta(_: Route.MetaArgs) {
   return [
     { title: 'mbm' },
@@ -254,11 +258,11 @@ export default function HomePage() {
                         </span>
                         <span className="mt-1 block space-y-0.5 text-xs text-green-200/90 sm:text-sm">
                           <span className="block">
-                            Estimated APR improvement
+                            Estimated APR gain
                             {' '}
                             +
                             {opportunity.aprGainPct.toFixed(2)}
-                            %
+                            {' pp'}
                           </span>
                           <span className="block">
                             Improvement over previous
@@ -268,17 +272,15 @@ export default function HomePage() {
                               : '--'}
                           </span>
                           <span className="block">
-                            Daily Return
+                            Daily gain
                             {' '}
-                            +
-                            {formatUsd(opportunity.yearlyReturnGainUsd / 365)}
+                            {formatOpportunityGain(opportunity.yearlyReturnGainUsd / 365)}
                             {' '}
                             /
                             {' '}
-                            Yearly Return
+                            Yearly gain
                             {' '}
-                            +
-                            {formatUsd(opportunity.yearlyReturnGainUsd)}
+                            {formatOpportunityGain(opportunity.yearlyReturnGainUsd)}
                           </span>
                         </span>
                       </button>

@@ -9,8 +9,8 @@ import { getDefaultMarketAprByAssetSymbol, resolveMarketAprByAssetSymbol } from 
 import { useLiveMarketPositions } from '~/lib/hooks/rpc/use-live-market-positions'
 import { getMorphoBlueAddress, parseTokenAmount } from '~/lib/hooks/rpc/use-morpho'
 import { useMarketRiskStatusMapWithCollateralReviews } from '~/lib/market-risk/hooks'
-import { getMarketSupplyUsdWithFallback } from '~/lib/morpho/market-valuation'
 import { hasVisibleSuppliedAssets } from '~/lib/morpho/position-visibility'
+import { getHomeScanPortfolio, MIN_HOME_SCAN_PRINCIPAL_USD } from '~/lib/optimizer/home-scan-portfolio'
 import SupplyOptimizerWorker from '~/lib/optimizer/supply-optimizer.worker?worker'
 import { useSupplyOptimizerReads } from '~/lib/optimizer/use-supply-optimizer-reads'
 import { getHomeMagicLastRunMs, setHomeMagicLastRunMs } from '../stores/home-magic-last-run'
@@ -83,6 +83,7 @@ export function useHomeMagicOptimizerScan() {
     runId: number
     timestamp: bigint
     positions: UserSupplyPosition[]
+    principalUsd: number
     markets: Array<{ uniqueKey: `0x${string}`, irmAddress: `0x${string}` }>
   }>(null)
 
@@ -161,49 +162,7 @@ export function useHomeMagicOptimizerScan() {
     })
   }, [chainId, getScanRiskStatus, selectedUserMarkets])
 
-  const positions = useMemo<UserSupplyPosition[]>(() => {
-    const out: UserSupplyPosition[] = []
-
-    for (const p of selectedUserMarketsSafe) {
-      const marketSupplyAssets = BigInt(p.market.state.supplyAssets)
-      const marketSupplyShares = BigInt(p.market.state.supplyShares)
-      const userSupplyShares = BigInt(p.userState.supplyShares)
-      if (marketSupplyShares <= 0n || marketSupplyAssets <= 0n || userSupplyShares <= 0n)
-        continue
-
-      const suppliedAssets = (userSupplyShares * marketSupplyAssets) / marketSupplyShares
-      if (suppliedAssets <= 0n)
-        continue
-
-      out.push({
-        marketId: p.market.uniqueKey as `0x${string}`,
-        suppliedAssets,
-      })
-    }
-
-    return out
-  }, [selectedUserMarketsSafe])
-
-  const selectedUserMarketsUsd = useMemo(() => {
-    let totalPrincipalUsd = 0
-
-    for (const p of selectedUserMarketsSafe) {
-      const marketSupplyShares = BigInt(p.market.state.supplyShares)
-      const userSupplyShares = BigInt(p.userState.supplyShares)
-      const marketSupplyUsd = getMarketSupplyUsdWithFallback(p.market)
-
-      if (marketSupplyShares <= 0n || userSupplyShares <= 0n || marketSupplyUsd == null)
-        continue
-
-      const shareRatio = Number(userSupplyShares) / Number(marketSupplyShares)
-      if (!Number.isFinite(shareRatio) || shareRatio <= 0)
-        continue
-
-      totalPrincipalUsd += marketSupplyUsd * shareRatio
-    }
-
-    return totalPrincipalUsd
-  }, [selectedUserMarketsSafe])
+  const { positions, principalUsd } = useMemo(() => getHomeScanPortfolio(selectedUserMarketsSafe), [selectedUserMarketsSafe])
 
   const optimizeReadResult = useSupplyOptimizerReads({
     input: request,
@@ -339,10 +298,14 @@ export function useHomeMagicOptimizerScan() {
       return
     if (request)
       return
+    if (principalUsd == null || principalUsd < MIN_HOME_SCAN_PRINCIPAL_USD) {
+      advanceQueue()
+      return
+    }
     if (topMarketsQuery.isLoading || topMarketsQuery.isFetching)
       return
 
-    if (!topMarkets || topMarkets.length === 0 || topMarketsQuery.isError || positions.length === 0) {
+    if (!topMarkets || topMarkets.length === 0 || topMarketsQuery.isError) {
       advanceQueue()
       return
     }
@@ -377,9 +340,10 @@ export function useHomeMagicOptimizerScan() {
       runId,
       timestamp,
       positions,
+      principalUsd,
       markets: [...universe.values()],
     })
-  }, [activeAsset, chainId, getScanRiskStatus, isScanning, positions, request, selectedUserMarketsSafe, topMarkets, topMarketsQuery.isError, topMarketsQuery.isFetching, topMarketsQuery.isLoading])
+  }, [activeAsset, advanceQueue, chainId, getScanRiskStatus, isScanning, positions, principalUsd, request, selectedUserMarketsSafe, topMarkets, topMarketsQuery.isError, topMarketsQuery.isFetching, topMarketsQuery.isLoading])
 
   useEffect(() => {
     if (!request || !optimizeReadResult || !activeAsset)
@@ -416,7 +380,7 @@ export function useHomeMagicOptimizerScan() {
           const relativeImprovementPct = currentAprPct > 0
             ? (pct / currentAprPct) * 100
             : undefined
-          const yearlyReturnGainUsd = selectedUserMarketsUsd * (Number.isFinite(pct) ? pct / 100 : 0)
+          const yearlyReturnGainUsd = request.principalUsd * (pct / 100)
           const chainIdSafe = chainId ?? 0
           const userAddressLower = userAddress?.toLowerCase()
           const loanAssetAddressLower = activeAsset.address.toLowerCase()
@@ -494,7 +458,7 @@ export function useHomeMagicOptimizerScan() {
       active = false
       worker.terminate()
     }
-  }, [activeAsset, addOpportunity, chainId, marketAprBySymbol, noBenefitDeltaAprWad, optimizeReadResult, request, selectedUserMarketsUsd, upsertPrecomputedResult, userAddress])
+  }, [activeAsset, addOpportunity, advanceQueue, chainId, marketAprBySymbol, noBenefitDeltaAprWad, optimizeReadResult, request, upsertPrecomputedResult, userAddress])
 
   useEffect(() => {
     return () => {

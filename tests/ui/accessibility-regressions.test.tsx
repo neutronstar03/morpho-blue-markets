@@ -45,7 +45,7 @@ vi.mock('~/pages/home/blacklist-recap', () => ({ BlacklistRecap: () => null }))
 const OPEN_OPTIMIZER_EVENT = 'open-supply-apr-optimizer'
 const TX_HASH = (`0x${'a'.repeat(64)}`) as `0x${string}`
 
-function seedOpportunity() {
+function seedOpportunity(yearlyReturnGainUsd = 365) {
   useHomeMagicOptimizerStore.setState({
     opportunities: [
       {
@@ -59,7 +59,7 @@ function seedOpportunity() {
         aprGainWad: 30_000_000_000_000_000n,
         aprGainPct: 3,
         relativeImprovementPct: 4.5,
-        yearlyReturnGainUsd: 365,
+        yearlyReturnGainUsd,
         createdAt: Date.now(),
         expiresAt: Date.now() + 60_000,
       },
@@ -95,6 +95,15 @@ describe('home opportunity card accessibility', () => {
     expect(action.contains(dismiss)).toBe(false)
     expect(action.parentElement).toBe(dismiss.parentElement)
     expect(document.querySelectorAll('button button')).toHaveLength(0)
+  })
+
+  it('distinguishes APR percentage points from relative gain and shows subcent returns', () => {
+    seedOpportunity(0.5)
+    render(<HomePage />)
+
+    expect(screen.getByText('Estimated APR gain +3.00 pp')).toBeInTheDocument()
+    expect(screen.getByText('Improvement over previous +4.50%')).toBeInTheDocument()
+    expect(screen.getByText('Daily gain <$0.01 / Yearly gain +$0.50')).toBeInTheDocument()
   })
 
   it('runs the optimizer from the keyboard-focusable action control', () => {
