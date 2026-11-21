@@ -27,3 +27,44 @@ test('rejects malformed token addresses without calling upstream', async () => {
   }
   expect(fetch).not.toHaveBeenCalled()
 })
+
+test('address casing and equivalent chain parameters reuse the same positive cache entry', async () => {
+  const globals = globalThis as { caches?: unknown }
+  const originalCaches = globals.caches
+  const store = new Map<string, Response>()
+  const pending: Promise<unknown>[] = []
+  globals.caches = {
+    default: {
+      match: async (request: Request) => store.get(request.url)?.clone(),
+      put: async (request: Request, response: Response) => store.set(request.url, response),
+    },
+  }
+  const fetch = spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({
+    data: { attributes: { total_reserve_in_usd: '10000' } },
+  }))
+  try {
+    const canonicalAddress = `0x${'ab'.repeat(20)}`
+    const base = 'https://example.test/api/token-liquidity'
+    const waitUntil = (promise: Promise<unknown>) => pending.push(promise)
+    const first = await onRequestGet({
+      ...context(),
+      request: new Request(`${base}?address=0x${'AB'.repeat(20)}&chainId=01`),
+      waitUntil,
+    })
+    await Promise.all(pending)
+    const second = await onRequestGet({
+      ...context(),
+      request: new Request(`${base}?chainId=1&address=${canonicalAddress}`),
+      waitUntil,
+    })
+    expect(first.headers.get('Cache-Control')).toBe('public, max-age=3600')
+    expect(await second.json()).toEqual({ liquidityUsd: '10000' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+  }
+  finally {
+    if (originalCaches === undefined)
+      delete globals.caches
+    else
+      globals.caches = originalCaches
+  }
+})

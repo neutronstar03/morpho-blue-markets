@@ -37,21 +37,21 @@ function VaultYieldResults({ chainId, chainName, assetAddress, assetSymbol }: Pr
         {' · Listed vaults with at least $50,000 liquidity and non-negative average net APY.'}
       </p>
       <p className="text-gray-400">Average net APY is a comparison reference. It does not change the optimizer's Market APR.</p>
-      <p role="status" aria-live="polite">
-        {query.isPlaceholderData ? 'Cached vault data; refreshing live data.' : query.isError ? 'Live vault data unavailable.' : query.isFetching ? 'Loading live vault data…' : query.data ? 'Live vault data loaded.' : ''}
-      </p>
-      {query.isError && (
-        <div role="alert">
-          <p>
-            Live vault data could not be refreshed.
-            {query.data ? ' Previously loaded data may be stale.' : ''}
-          </p>
-          <Button type="button" variant="outline" onClick={() => void query.refetch()}>Retry live vault data</Button>
-        </div>
-      )}
-      {query.data && vaults.length === 0 && <p>{`No matching eligible vaults in the ${query.isPlaceholderData ? 'cached' : 'loaded'} data.`}</p>}
-      {vaults.length > 0 && (
-        <div role="region" aria-label="Vault yield table, scroll for more vaults" tabIndex={0} className="overflow-auto max-h-80 rounded border border-gray-700">
+      <div role="region" aria-label="Vault yield results" tabIndex={0} className="h-80 overflow-auto rounded border border-gray-700">
+        <p role="status" aria-live="polite" className="p-2">
+          {query.isPlaceholderData ? 'Cached vault data; refreshing live data.' : query.isError ? 'Live vault data unavailable.' : query.isFetching ? 'Loading live vault data…' : query.data ? 'Live vault data loaded.' : ''}
+        </p>
+        {query.isError && (
+          <div role="alert" className="space-y-2 p-2">
+            <p>
+              Live vault data could not be refreshed.
+              {query.data ? ' Previously loaded data may be stale.' : ''}
+            </p>
+            <Button type="button" variant="outline" onClick={() => void query.refetch()}>Retry live vault data</Button>
+          </div>
+        )}
+        {query.data && vaults.length === 0 && <p className="p-2">{`No matching eligible vaults in the ${query.isPlaceholderData ? 'cached' : 'loaded'} data.`}</p>}
+        {vaults.length > 0 && (
           <table className="w-full text-left">
             <caption className="sr-only">{`Vault yield comparison for ${chainName}${assetSymbol ? ` and ${assetSymbol}` : ''}`}</caption>
             <thead>
@@ -84,8 +84,8 @@ function VaultYieldResults({ chainId, chainName, assetAddress, assetSymbol }: Pr
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

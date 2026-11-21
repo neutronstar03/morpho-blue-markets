@@ -45,6 +45,9 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
     return errorResponse('Invalid numeric market filters', 400)
   }
 
+  const variables = { first, skip, chainId, minNetSupplyApy, maxNetSupplyApy, minBorrowUsd, minUtilization }
+  url.search = new URLSearchParams(Object.entries(variables).map(([key, value]) => [key, String(value)])).toString()
+
   return edgeCacheProxy({
     requestUrl: url.toString(),
     waitUntil: promise => context.waitUntil(promise),
@@ -56,15 +59,7 @@ export async function onRequestGet(context: EventContext<Env>): Promise<Response
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: QUERY_POPULAR_LOAN_ASSETS,
-          variables: {
-            first,
-            skip,
-            chainId,
-            minNetSupplyApy,
-            maxNetSupplyApy,
-            minBorrowUsd,
-            minUtilization,
-          },
+          variables,
         }),
       })
 
